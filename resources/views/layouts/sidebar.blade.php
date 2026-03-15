@@ -5,8 +5,8 @@
 
     {{-- Logo --}}
     <div class="flex items-center gap-3 px-5 py-4 border-b border-white/10">
-        <div class="flex-shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
-            <img src="{{ asset('icon.png') }}" alt="أيقونة النظام" class="w-8 h-8 object-contain"
+        <div class="flex-shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center" style="background-color: white;">
+            <img src="{{ asset('icon.png') }}" alt="أيقونة النظام" class="w-8 h-8 object-contain" 
                  onerror="this.parentElement.innerHTML='<svg class=\'w-5 h-5 text-white\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z\'/></svg>'">
         </div>
         <div class="min-w-0 flex-1">
