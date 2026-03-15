@@ -11,6 +11,7 @@ use App\Models\ImportBatch;
 use App\Models\Setting;
 use App\Services\Attendance\AttendanceCalculationService;
 use App\Services\Attendance\PublicHolidayService;
+use App\Services\Dashboard\DashboardStatisticsService;
 use App\Services\Employee\EmployeeService;
 use App\Services\Excel\ExcelParserService;
 use App\Services\Excel\ExcelReaderService;
@@ -27,6 +28,7 @@ class ImportService
         private readonly EmployeeService              $employeeService,
         private readonly AttendanceCalculationService $calculator,
         private readonly PublicHolidayService         $holidayService,
+        private readonly DashboardStatisticsService   $dashboardStats,
     ) {}
 
     // ===================================================
@@ -235,6 +237,8 @@ class ImportService
 
             DB::commit();
 
+            $this->dashboardStats->clearCache();
+
             return $batch->fresh();
 
         } catch (\Exception $e) {
@@ -281,6 +285,8 @@ class ImportService
             $batch->delete();
 
             DB::commit();
+
+            $this->dashboardStats->clearCache();
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
