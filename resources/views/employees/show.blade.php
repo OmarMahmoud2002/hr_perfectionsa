@@ -6,6 +6,12 @@
 
 @section('content')
 
+@php
+    $periodLabel = \Carbon\Carbon::parse($periodStart)->locale('ar')->isoFormat('D MMM')
+                 . ' — '
+                 . \Carbon\Carbon::parse($periodEnd)->locale('ar')->isoFormat('D MMM YYYY');
+@endphp
+
 {{-- Breadcrumb --}}
 <nav class="breadcrumb">
     <a href="{{ route('employees.index') }}">الموظفين</a>
@@ -114,7 +120,10 @@
         {{-- ملخص الشهر --}}
         <div class="card p-5">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-bold text-slate-700">ملخص الشهر</h3>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-700">ملخص الشهر</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">{{ $periodLabel }}</p>
+                </div>
                 <form method="GET" class="flex items-center gap-1">
                     <select name="month" onchange="this.form.submit()" class="text-xs border-0 bg-slate-100 rounded-lg px-2 py-1 focus:ring-1 focus:ring-secondary-300">
                         @foreach(range(1, 12) as $m)
@@ -172,7 +181,10 @@
     <div class="lg:col-span-2">
         <div class="card overflow-hidden">
             <div class="card-header">
-                <h3 class="text-sm font-bold text-slate-700">سجل الحضور والانصراف</h3>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-700">سجل الحضور والانصراف</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">{{ $periodLabel }}</p>
+                </div>
                 <span class="badge-gray">{{ $employee->attendanceRecords->count() }} يوم</span>
             </div>
 

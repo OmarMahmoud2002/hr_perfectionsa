@@ -38,7 +38,6 @@ Route::middleware(['auth'])->group(function () {
     // الموظفين (Admin فقط للإضافة/التعديل)
     // ================================
     Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
-    Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
 
     Route::middleware(['role:admin'])->group(function () {
         Route::get('/employees/create', [EmployeeController::class, 'create'])->name('employees.create');
@@ -47,6 +46,8 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
         Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
     });
+
+    Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
 
     // ================================
     // الاستيراد (Admin فقط)

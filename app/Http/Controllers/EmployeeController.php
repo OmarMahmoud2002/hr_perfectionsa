@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Services\Employee\EmployeeService;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -52,20 +53,17 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee, Request $request): View
     {
-        $employee->load(['attendanceRecords' => function ($q) use ($request) {
-            if ($request->filled('month') && $request->filled('year')) {
-                $q->whereYear('date', $request->year)
-                  ->whereMonth('date', $request->month);
-            } else {
-                $q->whereYear('date', now()->year)
-                  ->whereMonth('date', now()->month);
-            }
-            $q->orderBy('date');
-        }]);
+        $month = (int) $request->input('month', now()->month);
+        $year  = (int) $request->input('year', now()->year);
 
-        // ملخص إحصائيات الموظف للشهر
-        $month = $request->input('month', now()->month);
-        $year  = $request->input('year', now()->year);
+        // فترة الراتب: من 22 الشهر السابق حتى 21 الشهر الحالي
+        $periodStart = Carbon::create($year, $month, 22)->subMonthNoOverflow()->toDateString();
+        $periodEnd   = Carbon::create($year, $month, 21)->toDateString();
+
+        $employee->load(['attendanceRecords' => function ($q) use ($periodStart, $periodEnd) {
+            $q->whereBetween('date', [$periodStart, $periodEnd])
+              ->orderBy('date');
+        }]);
 
         $records = $employee->attendanceRecords;
         $stats = [
@@ -81,7 +79,7 @@ class EmployeeController extends Controller
             ->where('year', $year)
             ->first();
 
-        return view('employees.show', compact('employee', 'stats', 'payroll', 'month', 'year'));
+        return view('employees.show', compact('employee', 'stats', 'payroll', 'month', 'year', 'periodStart', 'periodEnd'));
     }
 
     /**
