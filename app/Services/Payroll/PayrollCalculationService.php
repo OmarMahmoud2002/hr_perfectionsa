@@ -257,7 +257,9 @@ class PayrollCalculationService
             'total_absent_deduction'   => $reports->sum('absent_deduction'),
             'total_overtime_bonus'     => $reports->sum('overtime_bonus'),
             'total_attendance_bonus'   => $reports->sum('attendance_bonus'),
-            'total_net_salary'         => $reports->sum('net_salary'),
+            'total_extra_bonus'        => $reports->sum('extra_bonus'),
+            'total_extra_deduction'    => $reports->sum('extra_deduction'),
+            'total_net_salary'         => $reports->sum(fn ($r) => $r->net_salary_final),
             'locked_count'             => $reports->where('is_locked', true)->count(),
         ];
     }

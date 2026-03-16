@@ -25,6 +25,9 @@ class PayrollReport extends Model
         'absent_deduction',
         'overtime_bonus',
         'attendance_bonus',
+        'extra_bonus',
+        'extra_deduction',
+        'adjustment_note',
         'net_salary',
         'is_locked',
     ];
@@ -43,6 +46,8 @@ class PayrollReport extends Model
         'absent_deduction'       => 'decimal:2',
         'overtime_bonus'         => 'decimal:2',
         'attendance_bonus'       => 'decimal:2',
+        'extra_bonus'            => 'decimal:2',
+        'extra_deduction'        => 'decimal:2',
         'net_salary'             => 'decimal:2',
         'is_locked'              => 'boolean',
     ];
@@ -73,6 +78,22 @@ class PayrollReport extends Model
     public function getTotalDeductionsAttribute(): float
     {
         return $this->late_deduction + $this->absent_deduction;
+    }
+
+    /**
+     * الصافي النهائي بعد التسوية الإضافية (بونص أو خصم يدوي)
+     */
+    public function getNetSalaryFinalAttribute(): float
+    {
+        return max(0, (float) $this->net_salary + (float) $this->extra_bonus - (float) $this->extra_deduction);
+    }
+
+    /**
+     * هل يوجد تسوية إضافية على هذا الكشف
+     */
+    public function getHasAdjustmentAttribute(): bool
+    {
+        return $this->extra_bonus > 0 || $this->extra_deduction > 0;
     }
 
     /**

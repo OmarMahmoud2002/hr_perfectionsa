@@ -84,6 +84,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/payroll/calculate', [PayrollController::class, 'showCalculateForm'])->name('payroll.calculate.form');
         Route::post('/payroll/calculate', [PayrollController::class, 'calculate'])->name('payroll.calculate');
         Route::post('/payroll/lock/{report}', [PayrollController::class, 'lock'])->name('payroll.lock');
+        Route::patch('/payroll/{report}/adjustment', [PayrollController::class, 'updateAdjustment'])->name('payroll.adjustment');
     });
 
     // ================================

@@ -9,6 +9,10 @@
 @section('page-title', 'كشف مرتبات')
 @section('page-subtitle', $monthName)
 
+@push('styles')
+<style>[x-cloak] { display: none !important; }</style>
+@endpush
+
 @section('content')
 
 {{-- Breadcrumb --}}
@@ -81,21 +85,29 @@
     </div>
     <div class="card p-4">
         <p class="text-xs text-slate-500 mb-1">إجمالي الخصومات</p>
+        @php $totalAllDeductions = $summary['total_late_deduction'] + $summary['total_absent_deduction'] + $summary['total_extra_deduction']; @endphp
         <p class="text-2xl font-black text-red-500">
-            {{ number_format($summary['total_late_deduction'] + $summary['total_absent_deduction'], 0) }}
+            {{ number_format($totalAllDeductions, 0) }}
             <span class="text-sm font-normal">ج.م</span>
         </p>
+        @if($summary['total_extra_deduction'] > 0)
+        <p class="text-xs text-red-400 mt-1">خصم إضافي: {{ number_format($summary['total_extra_deduction'], 0) }}</p>
+        @endif
     </div>
     <div class="card p-4">
         <p class="text-xs text-slate-500 mb-1">إجمالي المكافآت</p>
+        @php $totalAllBonuses = $summary['total_overtime_bonus'] + $summary['total_attendance_bonus'] + $summary['total_extra_bonus']; @endphp
         <p class="text-2xl font-black text-emerald-600">
-            {{ number_format($summary['total_overtime_bonus'] + $summary['total_attendance_bonus'], 0) }}
+            {{ number_format($totalAllBonuses, 0) }}
             <span class="text-sm font-normal">ج.م</span>
         </p>
         <p class="text-xs text-slate-400 mt-1">
             OT: {{ number_format($summary['total_overtime_bonus'], 0) }}
             @if($summary['total_attendance_bonus'] > 0)
              • حضور: {{ number_format($summary['total_attendance_bonus'], 0) }}
+            @endif
+            @if($summary['total_extra_bonus'] > 0)
+             • <span class="text-emerald-500">إضافي: {{ number_format($summary['total_extra_bonus'], 0) }}</span>
             @endif
         </p>
     </div>
@@ -167,6 +179,7 @@
                     <th class="text-left">الخصومات</th>
                     <th class="text-left">المكافآت</th>
                     <th class="text-left font-bold">صافي المرتب</th>
+                    <th class="text-center">تسوية إضافية</th>
                 </tr>
             </thead>
             <tbody>
@@ -286,12 +299,149 @@
                         @endif
                     </td>
 
-                    {{-- صافي المرتب --}}
+                    {{-- صافي المرتب (النهائي بعد التسوية) --}}
                     <td class="text-left">
                         <span class="font-black text-base" style="color: #317c77;">
-                            {{ number_format($report->net_salary, 0) }}
+                            {{ number_format($report->net_salary_final, 0) }}
                         </span>
                         <span class="text-xs text-slate-400 mr-0.5">ج.م</span>
+                        @if($report->has_adjustment)
+                        <div class="text-xs text-slate-400 mt-0.5">
+                            <span class="font-mono">{{ number_format($report->net_salary, 0) }}</span>
+                            @if($report->extra_bonus > 0)
+                                <span class="text-emerald-500 font-semibold">+{{ number_format($report->extra_bonus, 0) }}</span>
+                            @else
+                                <span class="text-red-400 font-semibold">−{{ number_format($report->extra_deduction, 0) }}</span>
+                            @endif
+                        </div>
+                        @endif
+                    </td>
+
+                    {{-- تسوية إضافية (بونص أو خصم يدوي) --}}
+                    <td class="px-3 py-2 text-center align-top">
+                        @php
+                            $adjType   = $report->extra_bonus > 0 ? 'bonus' : ($report->extra_deduction > 0 ? 'deduction' : 'bonus');
+                            $adjAmount = $report->extra_bonus > 0 ? (float)$report->extra_bonus : ((float)$report->extra_deduction > 0 ? (float)$report->extra_deduction : '');
+                        @endphp
+
+                        @if(auth()->user()->isAdmin())
+                        <div x-data="{ open: false, type: '{{ $adjType }}', amount: '{{ $adjAmount }}' }">
+
+                            {{-- عرض القيمة الحالية --}}
+                            <div x-show="!open" class="flex items-center justify-center gap-1.5">
+                                @if($report->extra_bonus > 0)
+                                    <span class="text-xs font-bold text-emerald-600"
+                                          title="{{ $report->adjustment_note }}">
+                                        +{{ number_format($report->extra_bonus, 0) }}
+                                    </span>
+                                @elseif($report->extra_deduction > 0)
+                                    <span class="text-xs font-bold text-red-500"
+                                          title="{{ $report->adjustment_note }}">
+                                        −{{ number_format($report->extra_deduction, 0) }}
+                                    </span>
+                                @else
+                                    <span class="text-slate-300 text-xs">—</span>
+                                @endif
+
+                                @if(!$report->is_locked)
+                                <button @click.prevent="open = true" type="button"
+                                        title="تعديل التسوية"
+                                        class="text-slate-300 hover:text-secondary-500 transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </button>
+                                @endif
+                            </div>
+
+                            {{-- نموذج التعديل --}}
+                            <div x-show="open" x-cloak
+                                 class="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-right min-w-[210px] space-y-2 mt-1">
+                                <form method="POST" action="{{ route('payroll.adjustment', $report) }}"
+                                      class="space-y-2">
+                                    @csrf
+                                    @method('PATCH')
+
+                                    {{-- نوع التسوية --}}
+                                    <div class="flex gap-3 justify-center">
+                                        <label class="flex items-center gap-1 cursor-pointer">
+                                            <input type="radio" name="adjustment_type" value="bonus"
+                                                   :checked="type === 'bonus'"
+                                                   @change="type = 'bonus'"
+                                                   class="accent-emerald-500 w-3.5 h-3.5">
+                                            <span class="text-xs font-bold text-emerald-600">بونص +</span>
+                                        </label>
+                                        <label class="flex items-center gap-1 cursor-pointer">
+                                            <input type="radio" name="adjustment_type" value="deduction"
+                                                   :checked="type === 'deduction'"
+                                                   @change="type = 'deduction'"
+                                                   class="accent-red-500 w-3.5 h-3.5">
+                                            <span class="text-xs font-bold text-red-500">خصم −</span>
+                                        </label>
+                                    </div>
+
+                                    {{-- المبلغ --}}
+                                    <input type="number" name="adjustment_amount"
+                                           x-model="amount"
+                                           step="1" min="0"
+                                           placeholder="المبلغ بالجنيه"
+                                           class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-secondary-400 bg-white text-slate-700 placeholder-slate-300">
+
+                                    {{-- ملاحظة --}}
+                                    <input type="text" name="adjustment_note"
+                                           value="{{ old('adjustment_note', $report->adjustment_note) }}"
+                                           placeholder="ملاحظة (اختياري)"
+                                           maxlength="255"
+                                           class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-secondary-400 bg-white text-slate-700 placeholder-slate-300">
+
+                                    {{-- أزرار --}}
+                                    <div class="flex gap-1.5">
+                                        <button type="submit"
+                                                class="flex-1 text-xs font-semibold text-white rounded-lg py-1.5 px-2 transition-colors"
+                                                :class="type === 'bonus' ? 'bg-green-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'">
+                                            حفظ
+                                        </button>
+                                        <button type="button" @click="open = false"
+                                                class="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg py-1.5 px-2 bg-white transition-colors">
+                                            إلغاء
+                                        </button>
+                                    </div>
+                                </form>
+
+                                {{-- زر مسح التسوية إذا كان هناك قيمة --}}
+                                @if($report->has_adjustment)
+                                <form method="POST" action="{{ route('payroll.adjustment', $report) }}">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="hidden" name="adjustment_type" value="none">
+                                    <input type="hidden" name="adjustment_amount" value="0">
+                                    <button type="submit"
+                                            class="w-full text-xs text-slate-400 hover:text-red-400 transition-colors py-1">
+                                        مسح التسوية
+                                    </button>
+                                </form>
+                                @endif
+                            </div>
+
+                        </div>
+
+                        @else
+                        {{-- عرض فقط (غير أدمن) --}}
+                        @if($report->extra_bonus > 0)
+                            <span class="text-xs font-bold text-emerald-600"
+                                  title="{{ $report->adjustment_note }}">
+                                +{{ number_format($report->extra_bonus, 0) }}
+                            </span>
+                        @elseif($report->extra_deduction > 0)
+                            <span class="text-xs font-bold text-red-500"
+                                  title="{{ $report->adjustment_note }}">
+                                −{{ number_format($report->extra_deduction, 0) }}
+                            </span>
+                        @else
+                            <span class="text-slate-300 text-xs">—</span>
+                        @endif
+                        @endif
                     </td>
                 </tr>
                 @endforeach
@@ -315,6 +465,20 @@
                     <td class="px-4 py-3 font-black text-base" style="color: #317c77;">
                         {{ number_format($summary['total_net_salary'], 0) }}
                         <span class="text-xs font-normal text-slate-400 mr-0.5">ج.م</span>
+                    </td>
+                    <td class="px-4 py-3 text-center text-xs font-semibold">
+                        @if($summary['total_extra_bonus'] > 0)
+                            <span class="text-emerald-600">+{{ number_format($summary['total_extra_bonus'], 0) }}</span>
+                        @endif
+                        @if($summary['total_extra_bonus'] > 0 && $summary['total_extra_deduction'] > 0)
+                            <span class="text-slate-300 mx-0.5">/</span>
+                        @endif
+                        @if($summary['total_extra_deduction'] > 0)
+                            <span class="text-red-500">−{{ number_format($summary['total_extra_deduction'], 0) }}</span>
+                        @endif
+                        @if($summary['total_extra_bonus'] == 0 && $summary['total_extra_deduction'] == 0)
+                            <span class="text-slate-300">—</span>
+                        @endif
                     </td>
                 </tr>
             </tfoot>

@@ -154,6 +154,45 @@ class PayrollController extends Controller
     }
 
     /**
+     * تحديث التسوية الإضافية (بونص أو خصم يدوي)
+     */
+    public function updateAdjustment(Request $request, PayrollReport $report): RedirectResponse
+    {
+        if ($report->is_locked) {
+            return back()->with('error', 'كشف الراتب مؤمَّن — قم بإلغاء التأمين أولاً قبل تعديل التسوية.');
+        }
+
+        $validated = $request->validate([
+            'adjustment_type'   => ['required', 'in:bonus,deduction,none'],
+            'adjustment_amount' => ['required_unless:adjustment_type,none', 'nullable', 'numeric', 'min:0'],
+            'adjustment_note'   => ['nullable', 'string', 'max:255'],
+        ], [
+            'adjustment_type.required'  => 'نوع التسوية مطلوب.',
+            'adjustment_amount.numeric' => 'المبلغ يجب أن يكون رقماً.',
+            'adjustment_amount.min'     => 'المبلغ لا يمكن أن يكون بالسالب.',
+        ]);
+
+        $extraBonus     = 0;
+        $extraDeduction = 0;
+
+        if ($validated['adjustment_type'] === 'bonus') {
+            $extraBonus = (float) ($validated['adjustment_amount'] ?? 0);
+        } elseif ($validated['adjustment_type'] === 'deduction') {
+            $extraDeduction = (float) ($validated['adjustment_amount'] ?? 0);
+        }
+        // none → يصفّر التسوية
+
+        $report->update([
+            'extra_bonus'     => $extraBonus,
+            'extra_deduction' => $extraDeduction,
+            'adjustment_note' => $validated['adjustment_note'] ?? null,
+        ]);
+
+        $name = $report->employee?->name ?? 'الموظف';
+        return back()->with('success', "تم تحديث التسوية للموظف «{$name}».");
+    }
+
+    /**
      * تأمين كشف الراتب
      */
     public function lock(PayrollReport $report): RedirectResponse
