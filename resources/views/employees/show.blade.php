@@ -163,6 +163,13 @@
                 </div>
             </div>
 
+            @if(($stats['weekly_leave'] ?? 0) > 0)
+            <div class="flex items-center justify-between p-3 rounded-xl mt-3" style="background:#ede9fe;">
+                <span class="text-xs font-medium" style="color:#7c3aed;">إجازات أسبوعية</span>
+                <span class="font-bold" style="color:#7c3aed;">{{ $stats['weekly_leave'] }} يوم</span>
+            </div>
+            @endif
+
             @if($payroll)
             <div class="mt-3 pt-3 border-t border-slate-100">
                 <div class="flex items-center justify-between">
@@ -185,74 +192,107 @@
                     <h3 class="text-sm font-bold text-slate-700">سجل الحضور والانصراف</h3>
                     <p class="text-xs text-slate-400 mt-0.5">{{ $periodLabel }}</p>
                 </div>
-                <span class="badge-gray">{{ $employee->attendanceRecords->count() }} يوم</span>
+                <span class="badge-gray">{{ $dailyBreakdown->count() }} يوم</span>
             </div>
 
-            @if($employee->attendanceRecords->count() > 0)
+            @if($dailyBreakdown->isNotEmpty())
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
                             <th>التاريخ</th>
                             <th>اليوم</th>
-                            <th>الحضور</th>
-                            <th>الانصراف</th>
-                            <th>التأخير</th>
-                            <th>Overtime</th>
+                            <th class="text-center">الحضور</th>
+                            <th class="text-center">الانصراف</th>
+                            <th class="text-center">التأخير</th>
+                            <th class="text-center">Overtime</th>
                             <th>الحالة</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($employee->attendanceRecords as $record)
-                        <tr class="{{ $record->is_absent ? 'bg-red-50/50' : '' }}">
-                            <td class="font-mono text-xs text-slate-600">{{ $record->date->format('Y-m-d') }}</td>
-                            <td class="text-xs text-slate-500">{{ $record->date->locale('ar')->isoFormat('dddd') }}</td>
-                            <td>
-                                @if($record->clock_in)
-                                    <span class="{{ $record->late_minutes > 0 ? 'text-amber-600 font-semibold' : 'text-slate-700' }}">
-                                        {{ substr($record->clock_in, 0, 5) }}
-                                    </span>
-                                @else
+                        @foreach($dailyBreakdown as $day)
+                        @php
+                            $rowClass = match($day['status']) {
+                                'present'        => 'bg-emerald-50/40',
+                                'late'           => 'bg-amber-50/40',
+                                'absent'         => 'bg-red-50/40',
+                                'public_holiday' => 'bg-sky-50/40',
+                                'friday'         => 'bg-slate-50/60 opacity-70',
+                                'weekly_leave'   => 'bg-purple-50/60 opacity-80',
+                                default          => '',
+                            };
+                            $record = $day['record'];
+                        @endphp
+                        <tr class="{{ $rowClass }}">
+                            <td class="font-mono text-xs text-slate-600">{{ $day['date']->format('Y-m-d') }}</td>
+                            <td class="text-sm text-slate-600">{{ $day['day_name'] }}</td>
+
+                            {{-- الحضور --}}
+                            <td class="text-center">
+                                @if($record && $record->clock_in)
+                                    <span class="font-mono text-xs font-semibold text-slate-700">{{ substr($record->clock_in, 0, 5) }}</span>
+                                @elseif(in_array($day['status'], ['friday', 'public_holiday', 'weekly_leave']))
                                     <span class="text-slate-300">—</span>
+                                @else
+                                    <span class="text-red-400 text-xs">غائب</span>
                                 @endif
                             </td>
-                            <td>
-                                @if($record->clock_out)
-                                    <span class="{{ $record->overtime_minutes > 0 ? 'text-secondary-600 font-semibold' : 'text-slate-700' }}">
-                                        {{ substr($record->clock_out, 0, 5) }}
-                                    </span>
-                                @else
+
+                            {{-- الانصراف --}}
+                            <td class="text-center">
+                                @if($record && $record->clock_out)
+                                    <span class="font-mono text-xs font-semibold text-slate-700">{{ substr($record->clock_out, 0, 5) }}</span>
+                                @elseif(in_array($day['status'], ['friday', 'public_holiday', 'weekly_leave']))
                                     <span class="text-slate-300">—</span>
+                                @else
+                                    <span class="text-slate-300 text-xs">—</span>
                                 @endif
                             </td>
-                            <td>
-                                @if($record->late_minutes > 0)
-                                    <span class="text-amber-600 font-semibold text-xs">
-                                        {{ floor($record->late_minutes/60) > 0 ? floor($record->late_minutes/60).'س ' : '' }}{{ $record->late_minutes % 60 }}د
+
+                            {{-- التأخير --}}
+                            <td class="text-center">
+                                @if($record && $record->late_minutes > 0)
+                                    <span class="text-xs font-semibold text-amber-600">
+                                        {{ floor($record->late_minutes / 60) > 0 ? floor($record->late_minutes / 60) . 'س ' : '' }}{{ $record->late_minutes % 60 }}د
                                     </span>
                                 @else
                                     <span class="text-slate-300 text-xs">—</span>
                                 @endif
                             </td>
-                            <td>
-                                @if($record->overtime_minutes > 0)
-                                    <span class="font-semibold text-xs" style="color: #31719d;">
-                                        {{ floor($record->overtime_minutes/60) > 0 ? floor($record->overtime_minutes/60).'س ' : '' }}{{ $record->overtime_minutes % 60 }}د
+
+                            {{-- Overtime --}}
+                            <td class="text-center">
+                                @if($record && $record->overtime_minutes > 0)
+                                    <span class="text-xs font-semibold" style="color: #31719d;">
+                                        {{ floor($record->overtime_minutes / 60) > 0 ? floor($record->overtime_minutes / 60) . 'س ' : '' }}{{ $record->overtime_minutes % 60 }}د
                                     </span>
                                 @else
                                     <span class="text-slate-300 text-xs">—</span>
                                 @endif
                             </td>
+
+                            {{-- الحالة --}}
                             <td>
-                                @if($record->is_absent)
-                                    <span class="badge-danger">غياب</span>
-                                @elseif($record->notes && str_contains($record->notes, 'إجازة رسمية'))
-                                    <span class="badge-teal">إجازة</span>
-                                @elseif($record->late_minutes > 0)
-                                    <span class="badge-warning">متأخر</span>
-                                @else
-                                    <span class="badge-success">حضر</span>
-                                @endif
+                                @switch($day['status'])
+                                    @case('present')
+                                        <span class="badge-success">حاضر</span>
+                                        @break
+                                    @case('late')
+                                        <span class="badge-warning">متأخر</span>
+                                        @break
+                                    @case('absent')
+                                        <span class="badge-danger">غائب</span>
+                                        @break
+                                    @case('public_holiday')
+                                        <span class="badge-info">إجازة رسمية</span>
+                                        @break
+                                    @case('friday')
+                                        <span class="badge-gray">جمعة</span>
+                                        @break
+                                    @case('weekly_leave')
+                                        <span class="badge" style="background:#ede9fe;color:#7c3aed;border:1px solid #ddd6fe;">إجازة أسبوعية</span>
+                                        @break
+                                @endswitch
                             </td>
                         </tr>
                         @endforeach

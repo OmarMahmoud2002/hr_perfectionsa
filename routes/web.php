@@ -73,6 +73,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/attendance/employee/{employee}', [AttendanceController::class, 'employeeReport'])->name('attendance.employee');
     Route::get('/attendance/employee/{employee}/export', [AttendanceController::class, 'exportEmployee'])->name('attendance.employee.export');
 
+    // تغيير حالة يوم (للمديرين فقط)
+    Route::middleware(['role:admin'])->group(function () {
+        Route::patch('/attendance/employee/{employee}/{date}/status', [AttendanceController::class, 'updateDayStatus'])
+            ->name('attendance.record.status')
+            ->where('date', '\d{4}-\d{2}-\d{2}');
+    });
+
     // ================================
     // المرتبات
     // ================================

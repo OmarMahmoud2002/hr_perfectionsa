@@ -193,7 +193,14 @@
                                 {{ mb_substr($report->employee?->name ?? '?', 0, 1) }}
                             </div>
                             <div>
-                                <p class="font-semibold text-slate-800 text-sm">{{ $report->employee?->name ?? '(موظف محذوف)' }}</p>
+                                @if($report->employee)
+                                <a href="{{ route('attendance.employee', [$report->employee->id, 'month' => $month, 'year' => $year]) }}"
+                                   class="font-semibold text-slate-800 text-sm hover:text-secondary-600 transition-colors">
+                                    {{ $report->employee->name }}
+                                </a>
+                                @else
+                                <p class="font-semibold text-slate-800 text-sm">(موظف محذوف)</p>
+                                @endif
                                 <p class="text-xs text-slate-400 font-mono">{{ $report->employee?->ac_no ?? '—' }}</p>
                             </div>
                             @if($report->is_locked)
@@ -399,7 +406,7 @@
                                     <div class="flex gap-1.5">
                                         <button type="submit"
                                                 class="flex-1 text-xs font-semibold text-white rounded-lg py-1.5 px-2 transition-colors"
-                                                :class="type === 'bonus' ? 'bg-green-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'">
+                                                :style="type === 'bonus' ? 'background-color:#22c55e;' : 'background-color:#ef4444;'">
                                             حفظ
                                         </button>
                                         <button type="button" @click="open = false"

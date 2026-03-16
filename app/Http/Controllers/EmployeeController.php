@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ImportStatus;
 use App\Models\Employee;
+use App\Models\ImportBatch;
+use App\Services\Attendance\AbsenceDetectionService;
+use App\Services\Attendance\PublicHolidayService;
 use App\Services\Employee\EmployeeService;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
@@ -14,7 +18,9 @@ use Illuminate\View\View;
 class EmployeeController extends Controller
 {
     public function __construct(
-        private readonly EmployeeService $employeeService
+        private readonly EmployeeService $employeeService,
+        private readonly AbsenceDetectionService $absenceService,
+        private readonly PublicHolidayService $holidayService,
     ) {}
 
     /**
@@ -60,17 +66,25 @@ class EmployeeController extends Controller
         $periodStart = Carbon::create($year, $month, 22)->subMonthNoOverflow()->toDateString();
         $periodEnd   = Carbon::create($year, $month, 21)->toDateString();
 
-        $employee->load(['attendanceRecords' => function ($q) use ($periodStart, $periodEnd) {
-            $q->whereBetween('date', [$periodStart, $periodEnd])
-              ->orderBy('date');
-        }]);
+        // جلب batch والإجازات الرسمية
+        $batch = ImportBatch::where('month', $month)
+            ->where('year', $year)
+            ->where('status', ImportStatus::Completed)
+            ->first();
 
-        $records = $employee->attendanceRecords;
+        $publicHolidays = $batch ? $this->holidayService->getHolidayDates($batch) : [];
+
+        // التفاصيل اليومية مع تطبيق قاعدة الإجازة الأسبوعية
+        $dailyBreakdown = $this->absenceService->getDailyBreakdown($employee, $month, $year, $publicHolidays);
+
+        // الإحصائيات الصحيحة
+        $monthlyStats = $this->absenceService->getMonthlyStats($employee, $month, $year, $publicHolidays);
         $stats = [
-            'present'  => $records->where('is_absent', false)->count(),
-            'absent'   => $records->where('is_absent', true)->count(),
-            'late'     => $records->sum('late_minutes'),
-            'overtime' => $records->sum('overtime_minutes'),
+            'present'      => $monthlyStats['total_present_days'],
+            'absent'       => $monthlyStats['total_absent_days'],
+            'late'         => $monthlyStats['total_late_minutes'],
+            'overtime'     => $monthlyStats['total_overtime_minutes'],
+            'weekly_leave' => $monthlyStats['total_weekly_leave_days'],
         ];
 
         // أحدث راتب
@@ -79,7 +93,7 @@ class EmployeeController extends Controller
             ->where('year', $year)
             ->first();
 
-        return view('employees.show', compact('employee', 'stats', 'payroll', 'month', 'year', 'periodStart', 'periodEnd'));
+        return view('employees.show', compact('employee', 'stats', 'payroll', 'month', 'year', 'periodStart', 'periodEnd', 'dailyBreakdown'));
     }
 
     /**

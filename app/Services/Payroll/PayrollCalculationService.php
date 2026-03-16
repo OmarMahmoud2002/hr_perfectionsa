@@ -136,6 +136,9 @@ class PayrollCalculationService
                 'overtime_bonus'         => $overtimeBonus,
                 'attendance_bonus'       => $attendanceBonus,
                 'net_salary'             => $netSalary,
+                'extra_bonus'            => 0,
+                'extra_deduction'        => 0,
+                'adjustment_note'        => null,
                 // لا نعيد ضبط is_locked إذا كان محفوظاً — فقط نحدّثه إذا لم يكن مؤمناً
             ]
         );

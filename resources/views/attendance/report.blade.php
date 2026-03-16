@@ -201,7 +201,9 @@
                     $absentDays  = $stat['total_absent_days'];
                     $lateMin     = $stat['total_late_minutes'];
                     $otMin       = $stat['total_overtime_minutes'];
-                    $rate        = $workDays > 0 ? round(($presentDays / $workDays) * 100) : 0;
+                    $weeklyLeaveDays = $stat['total_weekly_leave_days'] ?? 0;
+                    $effectiveWorkDays = $workDays - $weeklyLeaveDays;
+                    $rate        = $effectiveWorkDays > 0 ? round(($presentDays / $effectiveWorkDays) * 100) : 0;
                 @endphp
                 <tr>
                     {{-- الموظف --}}

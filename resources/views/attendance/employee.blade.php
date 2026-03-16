@@ -2,6 +2,7 @@
 
 @php
     $monthName = \Carbon\Carbon::create($year, $month, 1)->locale('ar')->isoFormat('MMMM YYYY');
+    $isAdmin   = auth()->user()->role === 'admin';
 @endphp
 
 @section('title', 'حضور ' . $employee->name . ' — ' . $monthName)
@@ -116,7 +117,7 @@
             </a>
 
             {{-- حساب المرتب (للمديرين فقط) --}}
-            @if(auth()->user()->role === 'admin')
+            @if($isAdmin)
             <a href="{{ route('payroll.calculate.form') }}?month={{ $month }}&year={{ $year }}&employee_id={{ $employee->id }}"
                class="btn-primary w-full justify-center text-sm flex items-center gap-2">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,6 +138,14 @@
                 <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-sky-100 border border-sky-300 flex-shrink-0"></span><span class="text-slate-600">إجازة رسمية</span></div>
                 <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-slate-100 border border-slate-300 flex-shrink-0"></span><span class="text-slate-600">جمعة</span></div>
                 <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-purple-100 border border-purple-300 flex-shrink-0"></span><span class="text-slate-600">إجازة أسبوعية</span></div>
+                @if($isAdmin)
+                <div class="flex items-center gap-2 pt-1 border-t border-slate-100 mt-1">
+                    <svg class="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    <span class="text-slate-500">أيقونة القلم = حالة يدوية</span>
+                </div>
+                @endif
             </div>
         </div>
     </div>
@@ -160,6 +169,9 @@
                             <th class="text-center">التأخير</th>
                             <th class="text-center">Overtime</th>
                             <th>الحالة</th>
+                            @if($isAdmin)
+                            <th class="text-center">إجراء</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
@@ -174,7 +186,8 @@
                                 'weekly_leave'   => 'bg-purple-50/60 opacity-80',
                                 default          => '',
                             };
-                            $record = $day['record'];
+                            $record    = $day['record'];
+                            $isManual  = $record && $record->manual_status;
                         @endphp
                         <tr class="{{ $rowClass }}">
                             {{-- التاريخ --}}
@@ -233,35 +246,64 @@
 
                             {{-- الحالة --}}
                             <td>
-                                @switch($day['status'])
-                                    @case('present')
-                                        <span class="badge-success">حاضر</span>
-                                        @break
-                                    @case('late')
-                                        <span class="badge-warning">متأخر</span>
-                                        @break
-                                    @case('absent')
-                                        <span class="badge-danger">غائب</span>
-                                        @break
-                                    @case('public_holiday')
-                                        <span class="badge-info">إجازة رسمية</span>
-                                        @break
-                                    @case('friday')
-                                        <span class="badge-gray">جمعة</span>
-                                        @break
-                                    @case('weekly_leave')
-                                        <span class="badge" style="background:#ede9fe;color:#7c3aed;border:1px solid #ddd6fe;">إجازة أسبوعية</span>
-                                        @break
-                                @endswitch
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    @switch($day['status'])
+                                        @case('present')
+                                            <span class="badge-success">حاضر</span>
+                                            @break
+                                        @case('late')
+                                            <span class="badge-warning">متأخر</span>
+                                            @break
+                                        @case('absent')
+                                            <span class="badge-danger">غائب</span>
+                                            @break
+                                        @case('public_holiday')
+                                            <span class="badge-info">إجازة رسمية</span>
+                                            @break
+                                        @case('friday')
+                                            <span class="badge-gray">جمعة</span>
+                                            @break
+                                        @case('weekly_leave')
+                                            <span class="badge" style="background:#ede9fe;color:#7c3aed;border:1px solid #ddd6fe;">إجازة أسبوعية</span>
+                                            @break
+                                    @endswitch
 
-                                @if($record && $record->notes)
-                                    <span class="mr-1 text-xs text-slate-400" title="{{ $record->notes }}">
-                                        <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                        </svg>
-                                    </span>
-                                @endif
+                                    {{-- مؤشر الحالة اليدوية --}}
+                                    @if($isManual)
+                                        <span title="حالة يدوية" class="text-orange-400 flex-shrink-0">
+                                            <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </span>
+                                    @endif
+
+                                    @if($record && $record->notes && !$isManual)
+                                        <span class="mr-1 text-xs text-slate-400" title="{{ $record->notes }}">
+                                            <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
+
+                            {{-- زر التغيير (admin فقط) --}}
+                            @if($isAdmin)
+                            <td class="text-center">
+                                <button type="button"
+                                        class="status-change-btn text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                                        data-date="{{ $day['date']->format('Y-m-d') }}"
+                                        data-date-label="{{ $day['day_name'] }} {{ $day['date']->format('Y-m-d') }}"
+                                        data-current="{{ $day['status'] }}"
+                                        data-is-manual="{{ $isManual ? '1' : '0' }}"
+                                        data-url="{{ route('attendance.record.status', [$employee->id, $day['date']->format('Y-m-d')]) }}">
+                                    <svg class="w-3.5 h-3.5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                    تغيير
+                                </button>
+                            </td>
+                            @endif
                         </tr>
                         @endforeach
                     </tbody>
@@ -271,4 +313,164 @@
     </div>
 </div>
 
+{{-- ======================== مودال تغيير الحالة (admin) ======================== --}}
+@if($isAdmin)
+<div id="status-modal" style="display:none" role="dialog" aria-modal="true"
+     class="fixed inset-0 z-[998] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="status-modal-backdrop"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
+         style="transform:scale(0.9);opacity:0;transition:all 0.15s ease;" id="status-modal-box">
+
+        {{-- العنوان --}}
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-800">تغيير حالة اليوم</h3>
+                <p id="status-modal-date" class="text-xs text-slate-500 mt-0.5"></p>
+            </div>
+            <button type="button" id="status-modal-close"
+                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        {{-- الحالة الحالية --}}
+        <p class="text-xs text-slate-500 mb-3">
+            الحالة الحالية:
+            <span id="status-modal-current" class="font-semibold text-slate-700"></span>
+        </p>
+
+        {{-- النموذج المخفي --}}
+        <form id="status-change-form" method="POST" action="">
+            @csrf
+            @method('PATCH')
+            <input type="hidden" name="status" id="status-hidden-input" value="">
+
+            {{-- أزرار الحالات --}}
+            <div class="grid grid-cols-2 gap-2 mb-4">
+                <button type="button" class="status-option-btn flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 border-transparent text-sm font-medium transition-all hover:scale-[1.02]"
+                        data-value="present"
+                        style="background:#f0fdf4;color:#166534;border-color:#bbf7d0;">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                    حاضر
+                </button>
+                <button type="button" class="status-option-btn flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 border-transparent text-sm font-medium transition-all hover:scale-[1.02]"
+                        data-value="absent"
+                        style="background:#fff1f2;color:#9f1239;border-color:#fecdd3;">
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0"></span>
+                    غائب
+                </button>
+                <button type="button" class="status-option-btn flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 border-transparent text-sm font-medium transition-all hover:scale-[1.02]"
+                        data-value="weekly_leave"
+                        style="background:#faf5ff;color:#6b21a8;border-color:#e9d5ff;">
+                    <span class="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+                    إجازة أسبوعية
+                </button>
+                <button type="button" class="status-option-btn flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 border-transparent text-sm font-medium transition-all hover:scale-[1.02]"
+                        data-value="public_holiday"
+                        style="background:#f0f9ff;color:#075985;border-color:#bae6fd;">
+                    <span class="w-2.5 h-2.5 rounded-full bg-sky-500 flex-shrink-0"></span>
+                    إجازة رسمية
+                </button>
+            </div>
+
+            {{-- زر إعادة التعيين التلقائي --}}
+            <div id="status-reset-row" class="hidden mb-4">
+                <button type="button" class="status-option-btn w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-all"
+                        data-value="auto"
+                        style="background:#fff7ed;color:#9a3412;border-color:#fed7aa;">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    إعادة للحساب التلقائي
+                </button>
+            </div>
+
+            {{-- زر الإلغاء --}}
+            <button type="button" id="status-modal-cancel"
+                    class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors">
+                إلغاء
+            </button>
+        </form>
+    </div>
+</div>
+@endif
+
 @endsection
+
+@if($isAdmin)
+@push('scripts')
+<script>
+(function () {
+    var modal   = document.getElementById('status-modal');
+    var modalBox = document.getElementById('status-modal-box');
+    var form    = document.getElementById('status-change-form');
+    var hiddenInput = document.getElementById('status-hidden-input');
+    var dateLabel   = document.getElementById('status-modal-date');
+    var currentLbl  = document.getElementById('status-modal-current');
+    var resetRow    = document.getElementById('status-reset-row');
+
+    var statusNames = {
+        present:        'حاضر',
+        late:           'متأخر',
+        absent:         'غائب',
+        weekly_leave:   'إجازة أسبوعية',
+        public_holiday: 'إجازة رسمية',
+        friday:         'جمعة',
+    };
+
+    function openModal(btn) {
+        var date      = btn.getAttribute('data-date');
+        var dateL     = btn.getAttribute('data-date-label');
+        var current   = btn.getAttribute('data-current');
+        var isManual  = btn.getAttribute('data-is-manual') === '1';
+        var url       = btn.getAttribute('data-url');
+
+        form.action   = url;
+        dateLabel.textContent  = dateL;
+        currentLbl.textContent = statusNames[current] || current;
+        hiddenInput.value = '';
+
+        // إظهار زر إعادة التعيين فقط إذا كانت الحالة يدوية
+        if (isManual) {
+            resetRow.classList.remove('hidden');
+        } else {
+            resetRow.classList.add('hidden');
+        }
+
+        modal.style.display = 'flex';
+        requestAnimationFrame(function () {
+            modalBox.style.opacity   = '1';
+            modalBox.style.transform = 'scale(1)';
+        });
+    }
+
+    function closeModal() {
+        modalBox.style.opacity   = '0';
+        modalBox.style.transform = 'scale(0.9)';
+        setTimeout(function () { modal.style.display = 'none'; }, 150);
+    }
+
+    // فتح المودال
+    document.querySelectorAll('.status-change-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { openModal(btn); });
+    });
+
+    // إغلاق المودال
+    document.getElementById('status-modal-backdrop').addEventListener('click', closeModal);
+    document.getElementById('status-modal-close').addEventListener('click', closeModal);
+    document.getElementById('status-modal-cancel').addEventListener('click', closeModal);
+
+    // النقر على أحد خيارات الحالة
+    document.querySelectorAll('.status-option-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var value = btn.getAttribute('data-value');
+            hiddenInput.value = value;
+            form.submit();
+        });
+    });
+})();
+</script>
+@endpush
+@endif

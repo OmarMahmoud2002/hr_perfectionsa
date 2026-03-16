@@ -20,28 +20,15 @@ class AbsenceDetectionService
     /**
      * حساب ملخص الحضور الشهري لموظف واحد
      *
-     * @param  Employee  $employee
-     * @param  int       $month
-     * @param  int       $year
-     * @param  array     $publicHolidays  تواريخ الإجازات الرسمية (Y-m-d)
-     * @return array{
-     *   total_working_days: int,
-     *   total_present_days: int,
-     *   total_absent_days: int,
-     *   total_late_minutes: int,
-     *   total_overtime_minutes: int,
-     *   records: Collection
-     * }
+     * قاعدة manual_status:
+     *   - 'absent'        → غياب حقيقي دائماً (يتجاوز خوارزمية الإجازة الأسبوعية)
+     *   - 'present'       → حضور دائماً (حتى لو is_absent=true في البيانات الأصلية)
+     *   - 'weekly_leave'  → إجازة أسبوعية دائماً
+     *   - 'public_holiday'→ يُضاف لقائمة الإجازات الرسمية ويُستبعد من أيام العمل
+     *   - null            → يُحسب تلقائياً من البيانات الأصلية (is_absent, clock_in…)
      */
     public function getMonthlyStats(Employee $employee, int $month, int $year, array $publicHolidays = []): array
     {
-        // أيام العمل المفترضة في فترة الراتب (22 شهر سابق → 21 شهر حالي)
-        $workingDays = $this->workingDaysService->getWorkingDays(
-            $month,
-            $year,
-            $publicHolidays
-        );
-
         // فترة الراتب
         $periodStart = Carbon::create($year, $month, 22)->subMonthNoOverflow()->toDateString();
         $periodEnd   = Carbon::create($year, $month, 21)->toDateString();
@@ -52,11 +39,27 @@ class AbsenceDetectionService
             ->get()
             ->keyBy(fn ($r) => Carbon::parse($r->date)->toDateString());
 
+        // إضافة أيام الإجازات الرسمية المعيّنة يدوياً إلى قائمة الإجازات
+        // حتى تُستبعد من workingDays في WorkingDaysService
+        $manualPublicHolidayDates = $records
+            ->where('manual_status', 'public_holiday')
+            ->keys()
+            ->toArray();
+
+        $effectivePublicHolidays = array_unique(array_merge($publicHolidays, $manualPublicHolidayDates));
+
+        // أيام العمل المفترضة في فترة الراتب (22 شهر سابق → 21 شهر حالي)
+        $workingDays = $this->workingDaysService->getWorkingDays(
+            $month,
+            $year,
+            $effectivePublicHolidays
+        );
+
         // --- الخطوة الأولى: تحديد الأسابيع التي غاب فيها الموظف طوال الأسبوع ---
-        // (موظف مثلاً رحل يوم 10، فكل الأيام من 11→21 غياب كامل في أسابيعها)
-        // هذه الأسابيع لا تستحق إجازة أسبوعية لأن الموظف لم يحضر أصلاً
+        // manual_status يُؤخذ بعين الاعتبار لتحديد هل اليوم غياب أم لا
         $weekWorkingDaysCount = [];
-        $weekAbsentDaysCount  = [];
+        $weekAbsentDaysCount  = [];   // غياب حقيقي فقط (لحساب fullyAbsentWeeks وخصم أيام الغياب)
+        $weekNonPresentCount  = [];   // غياب + إجازة أسبوعية (لحساب بونص الحضور الكامل)
 
         foreach ($workingDays as $day) {
             $dateStr          = $day->toDateString();
@@ -67,21 +70,33 @@ class AbsenceDetectionService
 
             $weekWorkingDaysCount[$weekKey] = ($weekWorkingDaysCount[$weekKey] ?? 0) + 1;
 
-            if ($record === null || $record->is_absent) {
+            // غياب حقيقي (manual absent | auto absent)
+            $isAbsent = $this->resolveIsAbsent($record);
+
+            // غير حاضر: يشمل الغياب الحقيقي + الإجازة الأسبوعية (يدوية أو تلقائية)
+            // الإجازة الأسبوعية اليدوية: manual_status='weekly_leave'
+            // الإجازة الأسبوعية التلقائية: record=null أو is_absent=true (سيُحتسب عبر resolveIsAbsent)
+            $isNonPresent = $isAbsent || $record?->manual_status === 'weekly_leave';
+
+            if ($isAbsent) {
                 $weekAbsentDaysCount[$weekKey] = ($weekAbsentDaysCount[$weekKey] ?? 0) + 1;
+            }
+            if ($isNonPresent) {
+                $weekNonPresentCount[$weekKey] = ($weekNonPresentCount[$weekKey] ?? 0) + 1;
             }
         }
 
-        // أسبوع "غياب كامل" = كل أيام العمل فيه غائب (لا يستحق إجازة أسبوعية)
-        $fullyAbsentWeeks = [];
-        // أسبوع "حضور كامل" = أسبوع كامل الأيام داخل فترة الراتب (السبت→الخميس) + لا غياب فيه
-        // شرط "الأسبوع الكامل": السبت >= بداية الفترة  AND  الخميس (السبت+5) <= نهاية الفترة
+        // أسبوع "غياب كامل" = كل أيام العمل فيه غياب حقيقي (لا يستحق إجازة أسبوعية)
+        $fullyAbsentWeeks    = [];
+        // أسبوع "حضور كامل" = لا يوجد أي يوم غير حاضر (لا غياب ولا إجازة أسبوعية)
         $fullAttendanceWeeks = 0;
+
         foreach ($weekWorkingDaysCount as $weekKey => $total) {
             if (($weekAbsentDaysCount[$weekKey] ?? 0) === $total) {
+                // كل أيام الأسبوع غياب حقيقي → أسبوع غياب كامل
                 $fullyAbsentWeeks[$weekKey] = true;
-            } elseif (($weekAbsentDaysCount[$weekKey] ?? 0) === 0) {
-                // تحقق أن الأسبوع بأكمله (السبت → الخميس = 6 أيام) داخل فترة الراتب
+            } elseif (($weekNonPresentCount[$weekKey] ?? 0) === 0) {
+                // لا يوجد أي يوم غير حاضر → أهلٌ لبونص الحضور الكامل
                 $weekSaturday  = Carbon::parse($weekKey);
                 $weekThursday  = $weekSaturday->copy()->addDays(5);
                 $isFullWeek    = $weekSaturday->toDateString() >= $periodStart
@@ -102,13 +117,28 @@ class AbsenceDetectionService
         foreach ($workingDays as $day) {
             $dateStr = $day->toDateString();
             $record  = $records->get($dateStr);
+            $ms      = $record?->manual_status;
 
-            if ($record === null || $record->is_absent) {
+            // ① إجازة أسبوعية يدوية → تُحسب مباشرةً
+            if ($ms === 'weekly_leave') {
+                $weeklyLeaveDays++;
+                continue;
+            }
+
+            // ② غياب يدوي → غياب حقيقي دائماً (يتجاوز خوارزمية الإجازة الأسبوعية التلقائية)
+            if ($ms === 'absent') {
+                $absentDays++;
+                continue;
+            }
+
+            // ③ تحديد الغياب للأيام غير اليدوية أو اليدوية بـ 'present'
+            $isAbsent = $this->resolveIsAbsent($record);
+
+            if ($isAbsent) {
                 $dow              = $day->dayOfWeek;
                 $daysFromSaturday = ($dow + 1) % 7;
                 $weekKey          = $day->copy()->subDays($daysFromSaturday)->toDateString();
 
-                // أسبوع غياب كامل: كل الأيام تُحسب غياباً حقيقياً بدون إجازة أسبوعية
                 if (isset($fullyAbsentWeeks[$weekKey])) {
                     $absentDays++;
                     continue;
@@ -120,7 +150,6 @@ class AbsenceDetectionService
                 $weekAbsenceCounts[$weekKey]++;
 
                 if ($weekAbsenceCounts[$weekKey] === 1) {
-                    // أول غياب في الأسبوع = إجازة أسبوعية، لا يُخصم
                     $weeklyLeaveDays++;
                 } else {
                     $absentDays++;
@@ -130,26 +159,62 @@ class AbsenceDetectionService
             }
         }
 
+        // --- حساب إجمالي التأخير والأوفرتايم مع مراعاة manual_status ---
+        // الأيام ذات manual_status غير 'present' (أو null مع is_absent=true) لا تُضاف
+        $totalLateMinutes = 0;
+        $totalOtMinutes   = 0;
+
+        foreach ($records as $record) {
+            $ms = $record->manual_status;
+
+            // حالات لا تستحق late/ot: غياب أو إجازة أسبوعية أو إجازة رسمية (يدوية)
+            if (in_array($ms, ['absent', 'weekly_leave', 'public_holiday'], true)) {
+                continue;
+            }
+
+            // بيانات أصلية: غياب (is_absent=true) ولا يوجد تجاوز يدوي بـ 'present'
+            if ($ms === null && $record->is_absent) {
+                continue;
+            }
+
+            $totalLateMinutes += $record->late_minutes;
+            $totalOtMinutes   += $record->overtime_minutes;
+        }
+
         return [
             'total_working_days'          => $workingDays->count(),
             'total_present_days'          => $presentDays,
             'total_weekly_leave_days'     => $weeklyLeaveDays,
             'total_absent_days'           => $absentDays,
             'total_full_attendance_weeks' => $fullAttendanceWeeks,
-            'total_late_minutes'          => (int) $records->where('is_absent', false)->sum('late_minutes'),
-            'total_overtime_minutes'      => (int) $records->sum('overtime_minutes'),
+            'total_late_minutes'          => $totalLateMinutes,
+            'total_overtime_minutes'      => $totalOtMinutes,
             'records'                     => $records,
         ];
     }
 
     /**
+     * هل اليوم غياب؟ يأخذ manual_status بعين الاعتبار.
+     * - 'absent'       → true  (غياب دائماً)
+     * - 'present'      → false (حضور دائماً حتى لو is_absent=true)
+     * - 'weekly_leave' → false (ليس غياباً لأغراض اكتشاف أسبوع الغياب الكامل)
+     * - null           → يرجع is_absent من السجل الأصلي (أو true إذا لا سجل)
+     */
+    private function resolveIsAbsent(?AttendanceRecord $record): bool
+    {
+        if ($record === null) {
+            return true;
+        }
+
+        return match ($record->manual_status) {
+            'absent'                    => true,
+            'present', 'weekly_leave', 'public_holiday' => false,
+            default                     => (bool) $record->is_absent,
+        };
+    }
+
+    /**
      * حساب ملخص الحضور الشهري لجميع الموظفين في دفعة معينة
-     *
-     * @param  Collection<Employee>  $employees
-     * @param  int                   $month
-     * @param  int                   $year
-     * @param  array                 $publicHolidays
-     * @return Collection  مجموعة من مصفوفات stats لكل موظف
      */
     public function getBulkMonthlyStats(Collection $employees, int $month, int $year, array $publicHolidays = []): Collection
     {
@@ -161,13 +226,10 @@ class AbsenceDetectionService
 
     /**
      * جلب كل سجلات الحضور في شهر بشكل مُعبّأ مع حالة كل يوم
-     * يطبّق قاعدة الإجازة الأسبوعية: الجمعة + يوم غياب واحد في الأسبوع = إجازة (غير مخصوم)
-     *
-     * @return Collection  مصفوفة بتفاصيل كل يوم (date, date_str, day_name, status, record)
+     * يطبّق قاعدة الإجازة الأسبوعية ويحترم manual_status
      */
     public function getDailyBreakdown(Employee $employee, int $month, int $year, array $publicHolidays = []): Collection
     {
-        // فترة الراتب: 22 شهر سابق → 21 شهر حالي
         $firstDay = Carbon::create($year, $month, 22)->subMonthNoOverflow();
         $lastDay  = Carbon::create($year, $month, 21);
 
@@ -186,17 +248,20 @@ class AbsenceDetectionService
             $dateStr   = $current->toDateString();
             $dayOfWeek = $current->dayOfWeek;
 
-            // مفتاح الأسبوع: السبت هو بداية الأسبوع (0=أحد..5=جمعة..6=سبت)
-            $daysFromSaturday = ($dayOfWeek + 1) % 7; // سبت=0, أحد=1, ..., جمعة=6
+            $daysFromSaturday = ($dayOfWeek + 1) % 7;
             $weekKey          = $current->copy()->subDays($daysFromSaturday)->toDateString();
 
-            // تحديد نوع اليوم
-            if ($dayOfWeek === 5) {
+            $record   = $records->get($dateStr);
+            $isManual = $record && $record->manual_status;
+
+            // manual_status يأخذ الأولوية الكاملة على أي منطق تلقائي
+            if ($isManual) {
+                $status = $record->manual_status;
+            } elseif ($dayOfWeek === 5) {
                 $status = 'friday';
             } elseif (isset($holidaySet[$dateStr])) {
                 $status = 'public_holiday';
             } else {
-                $record = $records->get($dateStr);
                 if ($record === null || $record->is_absent) {
                     $status = 'absent';
                 } elseif ($record->late_minutes > 0) {
@@ -211,21 +276,20 @@ class AbsenceDetectionService
                 'date_str'  => $dateStr,
                 'day_name'  => $current->locale('ar')->dayName,
                 'status'    => $status,
-                'record'    => $records->get($dateStr),
+                'record'    => $record,
                 'week_key'  => $weekKey,
+                'is_manual' => (bool) $isManual,
             ]);
 
             $current->addDay();
         }
 
         // --- الخطوة الثانية: تحديد الأسابيع التي غاب فيها الموظف طوال الأسبوع ---
-        // أسبوع "غياب كامل" = كل أيام العمل فيه (غير الجمعة وغير الإجازات الرسمية) غائب
-        // هذه الأسابيع لا تستحق إجازة أسبوعية
         $weekWorkingCount = [];
         $weekAbsentCount  = [];
 
         foreach ($rawDays as $day) {
-            if (in_array($day['status'], ['friday', 'public_holiday'])) {
+            if (in_array($day['status'], ['friday', 'public_holiday', 'weekly_leave'])) {
                 continue;
             }
             $weekKey = $day['week_key'];
@@ -243,17 +307,19 @@ class AbsenceDetectionService
         }
 
         // --- الخطوة الثالثة: تطبيق قاعدة "الإجازة الأسبوعية" ---
-        // كل موظف له يومان عطلة في الأسبوع: الجمعة + يوم آخر بأي يوم
-        // أول غياب غير الجمعة في كل أسبوع → إجازة أسبوعية (لا يُخصم)
-        // الغياب الثاني فأكثر في نفس الأسبوع → يُحتسب غياباً
-        // استثناء: أسبوع الغياب الكامل لا يستحق إجازة أسبوعية
+        // الأيام اليدوية: حالتها نهائية لا تُغيَّر
         $weekAbsenceCounts = [];
 
         return $rawDays->map(function ($day) use (&$weekAbsenceCounts, $fullyAbsentWeeks) {
+            // يوم يدوي: لا يخضع لأي تحويل تلقائي
+            if ($day['is_manual']) {
+                unset($day['week_key'], $day['is_manual']);
+                return $day;
+            }
+
             if ($day['status'] === 'absent') {
                 $weekKey = $day['week_key'];
 
-                // أسبوع غياب كامل: يبقى 'absent' بدون إجازة أسبوعية
                 if (!isset($fullyAbsentWeeks[$weekKey])) {
                     if (!isset($weekAbsenceCounts[$weekKey])) {
                         $weekAbsenceCounts[$weekKey] = 0;
@@ -261,14 +327,12 @@ class AbsenceDetectionService
                     $weekAbsenceCounts[$weekKey]++;
 
                     if ($weekAbsenceCounts[$weekKey] === 1) {
-                        // أول غياب في الأسبوع = إجازة أسبوعية
                         $day['status'] = 'weekly_leave';
                     }
-                    // الثاني فأكثر يبقى 'absent'
                 }
             }
 
-            unset($day['week_key']);
+            unset($day['week_key'], $day['is_manual']);
             return $day;
         });
     }

@@ -22,6 +22,7 @@ class AttendanceRecord extends Model
         'work_minutes',
         'notes',
         'import_batch_id',
+        'manual_status',
     ];
 
     protected $casts = [
