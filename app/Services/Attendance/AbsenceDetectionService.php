@@ -52,9 +52,38 @@ class AbsenceDetectionService
             ->get()
             ->keyBy(fn ($r) => Carbon::parse($r->date)->toDateString());
 
-        $presentDays      = 0;
-        $absentDays       = 0;
-        $weeklyLeaveDays  = 0;
+        // --- الخطوة الأولى: تحديد الأسابيع التي غاب فيها الموظف طوال الأسبوع ---
+        // (موظف مثلاً رحل يوم 10، فكل الأيام من 11→21 غياب كامل في أسابيعها)
+        // هذه الأسابيع لا تستحق إجازة أسبوعية لأن الموظف لم يحضر أصلاً
+        $weekWorkingDaysCount = [];
+        $weekAbsentDaysCount  = [];
+
+        foreach ($workingDays as $day) {
+            $dateStr          = $day->toDateString();
+            $record           = $records->get($dateStr);
+            $dow              = $day->dayOfWeek;
+            $daysFromSaturday = ($dow + 1) % 7;
+            $weekKey          = $day->copy()->subDays($daysFromSaturday)->toDateString();
+
+            $weekWorkingDaysCount[$weekKey] = ($weekWorkingDaysCount[$weekKey] ?? 0) + 1;
+
+            if ($record === null || $record->is_absent) {
+                $weekAbsentDaysCount[$weekKey] = ($weekAbsentDaysCount[$weekKey] ?? 0) + 1;
+            }
+        }
+
+        // أسبوع "غياب كامل" = كل أيام العمل فيه غائب (لا يستحق إجازة أسبوعية)
+        $fullyAbsentWeeks = [];
+        foreach ($weekWorkingDaysCount as $weekKey => $total) {
+            if (($weekAbsentDaysCount[$weekKey] ?? 0) === $total) {
+                $fullyAbsentWeeks[$weekKey] = true;
+            }
+        }
+
+        // --- الخطوة الثانية: حساب الحضور والغياب مع قاعدة الإجازة الأسبوعية ---
+        $presentDays       = 0;
+        $absentDays        = 0;
+        $weeklyLeaveDays   = 0;
         $weekAbsenceCounts = [];
 
         foreach ($workingDays as $day) {
@@ -62,10 +91,15 @@ class AbsenceDetectionService
             $record  = $records->get($dateStr);
 
             if ($record === null || $record->is_absent) {
-                // حساب مفتاح الأسبوع (السبت بداية الأسبوع)
-                $dow              = $day->dayOfWeek; // 0=أحد, 1=اثنين, ..., 5=جمعة, 6=سبت
-                $daysFromSaturday = ($dow + 1) % 7;  // سبت=0, أحد=1, ..., جمعة=6
+                $dow              = $day->dayOfWeek;
+                $daysFromSaturday = ($dow + 1) % 7;
                 $weekKey          = $day->copy()->subDays($daysFromSaturday)->toDateString();
+
+                // أسبوع غياب كامل: كل الأيام تُحسب غياباً حقيقياً بدون إجازة أسبوعية
+                if (isset($fullyAbsentWeeks[$weekKey])) {
+                    $absentDays++;
+                    continue;
+                }
 
                 if (!isset($weekAbsenceCounts[$weekKey])) {
                     $weekAbsenceCounts[$weekKey] = 0;
@@ -170,25 +204,54 @@ class AbsenceDetectionService
             $current->addDay();
         }
 
-        // --- الخطوة الثانية: تطبيق قاعدة "الإجازة الأسبوعية" ---
+        // --- الخطوة الثانية: تحديد الأسابيع التي غاب فيها الموظف طوال الأسبوع ---
+        // أسبوع "غياب كامل" = كل أيام العمل فيه (غير الجمعة وغير الإجازات الرسمية) غائب
+        // هذه الأسابيع لا تستحق إجازة أسبوعية
+        $weekWorkingCount = [];
+        $weekAbsentCount  = [];
+
+        foreach ($rawDays as $day) {
+            if (in_array($day['status'], ['friday', 'public_holiday'])) {
+                continue;
+            }
+            $weekKey = $day['week_key'];
+            $weekWorkingCount[$weekKey] = ($weekWorkingCount[$weekKey] ?? 0) + 1;
+            if ($day['status'] === 'absent') {
+                $weekAbsentCount[$weekKey] = ($weekAbsentCount[$weekKey] ?? 0) + 1;
+            }
+        }
+
+        $fullyAbsentWeeks = [];
+        foreach ($weekWorkingCount as $weekKey => $total) {
+            if (($weekAbsentCount[$weekKey] ?? 0) === $total) {
+                $fullyAbsentWeeks[$weekKey] = true;
+            }
+        }
+
+        // --- الخطوة الثالثة: تطبيق قاعدة "الإجازة الأسبوعية" ---
         // كل موظف له يومان عطلة في الأسبوع: الجمعة + يوم آخر بأي يوم
         // أول غياب غير الجمعة في كل أسبوع → إجازة أسبوعية (لا يُخصم)
         // الغياب الثاني فأكثر في نفس الأسبوع → يُحتسب غياباً
+        // استثناء: أسبوع الغياب الكامل لا يستحق إجازة أسبوعية
         $weekAbsenceCounts = [];
 
-        return $rawDays->map(function ($day) use (&$weekAbsenceCounts) {
+        return $rawDays->map(function ($day) use (&$weekAbsenceCounts, $fullyAbsentWeeks) {
             if ($day['status'] === 'absent') {
                 $weekKey = $day['week_key'];
-                if (!isset($weekAbsenceCounts[$weekKey])) {
-                    $weekAbsenceCounts[$weekKey] = 0;
-                }
-                $weekAbsenceCounts[$weekKey]++;
 
-                if ($weekAbsenceCounts[$weekKey] === 1) {
-                    // أول غياب في الأسبوع = إجازة أسبوعية
-                    $day['status'] = 'weekly_leave';
+                // أسبوع غياب كامل: يبقى 'absent' بدون إجازة أسبوعية
+                if (!isset($fullyAbsentWeeks[$weekKey])) {
+                    if (!isset($weekAbsenceCounts[$weekKey])) {
+                        $weekAbsenceCounts[$weekKey] = 0;
+                    }
+                    $weekAbsenceCounts[$weekKey]++;
+
+                    if ($weekAbsenceCounts[$weekKey] === 1) {
+                        // أول غياب في الأسبوع = إجازة أسبوعية
+                        $day['status'] = 'weekly_leave';
+                    }
+                    // الثاني فأكثر يبقى 'absent'
                 }
-                // الثاني فأكثر يبقى 'absent'
             }
 
             unset($day['week_key']);

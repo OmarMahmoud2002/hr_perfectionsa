@@ -119,82 +119,15 @@
         {{-- الجانب الأيسر: نموذج الحساب --}}
         <div class="lg:col-span-2 space-y-5">
 
-            {{-- معدلات الحساب --}}
-            <div class="card">
-                <div class="card-header">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-xl flex items-center justify-center bg-gold-100">
-                            <svg class="w-4 h-4 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-700">معدلات الحساب</h3>
-                            <p class="text-xs text-slate-400">القيم مسحوبة من الإعدادات — يمكنك تعديلها لهذه الجلسة فقط</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-
-                        {{-- خصم التأخير --}}
-                        <div class="form-group mb-0">
-                            <label class="form-label">
-                                خصم ساعة التأخير
-                                <span class="form-hint">بالجنيه لكل ساعة</span>
-                            </label>
-                            <div class="relative">
-                                <input type="number" name="late_deduction_per_hour" step="0.01" min="0"
-                                       value="{{ old('late_deduction_per_hour', $defaultRates['late_deduction_per_hour']) }}"
-                                       class="form-input pl-12 @error('late_deduction_per_hour') border-red-400 @enderror">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">ج.م</span>
-                            </div>
-                            @error('late_deduction_per_hour')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        {{-- خصم الغياب --}}
-                        <div class="form-group mb-0">
-                            <label class="form-label">
-                                خصم يوم الغياب
-                                <span class="form-hint">بالجنيه لكل يوم</span>
-                            </label>
-                            <div class="relative">
-                                <input type="number" name="absent_deduction_per_day" step="0.01" min="0"
-                                       value="{{ old('absent_deduction_per_day', $defaultRates['absent_deduction_per_day']) }}"
-                                       class="form-input pl-12 @error('absent_deduction_per_day') border-red-400 @enderror">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">ج.م</span>
-                            </div>
-                            @error('absent_deduction_per_day')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        {{-- مكافأة Overtime --}}
-                        <div class="form-group mb-0">
-                            <label class="form-label">
-                                مكافأة ساعة Overtime
-                                <span class="form-hint">بالجنيه لكل ساعة</span>
-                            </label>
-                            <div class="relative">
-                                <input type="number" name="overtime_rate_per_hour" step="0.01" min="0"
-                                       value="{{ old('overtime_rate_per_hour', $defaultRates['overtime_rate_per_hour']) }}"
-                                       class="form-input pl-12 @error('overtime_rate_per_hour') border-red-400 @enderror">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">ج.م</span>
-                            </div>
-                            @error('overtime_rate_per_hour')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {{-- المعادلة التوضيحية --}}
             <div class="card p-4 border-2 border-dashed border-secondary-200">
-                <p class="text-xs font-bold text-secondary-600 mb-2 uppercase tracking-wide">معادلة الحساب</p>
-                <div class="flex flex-wrap items-center gap-2 text-sm font-mono">
+                <p class="text-xs font-bold text-secondary-600 mb-3 uppercase tracking-wide">معادلة الحساب (تلقائية من راتب كل موظف)</p>
+                <div class="space-y-1.5 text-xs font-mono text-slate-600 mb-3">
+                    <p>تكلفة اليوم  = الراتب الأساسي ÷ <strong>30</strong></p>
+                    <p>تكلفة الساعة = تكلفة اليوم ÷ <strong>8</strong></p>
+                    <p>خصم / مكافأة الساعة = تكلفة الساعة × <strong>1.5</strong></p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-sm font-mono border-t border-slate-200 pt-3">
                     <span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-700">المرتب الأساسي</span>
                     <span class="text-red-400 font-bold text-base">−</span>
                     <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">خصم التأخير</span>

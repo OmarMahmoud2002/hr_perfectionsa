@@ -98,95 +98,6 @@
                 </div>
             </div>
 
-            {{-- ===== قسم قيم الخصم والمكافأة ===== --}}
-            <div class="card overflow-hidden">
-                <div class="card-header">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 sm:w-10 sm:h-10 bg-gold-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                            <svg class="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-sm sm:text-base font-bold text-white">قيم الخصم والمكافأة</h3>
-                            <p class="text-xs text-white/70 hidden sm:block">المبالغ المباشرة بالجنيه لكل ساعة / يوم</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
-
-                        {{-- خصم ساعة التأخير --}}
-                        <div class="form-group">
-                            <label class="form-label">
-                                خصم ساعة التأخير
-                                <span class="form-hint">بالجنيه لكل ساعة</span>
-                            </label>
-                            <div class="relative">
-                                <input type="number" name="late_deduction_per_hour" step="0.01" min="0"
-                                       value="{{ old('late_deduction_per_hour', $settings['late_deduction_per_hour'] ?? 0) }}"
-                                       class="form-input ltr-input pl-12" required>
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">ج.م</span>
-                            </div>
-                            @error('late_deduction_per_hour')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        {{-- خصم يوم الغياب --}}
-                        <div class="form-group">
-                            <label class="form-label">
-                                خصم يوم الغياب
-                                <span class="form-hint">بالجنيه لكل يوم</span>
-                            </label>
-                            <div class="relative">
-                                <input type="number" name="absent_deduction_per_day" step="0.01" min="0"
-                                       value="{{ old('absent_deduction_per_day', $settings['absent_deduction_per_day'] ?? 0) }}"
-                                       class="form-input ltr-input pl-12" required>
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">ج.م</span>
-                            </div>
-                            @error('absent_deduction_per_day')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        {{-- مكافأة ساعة الأوفرتايم --}}
-                        <div class="form-group">
-                            <label class="form-label">
-                                مكافأة ساعة الأوفرتايم
-                                <span class="form-hint">بالجنيه لكل ساعة</span>
-                            </label>
-                            <div class="relative">
-                                <input type="number" name="overtime_rate_per_hour" step="0.01" min="0"
-                                       value="{{ old('overtime_rate_per_hour', $settings['overtime_rate_per_hour'] ?? 0) }}"
-                                       class="form-input ltr-input pl-12" required>
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">ج.م</span>
-                            </div>
-                            @error('overtime_rate_per_hour')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                    </div>
-
-                    {{-- صندوق توضيحي لمعادلة الراتب --}}
-                    <div class="mt-4 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                        <p class="text-xs font-bold text-blue-700 mb-2 flex items-center gap-1">
-                            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01"/>
-                            </svg>
-                            معادلة الراتب النهائي
-                        </p>
-                        <p class="text-xs text-blue-600 leading-relaxed font-mono">
-                            الراتب = الأساسي − (ساعات التأخير × خصم الساعة) − (أيام الغياب × خصم اليوم) + (ساعات OT × مكافأة الساعة)
-                        </p>
-                        <p class="text-xs text-blue-500 mt-1">
-                            ملاحظة: أول يوم غياب في كل أسبوع يُحتسب إجازة أسبوعية ولا يُخصم.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
             {{-- ===== قسم قواعد الحضور ===== --}}
             <div class="card overflow-hidden">
                 <div class="card-header">
@@ -230,15 +141,18 @@
                     </div>
 
                     {{-- حساب الراتب اليومي التوضيحي --}}
-                    <div class="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                        <p class="text-xs text-emerald-700 flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            مثال: موظف راتبه 5000 ÷
-                            <strong>{{ $settings['working_days_per_month'] }}</strong> يوم =
-                            <strong>{{ number_format(5000 / max((float)$settings['working_days_per_month'], 1), 1) }}</strong>
-                            جنيه/يوم
+                    <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                        <p class="text-xs font-bold text-blue-700 mb-2">معادلة الحساب التلقائية (مبنية على راتب كل موظف)</p>
+                        <div class="space-y-1 text-xs text-blue-600 font-mono">
+                            <p>تكلفة اليوم  = الراتب الأساسي ÷ 30</p>
+                            <p>تكلفة الساعة = تكلفة اليوم ÷ 8</p>
+                            <p>خصم/مكافأة الساعة = تكلفة الساعة × 1.5</p>
+                        </div>
+                        <p class="text-xs text-blue-500 mt-2">
+                            مثال: موظف راتبه 5000 → يوم = {{ number_format(5000/30, 1) }} ج.م — ساعة = {{ number_format(5000/30/8, 1) }} ج.م — ساعة تأخير/OT = {{ number_format(5000/30/8*1.5, 1) }} ج.م
+                        </p>
+                        <p class="text-xs text-blue-500 mt-1">
+                            ملاحظة: أول يوم غياب في كل أسبوع يُحتسب إجازة أسبوعية ولا يُخصم.
                         </p>
                     </div>
                 </div>

@@ -6,7 +6,6 @@ use App\Enums\ImportStatus;
 use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\PayrollReport;
-use App\Models\Setting;
 use App\Services\Payroll\PayrollCalculationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -61,11 +60,7 @@ class PayrollController extends Controller
             ->get();
 
         // الإعدادات الافتراضية
-        $defaultRates = [
-            'late_deduction_per_hour'  => Setting::getValue('late_deduction_per_hour', 0),
-            'absent_deduction_per_day' => Setting::getValue('absent_deduction_per_day', 0),
-            'overtime_rate_per_hour'   => Setting::getValue('overtime_rate_per_hour', 0),
-        ];
+        // (المعدلات تُحسب تلقائياً من راتب كل موظف — لا توجد معدلات ثابتة)
 
         // الموظفون الذين لديهم بيانات في هذا الشهر
         $employees = collect();
@@ -76,7 +71,7 @@ class PayrollController extends Controller
         }
 
         return view('payroll.calculate', compact(
-            'month', 'year', 'batch', 'availableBatches', 'defaultRates', 'employees', 'employeeId'
+            'month', 'year', 'batch', 'availableBatches', 'employees', 'employeeId'
         ));
     }
 
@@ -86,44 +81,29 @@ class PayrollController extends Controller
     public function calculate(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'month'                    => ['required', 'integer', 'min:1', 'max:12'],
-            'year'                     => ['required', 'integer', 'min:2020'],
-            'late_deduction_per_hour'  => ['required', 'numeric', 'min:0'],
-            'absent_deduction_per_day' => ['required', 'numeric', 'min:0'],
-            'overtime_rate_per_hour'   => ['required', 'numeric', 'min:0'],
-            'mode'                     => ['required', 'in:all,single'],
-            'employee_id'              => ['nullable', 'exists:employees,id'],
+            'month'       => ['required', 'integer', 'min:1', 'max:12'],
+            'year'        => ['required', 'integer', 'min:2020'],
+            'mode'        => ['required', 'in:all,single'],
+            'employee_id' => ['nullable', 'exists:employees,id'],
         ], [
-            'month.required'                    => 'الشهر مطلوب.',
-            'year.required'                     => 'السنة مطلوبة.',
-            'late_deduction_per_hour.required'  => 'معدل خصم التأخير مطلوب.',
-            'late_deduction_per_hour.numeric'   => 'معدل خصم التأخير يجب أن يكون رقماً.',
-            'absent_deduction_per_day.required' => 'معدل خصم الغياب مطلوب.',
-            'absent_deduction_per_day.numeric'  => 'معدل خصم الغياب يجب أن يكون رقماً.',
-            'overtime_rate_per_hour.required'   => 'معدل مكافأة الأوفرتايم مطلوب.',
-            'overtime_rate_per_hour.numeric'    => 'معدل مكافأة الأوفرتايم يجب أن يكون رقماً.',
+            'month.required' => 'الشهر مطلوب.',
+            'year.required'  => 'السنة مطلوبة.',
         ]);
 
         $month = (int) $validated['month'];
         $year  = (int) $validated['year'];
 
-        $rates = [
-            'late_deduction_per_hour'  => $validated['late_deduction_per_hour'],
-            'absent_deduction_per_day' => $validated['absent_deduction_per_day'],
-            'overtime_rate_per_hour'   => $validated['overtime_rate_per_hour'],
-        ];
-
         try {
             if ($validated['mode'] === 'single' && !empty($validated['employee_id'])) {
                 $employee = Employee::findOrFail($validated['employee_id']);
-                $this->payrollService->calculateForEmployee($employee, $month, $year, $rates);
+                $this->payrollService->calculateForEmployee($employee, $month, $year);
                 $message = "تم حساب راتب الموظف «{$employee->name}» بنجاح.";
 
                 return redirect()
                     ->to(route('payroll.report', ['month' => $month, 'year' => $year]) . '?employee_id=' . $employee->id)
                     ->with('success', $message);
             } else {
-                $reports = $this->payrollService->calculateForAll($month, $year, $rates);
+                $reports = $this->payrollService->calculateForAll($month, $year);
                 $count   = $reports->count();
                 $message = "تم حساب رواتب {$count} موظف بنجاح.";
 

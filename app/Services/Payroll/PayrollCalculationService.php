@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Log;
  * خدمة حساب المرتبات الشهرية
  * تعتمد على بيانات الحضور من attendance_records
  * وتطبّق معادلة: net = basic - late_deduction - absent_deduction + ot_bonus
+ * المعدلات تُحسب تلقائياً من راتب الموظف (salary÷30 لليوم، ×1.5 للتأخير/OT)
  */
 class PayrollCalculationService
 {
@@ -31,14 +32,17 @@ class PayrollCalculationService
     /**
      * حساب أو إعادة حساب راتب موظف لشهر معين
      *
+     * المعدلات تُحسب تلقائياً من راتب الموظف:
+     *   تكلفة اليوم  = الراتب ÷ 30
+     *   تكلفة الساعة = تكلفة اليوم ÷ 8
+     *   خصم/مكافأة ساعة التأخير أو الأوفرتايم = تكلفة الساعة × 1.5
+     *
      * @param  Employee  $employee
      * @param  int       $month
      * @param  int       $year
-     * @param  array     $rates  معدلات الخصم والإضافة
-     *                   [late_deduction_per_hour, absent_deduction_per_day, overtime_rate_per_hour]
      * @return PayrollReport
      */
-    public function calculateForEmployee(Employee $employee, int $month, int $year, array $rates): PayrollReport
+    public function calculateForEmployee(Employee $employee, int $month, int $year): PayrollReport
     {
         // جلب إجازات الشهر
         $batch = ImportBatch::where('month', $month)
@@ -57,6 +61,14 @@ class PayrollCalculationService
         $totalOtMinutes   = (int) $stats['total_overtime_minutes'];
         $absentDays       = $stats['total_absent_days'];
 
+        // معدلات مبنية على راتب الموظف
+        // تكلفة اليوم = الراتب ÷ 30
+        // تكلفة الساعة = تكلفة اليوم ÷ 8
+        // معدل التأخير / الأوفرتايم = تكلفة الساعة × 1.5
+        $dailyRate         = $basicSalary / 30;
+        $hourlyRate        = $dailyRate / 8;
+        $hourlyRateWith1_5 = $hourlyRate * 1.5;
+
         /*
          * قاعدة الأوفرتايم والتأخير:
          *
@@ -67,7 +79,7 @@ class PayrollCalculationService
          *
          * حالة 2 — الأوفرتايم ≥ التأخير (الفرق في صالح OT):
          *   • لا يوجد خصم تأخير
-         *   • مكافأة OT = إجمالي ساعات الأوفرتايم × سعر الساعة (مهما كانت المدة)
+         *   • مكافأة OT = إجمالي ساعات الأوفرتايم × سعر الساعة × 1.5 (مهما كانت المدة)
          */
         $netLateMinutes = $totalLateMinutes - $totalOtMinutes;
 
@@ -75,15 +87,15 @@ class PayrollCalculationService
             // صافي التأخير موجب — تطبيق فترة السماح (4 ساعات)
             $graceLimitMinutes    = 4 * 60; // 240 دقيقة
             $effectiveLateMinutes = ($netLateMinutes < $graceLimitMinutes) ? 0 : $netLateMinutes;
-            $lateDeduction        = round(($effectiveLateMinutes / 60) * (float) ($rates['late_deduction_per_hour'] ?? 0), 2);
+            $lateDeduction        = round(($effectiveLateMinutes / 60) * $hourlyRateWith1_5, 2);
             $overtimeBonus        = 0; // الأوفرتايم استُنفد في تعويض التأخير
         } else {
             // صافي الأوفرتايم — لا خصم، ومكافأة على إجمالي ساعات OT
             $lateDeduction = 0;
-            $overtimeBonus = round(($totalOtMinutes / 60) * (float) ($rates['overtime_rate_per_hour'] ?? 0), 2);
+            $overtimeBonus = round(($totalOtMinutes / 60) * $hourlyRateWith1_5, 2);
         }
 
-        $absentDeduction = round($absentDays * (float) ($rates['absent_deduction_per_day'] ?? 0), 2);
+        $absentDeduction = round($absentDays * $dailyRate, 2);
 
         $netSalary = $basicSalary - $lateDeduction - $absentDeduction + $overtimeBonus;
 
@@ -132,10 +144,9 @@ class PayrollCalculationService
      *
      * @param  int    $month
      * @param  int    $year
-     * @param  array  $rates
      * @return Collection<PayrollReport>
      */
-    public function calculateForAll(int $month, int $year, array $rates): Collection
+    public function calculateForAll(int $month, int $year): Collection
     {
         // التحقق من وجود بيانات للشهر
         $batch = ImportBatch::where('month', $month)
@@ -173,7 +184,7 @@ class PayrollCalculationService
                     continue;
                 }
 
-                $report = $this->calculateForEmployee($employee, $month, $year, $rates);
+                $report = $this->calculateForEmployee($employee, $month, $year);
                 $reports->push($report);
             }
 
