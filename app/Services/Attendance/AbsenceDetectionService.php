@@ -74,9 +74,22 @@ class AbsenceDetectionService
 
         // أسبوع "غياب كامل" = كل أيام العمل فيه غائب (لا يستحق إجازة أسبوعية)
         $fullyAbsentWeeks = [];
+        // أسبوع "حضور كامل" = أسبوع كامل الأيام داخل فترة الراتب (السبت→الخميس) + لا غياب فيه
+        // شرط "الأسبوع الكامل": السبت >= بداية الفترة  AND  الخميس (السبت+5) <= نهاية الفترة
+        $fullAttendanceWeeks = 0;
         foreach ($weekWorkingDaysCount as $weekKey => $total) {
             if (($weekAbsentDaysCount[$weekKey] ?? 0) === $total) {
                 $fullyAbsentWeeks[$weekKey] = true;
+            } elseif (($weekAbsentDaysCount[$weekKey] ?? 0) === 0) {
+                // تحقق أن الأسبوع بأكمله (السبت → الخميس = 6 أيام) داخل فترة الراتب
+                $weekSaturday  = Carbon::parse($weekKey);
+                $weekThursday  = $weekSaturday->copy()->addDays(5);
+                $isFullWeek    = $weekSaturday->toDateString() >= $periodStart
+                              && $weekThursday->toDateString() <= $periodEnd;
+
+                if ($isFullWeek) {
+                    $fullAttendanceWeeks++;
+                }
             }
         }
 
@@ -118,13 +131,14 @@ class AbsenceDetectionService
         }
 
         return [
-            'total_working_days'      => $workingDays->count(),
-            'total_present_days'      => $presentDays,
-            'total_weekly_leave_days' => $weeklyLeaveDays,
-            'total_absent_days'       => $absentDays,
-            'total_late_minutes'      => (int) $records->where('is_absent', false)->sum('late_minutes'),
-            'total_overtime_minutes'  => (int) $records->sum('overtime_minutes'),
-            'records'                 => $records,
+            'total_working_days'          => $workingDays->count(),
+            'total_present_days'          => $presentDays,
+            'total_weekly_leave_days'     => $weeklyLeaveDays,
+            'total_absent_days'           => $absentDays,
+            'total_full_attendance_weeks' => $fullAttendanceWeeks,
+            'total_late_minutes'          => (int) $records->where('is_absent', false)->sum('late_minutes'),
+            'total_overtime_minutes'      => (int) $records->sum('overtime_minutes'),
+            'records'                     => $records,
         ];
     }
 

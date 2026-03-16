@@ -56,10 +56,11 @@ class PayrollCalculationService
         $stats = $this->absenceService->getMonthlyStats($employee, $month, $year, $publicHolidays);
 
         // ============ الحساب المالي ============
-        $basicSalary      = (float) $employee->basic_salary;
-        $totalLateMinutes = (int) $stats['total_late_minutes'];
-        $totalOtMinutes   = (int) $stats['total_overtime_minutes'];
-        $absentDays       = $stats['total_absent_days'];
+        $basicSalary           = (float) $employee->basic_salary;
+        $totalLateMinutes      = (int) $stats['total_late_minutes'];
+        $totalOtMinutes        = (int) $stats['total_overtime_minutes'];
+        $absentDays            = $stats['total_absent_days'];
+        $fullAttendanceWeeks   = $stats['total_full_attendance_weeks'];
 
         // معدلات مبنية على راتب الموظف
         // تكلفة اليوم = الراتب ÷ 30
@@ -97,7 +98,12 @@ class PayrollCalculationService
 
         $absentDeduction = round($absentDays * $dailyRate, 2);
 
-        $netSalary = $basicSalary - $lateDeduction - $absentDeduction + $overtimeBonus;
+        // بونص الحضور الكامل الأسبوعي:
+        // إذا حضر الموظف جميع أيام الأسبوع (السبت → الخميس) بدون أي غياب
+        // يُضاف له يوم راتب إضافي لكل أسبوع كامل
+        $attendanceBonus = round($fullAttendanceWeeks * $dailyRate, 2);
+
+        $netSalary = $basicSalary - $lateDeduction - $absentDeduction + $overtimeBonus + $attendanceBonus;
 
         // لا يمكن أن يكون المرتب النهائي بالسالب
         if ($netSalary < 0) {
@@ -123,10 +129,12 @@ class PayrollCalculationService
                 'total_absent_days'      => $absentDays,
                 'total_late_minutes'     => $stats['total_late_minutes'],
                 'total_overtime_minutes' => $stats['total_overtime_minutes'],
+                'full_attendance_weeks'  => $fullAttendanceWeeks,
                 'basic_salary'           => $basicSalary,
                 'late_deduction'         => $lateDeduction,
                 'absent_deduction'       => $absentDeduction,
                 'overtime_bonus'         => $overtimeBonus,
+                'attendance_bonus'       => $attendanceBonus,
                 'net_salary'             => $netSalary,
                 // لا نعيد ضبط is_locked إذا كان محفوظاً — فقط نحدّثه إذا لم يكن مؤمناً
             ]
@@ -243,13 +251,14 @@ class PayrollCalculationService
     public function getSummary(Collection $reports): array
     {
         return [
-            'total_employees'        => $reports->count(),
-            'total_basic_salary'     => $reports->sum('basic_salary'),
-            'total_late_deduction'   => $reports->sum('late_deduction'),
-            'total_absent_deduction' => $reports->sum('absent_deduction'),
-            'total_overtime_bonus'   => $reports->sum('overtime_bonus'),
-            'total_net_salary'       => $reports->sum('net_salary'),
-            'locked_count'           => $reports->where('is_locked', true)->count(),
+            'total_employees'          => $reports->count(),
+            'total_basic_salary'       => $reports->sum('basic_salary'),
+            'total_late_deduction'     => $reports->sum('late_deduction'),
+            'total_absent_deduction'   => $reports->sum('absent_deduction'),
+            'total_overtime_bonus'     => $reports->sum('overtime_bonus'),
+            'total_attendance_bonus'   => $reports->sum('attendance_bonus'),
+            'total_net_salary'         => $reports->sum('net_salary'),
+            'locked_count'             => $reports->where('is_locked', true)->count(),
         ];
     }
 }

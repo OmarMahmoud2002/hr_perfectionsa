@@ -87,10 +87,16 @@
         </p>
     </div>
     <div class="card p-4">
-        <p class="text-xs text-slate-500 mb-1">إجمالي مكافآت OT</p>
+        <p class="text-xs text-slate-500 mb-1">إجمالي المكافآت</p>
         <p class="text-2xl font-black text-emerald-600">
-            {{ number_format($summary['total_overtime_bonus'], 0) }}
+            {{ number_format($summary['total_overtime_bonus'] + $summary['total_attendance_bonus'], 0) }}
             <span class="text-sm font-normal">ج.م</span>
+        </p>
+        <p class="text-xs text-slate-400 mt-1">
+            OT: {{ number_format($summary['total_overtime_bonus'], 0) }}
+            @if($summary['total_attendance_bonus'] > 0)
+             • حضور: {{ number_format($summary['total_attendance_bonus'], 0) }}
+            @endif
         </p>
     </div>
     <div class="card p-4">
@@ -262,10 +268,19 @@
 
                     {{-- المكافآت --}}
                     <td class="text-left">
-                        @if($report->overtime_bonus > 0)
-                        <span class="font-mono text-sm font-semibold text-emerald-600">
-                            {{ number_format($report->overtime_bonus, 0) }}
-                        </span>
+                        @php $totalBonus = $report->overtime_bonus + $report->attendance_bonus; @endphp
+                        @if($totalBonus > 0)
+                        <div class="font-mono text-sm font-semibold text-emerald-600">
+                            {{ number_format($totalBonus, 0) }}
+                        </div>
+                        <div class="text-xs text-slate-400 mt-0.5">
+                            @if($report->overtime_bonus > 0) OT: {{ number_format($report->overtime_bonus, 0) }} @endif
+                            @if($report->overtime_bonus > 0 && $report->attendance_bonus > 0) • @endif
+                            @if($report->attendance_bonus > 0)
+                                <span class="text-amber-600">حضور: {{ number_format($report->attendance_bonus, 0) }}</span>
+                                <span class="text-slate-300">({{ $report->full_attendance_weeks }}أ)</span>
+                            @endif
+                        </div>
                         @else
                             <span class="text-slate-300">—</span>
                         @endif
@@ -295,7 +310,7 @@
                         {{ number_format($summary['total_late_deduction'] + $summary['total_absent_deduction'], 0) }}
                     </td>
                     <td class="px-4 py-3 font-bold font-mono text-emerald-600 text-sm">
-                        {{ number_format($summary['total_overtime_bonus'], 0) }}
+                        {{ number_format($summary['total_overtime_bonus'] + $summary['total_attendance_bonus'], 0) }}
                     </td>
                     <td class="px-4 py-3 font-black text-base" style="color: #317c77;">
                         {{ number_format($summary['total_net_salary'], 0) }}
