@@ -23,7 +23,7 @@ class PayrollController extends Controller
     public function index(Request $request): View
     {
         // الشهور التي يوجد لها كشوف مرتبات
-        $payrollMonths = PayrollReport::selectRaw('month, year, COUNT(*) as employee_count, SUM(net_salary) as total_net')
+        $payrollMonths = PayrollReport::selectRaw('month, year, COUNT(*) as employee_count, SUM(net_salary + extra_bonus - extra_deduction) as total_net')
             ->groupBy('month', 'year')
             ->orderByDesc('year')
             ->orderByDesc('month')

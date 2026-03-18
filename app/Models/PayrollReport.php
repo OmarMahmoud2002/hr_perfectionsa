@@ -29,6 +29,7 @@ class PayrollReport extends Model
         'extra_deduction',
         'adjustment_note',
         'net_salary',
+        'net_salary_final',
         'is_locked',
     ];
 
@@ -49,8 +50,26 @@ class PayrollReport extends Model
         'extra_bonus'            => 'decimal:2',
         'extra_deduction'        => 'decimal:2',
         'net_salary'             => 'decimal:2',
+        'net_salary_final'       => 'decimal:2',
         'is_locked'              => 'boolean',
     ];
+
+    // ========================
+    // Boot Method - Auto-calculate net_salary_final
+    // ========================
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // تلقائياً حساب net_salary_final عند الحفظ أو التحديث
+        static::saving(function ($report) {
+            $report->net_salary_final = max(
+                0,
+                (float) $report->net_salary + (float) $report->extra_bonus - (float) $report->extra_deduction
+            );
+        });
+    }
 
     // ========================
     // Relationships
@@ -78,14 +97,6 @@ class PayrollReport extends Model
     public function getTotalDeductionsAttribute(): float
     {
         return $this->late_deduction + $this->absent_deduction;
-    }
-
-    /**
-     * الصافي النهائي بعد التسوية الإضافية (بونص أو خصم يدوي)
-     */
-    public function getNetSalaryFinalAttribute(): float
-    {
-        return max(0, (float) $this->net_salary + (float) $this->extra_bonus - (float) $this->extra_deduction);
     }
 
     /**

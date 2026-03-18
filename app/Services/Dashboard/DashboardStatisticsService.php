@@ -88,14 +88,19 @@ class DashboardStatisticsService
 
         $records = AttendanceRecord::where('import_batch_id', $batch->id);
 
-        $totalRecords  = $records->count();
-        $presentDays   = (clone $records)->where('is_absent', false)->count();
-        $absentDays    = (clone $records)->where('is_absent', true)->count();
+        // استبعاد أيام الجمعة (DAYOFWEEK = 6 في MySQL) من حساب نسبة الحضور
+        // نحسب فقط من أيام العمل (5 أيام في الأسبوع)
+        $workingDaysRecords = (clone $records)->whereRaw('DAYOFWEEK(date) != 6')->count();
+        $presentDays        = (clone $records)->whereRaw('DAYOFWEEK(date) != 6')->where('is_absent', false)->count();
+        $absentDays         = (clone $records)->whereRaw('DAYOFWEEK(date) != 6')->where('is_absent', true)->count();
+
+        $totalRecords  = $records->count(); // جميع السجلات (مع الجمعة)
         $totalLate     = (clone $records)->sum('late_minutes');
         $totalOT       = (clone $records)->sum('overtime_minutes');
 
-        $attendanceRate = $totalRecords > 0
-            ? round(($presentDays / $totalRecords) * 100, 1)
+        // حساب نسبة الحضور من أيام العمل فقط (بدون الجمعة)
+        $attendanceRate = $workingDaysRecords > 0
+            ? round(($presentDays / $workingDaysRecords) * 100, 1)
             : 0;
 
         return [
