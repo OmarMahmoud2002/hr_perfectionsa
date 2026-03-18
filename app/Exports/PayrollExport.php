@@ -34,21 +34,23 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
      * الصف 2: عناوين الأعمدة
      * الصف 3+: بيانات الموظفين
      *
-     * الأعمدة (16 عمود A→P):
+     * الأعمدة (17 عمود A→Q):
      *   A=#  B=الموظف  C=رقم الكارت  D=أيام العمل  E=أيام الحضور  F=أيام الغياب
-     *   G=التأخير(د)  H=OT(د)  I=الفرق(د)  J=المرتب الأساسي
-     *   K=خصم التأخير  L=خصم الغياب  M=مكافأة OT  N=بونص حضور  O=صافي المرتب  P=الحالة
+     *   G=التأخير(س)  H=OT(س)  I=الفرق(س)  J=المرتب الأساسي
+     *   K=خصم التأخير  L=خصم الغياب  M=مكافأة OT  N=بونص حضور
+     *   O=بونص إضافي  P=خصم إضافي  Q=صافي المرتب
      */
     public function collection(): Collection
     {
         // صف 1: placeholder للعنوان (سيُستبدل في styles)
-        $titleRow = collect([array_fill(0, 16, '')]);
+        $titleRow = collect([array_fill(0, 17, '')]);
 
         // صف 2: عناوين الأعمدة
         $headerRow = collect([[
             '#', 'الموظف', 'رقم الكارت', 'أيام العمل', 'أيام الحضور', 'أيام الغياب',
-            'التأخير (د)', 'OT (د)', 'الفرق (د)', 'المرتب الأساسي',
-            'خصم التأخير', 'خصم الغياب', 'مكافأة OT', 'بونص حضور', 'صافي المرتب', 'الحالة',
+            'التأخير (س)', 'OT (س)', 'الفرق (س)', 'المرتب الأساسي',
+            'خصم التأخير', 'خصم الغياب', 'مكافأة OT', 'بونص حضور',
+            'بونص إضافي', 'خصم إضافي', 'صافي المرتب',
         ]]);
 
         // صف 3+: بيانات الموظفين
@@ -60,16 +62,17 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
                 $report->total_working_days,
                 $report->total_present_days,
                 $report->total_absent_days,
-                $report->total_late_minutes,
-                $report->total_overtime_minutes,
-                $report->total_overtime_minutes - $report->total_late_minutes,
+                round($report->total_late_minutes / 60, 2),
+                round($report->total_overtime_minutes / 60, 2),
+                round(($report->total_overtime_minutes - $report->total_late_minutes) / 60, 2),
                 $report->basic_salary,
                 $report->late_deduction,
                 $report->absent_deduction,
                 $report->overtime_bonus,
                 $report->attendance_bonus,
-                $report->net_salary,
-                $report->is_locked ? 'مؤمّن' : 'مفتوح',
+                $report->extra_bonus,
+                $report->extra_deduction,
+                $report->net_salary_final,
             ];
         });
 
@@ -96,8 +99,9 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
             'L' => 14,
             'M' => 14,
             'N' => 14,
-            'O' => 16,
-            'P' => 10,
+            'O' => 14,
+            'P' => 14,
+            'Q' => 16,
         ];
     }
 
@@ -113,7 +117,7 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
         // عنوان الكشف (الصف 1)
         // ==================
         $monthLabel = \Carbon\Carbon::create($this->year, $this->month, 1)->locale('ar')->isoFormat('MMMM YYYY');
-        $sheet->mergeCells('A1:P1');
+        $sheet->mergeCells('A1:Q1');
         $sheet->setCellValue('A1', "كشف مرتبات — {$monthLabel}");
         $sheet->getStyle('A1')->applyFromArray([
             'font' => [
@@ -135,7 +139,7 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
         // ==================
         // ترويسة الأعمدة (الصف 2)
         // ==================
-        $sheet->getStyle('A2:P2')->applyFromArray([
+        $sheet->getStyle('A2:Q2')->applyFromArray([
             'font' => [
                 'bold'  => true,
                 'size'  => 10,
@@ -161,7 +165,7 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
         // بيانات الجدول (الصف 3 → $lastRow)
         // ==================
         if ($lastRow > 2) {
-            $sheet->getStyle("A3:P{$lastRow}")->applyFromArray([
+            $sheet->getStyle("A3:Q{$lastRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
                 'borders' => [
                     'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFE2E8F0']],
@@ -172,14 +176,24 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
             $sheet->getStyle("B3:B{$lastRow}")->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            // عمود صافي المرتب (O) — تلوين
-            $sheet->getStyle("O3:O{$lastRow}")->applyFromArray([
+            // عمود صافي المرتب (Q) — تلوين
+            $sheet->getStyle("Q3:Q{$lastRow}")->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['argb' => 'FF317C77']],
             ]);
 
             // عمود بونص الحضور (N) — تلوين ذهبي
             $sheet->getStyle("N3:N{$lastRow}")->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['argb' => 'FFD97706']],
+            ]);
+
+            // عمود بونص إضافي (O) — تلوين أخضر
+            $sheet->getStyle("O3:O{$lastRow}")->applyFromArray([
+                'font' => ['bold' => true, 'color' => ['argb' => 'FF10B981']],
+            ]);
+
+            // عمود خصم إضافي (P) — تلوين أحمر
+            $sheet->getStyle("P3:P{$lastRow}")->applyFromArray([
+                'font' => ['bold' => true, 'color' => ['argb' => 'FFDC2626']],
             ]);
 
             // عمود الفرق (I) — تلوين حسب القيمة (أخضر موجب، أحمر سالب)
@@ -196,7 +210,7 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
             // تلوين صفوف التبادل (تبدأ من صف 3)
             foreach (range(3, $lastRow) as $row) {
                 if ($row % 2 === 1) {
-                    $sheet->getStyle("A{$row}:P{$row}")->getFill()
+                    $sheet->getStyle("A{$row}:Q{$row}")->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setARGB('FFF8FAFC');
                 }
@@ -207,7 +221,7 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
         // صف الإجمالي (بعد آخر صف بيانات)
         // ==================
         $totalRow = $lastRow + 1;
-        $sheet->getStyle("A{$totalRow}:P{$totalRow}")->applyFromArray([
+        $sheet->getStyle("A{$totalRow}:Q{$totalRow}")->applyFromArray([
             'font' => [
                 'bold'  => true,
                 'color' => ['argb' => 'FF1E293B'],
@@ -228,7 +242,9 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
         $sheet->setCellValue("L{$totalRow}", $this->reports->sum('absent_deduction'));
         $sheet->setCellValue("M{$totalRow}", $this->reports->sum('overtime_bonus'));
         $sheet->setCellValue("N{$totalRow}", $this->reports->sum('attendance_bonus'));
-        $sheet->setCellValue("O{$totalRow}", $this->reports->sum('net_salary'));
+        $sheet->setCellValue("O{$totalRow}", $this->reports->sum('extra_bonus'));
+        $sheet->setCellValue("P{$totalRow}", $this->reports->sum('extra_deduction'));
+        $sheet->setCellValue("Q{$totalRow}", $this->reports->sum('net_salary_final'));
 
         // RTL للشيت كاملاً
         $sheet->setRightToLeft(true);
