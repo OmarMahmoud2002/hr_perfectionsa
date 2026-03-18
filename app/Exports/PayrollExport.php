@@ -55,6 +55,16 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
 
         // صف 3+: بيانات الموظفين
         $dataRows = $this->reports->map(function ($report, $index) {
+            // تحويل الدقائق إلى صيغة ساعة:دقيقة
+            $lateFormatted = floor($report->total_late_minutes / 60) . ':' . str_pad($report->total_late_minutes % 60, 2, '0', STR_PAD_LEFT);
+            $overtimeFormatted = floor($report->total_overtime_minutes / 60) . ':' . str_pad($report->total_overtime_minutes % 60, 2, '0', STR_PAD_LEFT);
+
+            // حساب الفرق وتحويله
+            $diffMinutes = $report->total_overtime_minutes - $report->total_late_minutes;
+            $diffSign = $diffMinutes < 0 ? '-' : '';
+            $diffAbsolute = abs($diffMinutes);
+            $diffFormatted = $diffSign . floor($diffAbsolute / 60) . ':' . str_pad($diffAbsolute % 60, 2, '0', STR_PAD_LEFT);
+
             return [
                 $index + 1,
                 $report->employee->name,
@@ -62,9 +72,9 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
                 $report->total_working_days,
                 $report->total_present_days,
                 $report->total_absent_days,
-                round($report->total_late_minutes / 60, 2),
-                round($report->total_overtime_minutes / 60, 2),
-                round(($report->total_overtime_minutes - $report->total_late_minutes) / 60, 2),
+                $lateFormatted,
+                $overtimeFormatted,
+                $diffFormatted,
                 $report->basic_salary,
                 $report->late_deduction,
                 $report->absent_deduction,
@@ -199,8 +209,16 @@ class PayrollExport implements FromCollection, WithStyles, WithTitle, WithColumn
             // عمود الفرق (I) — تلوين حسب القيمة (أخضر موجب، أحمر سالب)
             foreach (range(3, $lastRow) as $row) {
                 $diff = $sheet->getCell("I{$row}")->getValue();
-                if (is_numeric($diff)) {
-                    $color = $diff >= 0 ? 'FF059669' : 'FFDC2626';
+                // التحقق من الإشارة السالبة في النص
+                if (is_string($diff) && str_starts_with($diff, '-')) {
+                    $color = 'FFDC2626'; // أحمر للسالب
+                } else if (!empty($diff) && $diff !== '—' && $diff !== '0:00') {
+                    $color = 'FF059669'; // أخضر للموجب
+                } else {
+                    $color = null;
+                }
+
+                if ($color) {
                     $sheet->getStyle("I{$row}")->applyFromArray([
                         'font' => ['bold' => true, 'color' => ['argb' => $color]],
                     ]);
