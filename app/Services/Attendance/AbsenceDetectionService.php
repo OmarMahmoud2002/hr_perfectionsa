@@ -4,6 +4,7 @@ namespace App\Services\Attendance;
 
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
+use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -29,9 +30,9 @@ class AbsenceDetectionService
      */
     public function getMonthlyStats(Employee $employee, int $month, int $year, array $publicHolidays = []): array
     {
-        // فترة الراتب
-        $periodStart = Carbon::create($year, $month, 22)->subMonthNoOverflow()->toDateString();
-        $periodEnd   = Carbon::create($year, $month, 21)->toDateString();
+        [$periodStartDate, $periodEndDate] = PayrollPeriod::resolve($month, $year);
+        $periodStart = $periodStartDate->toDateString();
+        $periodEnd   = $periodEndDate->toDateString();
 
         // سجلات الحضور الفعلية من قاعدة البيانات
         $records = AttendanceRecord::where('employee_id', $employee->id)
@@ -55,58 +56,10 @@ class AbsenceDetectionService
             $effectivePublicHolidays
         );
 
-        // --- الخطوة الأولى: تحديد الأسابيع التي غاب فيها الموظف طوال الأسبوع ---
-        // manual_status يُؤخذ بعين الاعتبار لتحديد هل اليوم غياب أم لا
-        $weekWorkingDaysCount = [];
-        $weekAbsentDaysCount  = [];   // غياب حقيقي فقط (لحساب fullyAbsentWeeks وخصم أيام الغياب)
-        $weekNonPresentCount  = [];   // غياب + إجازة أسبوعية (لحساب بونص الحضور الكامل)
-
-        foreach ($workingDays as $day) {
-            $dateStr          = $day->toDateString();
-            $record           = $records->get($dateStr);
-            $dow              = $day->dayOfWeek;
-            $daysFromSaturday = ($dow + 1) % 7;
-            $weekKey          = $day->copy()->subDays($daysFromSaturday)->toDateString();
-
-            $weekWorkingDaysCount[$weekKey] = ($weekWorkingDaysCount[$weekKey] ?? 0) + 1;
-
-            // غياب حقيقي (manual absent | auto absent)
-            $isAbsent = $this->resolveIsAbsent($record);
-
-            // غير حاضر: يشمل الغياب الحقيقي + الإجازة الأسبوعية (يدوية أو تلقائية)
-            // الإجازة الأسبوعية اليدوية: manual_status='weekly_leave'
-            // الإجازة الأسبوعية التلقائية: record=null أو is_absent=true (سيُحتسب عبر resolveIsAbsent)
-            $isNonPresent = $isAbsent || $record?->manual_status === 'weekly_leave';
-
-            if ($isAbsent) {
-                $weekAbsentDaysCount[$weekKey] = ($weekAbsentDaysCount[$weekKey] ?? 0) + 1;
-            }
-            if ($isNonPresent) {
-                $weekNonPresentCount[$weekKey] = ($weekNonPresentCount[$weekKey] ?? 0) + 1;
-            }
-        }
-
-        // أسبوع "غياب كامل" = كل أيام العمل فيه غياب حقيقي (لا يستحق إجازة أسبوعية)
-        $fullyAbsentWeeks    = [];
-        // أسبوع "حضور كامل" = لا يوجد أي يوم غير حاضر (لا غياب ولا إجازة أسبوعية)
-        $fullAttendanceWeeks = 0;
-
-        foreach ($weekWorkingDaysCount as $weekKey => $total) {
-            if (($weekAbsentDaysCount[$weekKey] ?? 0) === $total) {
-                // كل أيام الأسبوع غياب حقيقي → أسبوع غياب كامل
-                $fullyAbsentWeeks[$weekKey] = true;
-            } elseif (($weekNonPresentCount[$weekKey] ?? 0) === 0) {
-                // لا يوجد أي يوم غير حاضر → أهلٌ لبونص الحضور الكامل
-                $weekSaturday  = Carbon::parse($weekKey);
-                $weekThursday  = $weekSaturday->copy()->addDays(5);
-                $isFullWeek    = $weekSaturday->toDateString() >= $periodStart
-                              && $weekThursday->toDateString() <= $periodEnd;
-
-                if ($isFullWeek) {
-                    $fullAttendanceWeeks++;
-                }
-            }
-        }
+        // حساب إحصائيات الغياب الأسبوعي (استخدام الدالة المشتركة)
+        $weekStats = $this->calculateWeekAbsenceStats($workingDays, $records, $periodStart, $periodEnd);
+        $fullyAbsentWeeks = $weekStats['fully_absent_weeks'];
+        $fullAttendanceWeeks = $weekStats['full_attendance_weeks'];
 
         // --- الخطوة الثانية: حساب الحضور والغياب مع قاعدة الإجازة الأسبوعية ---
         $presentDays       = 0;
@@ -230,8 +183,8 @@ class AbsenceDetectionService
      */
     public function getDailyBreakdown(Employee $employee, int $month, int $year, array $publicHolidays = []): Collection
     {
-        $firstDay = Carbon::create($year, $month, 22)->subMonthNoOverflow();
-        $lastDay  = Carbon::create($year, $month, 21);
+        [$firstDay, $lastDayRaw] = PayrollPeriod::resolve($month, $year);
+        $lastDay = $lastDayRaw->copy()->startOfDay();
 
         $records = AttendanceRecord::where('employee_id', $employee->id)
             ->whereBetween('date', [$firstDay->toDateString(), $lastDay->toDateString()])
@@ -284,27 +237,20 @@ class AbsenceDetectionService
             $current->addDay();
         }
 
-        // --- الخطوة الثانية: تحديد الأسابيع التي غاب فيها الموظف طوال الأسبوع ---
-        $weekWorkingCount = [];
-        $weekAbsentCount  = [];
+        // --- الخطوة الثانية: تحديد الأسابيع التي غاب فيها الموظف طوال الأسبوع (استخدام الدالة المشتركة) ---
+        // تحويل rawDays إلى تنسيق متوافق مع calculateWeekAbsenceStats
+        $workingDaysForCalc = $rawDays
+            ->filter(fn($d) => !in_array($d['status'], ['friday', 'public_holiday']))
+            ->map(fn($d) => $d['date']);
 
-        foreach ($rawDays as $day) {
-            if (in_array($day['status'], ['friday', 'public_holiday', 'weekly_leave'])) {
-                continue;
-            }
-            $weekKey = $day['week_key'];
-            $weekWorkingCount[$weekKey] = ($weekWorkingCount[$weekKey] ?? 0) + 1;
-            if ($day['status'] === 'absent') {
-                $weekAbsentCount[$weekKey] = ($weekAbsentCount[$weekKey] ?? 0) + 1;
-            }
-        }
+        $recordsForCalc = $records->filter(function($r) use ($rawDays) {
+            $dateStr = Carbon::parse($r->date)->toDateString();
+            $day = $rawDays->firstWhere('date_str', $dateStr);
+            return $day && !in_array($day['status'], ['friday', 'public_holiday']);
+        });
 
-        $fullyAbsentWeeks = [];
-        foreach ($weekWorkingCount as $weekKey => $total) {
-            if (($weekAbsentCount[$weekKey] ?? 0) === $total) {
-                $fullyAbsentWeeks[$weekKey] = true;
-            }
-        }
+        $weekStats = $this->calculateWeekAbsenceStats($workingDaysForCalc, $recordsForCalc, $firstDay->toDateString(), $lastDay->toDateString());
+        $fullyAbsentWeeks = $weekStats['fully_absent_weeks'];
 
         // --- الخطوة الثالثة: تطبيق قاعدة "الإجازة الأسبوعية" ---
         // الأيام اليدوية: حالتها نهائية لا تُغيَّر
@@ -335,5 +281,72 @@ class AbsenceDetectionService
             unset($day['week_key'], $day['is_manual']);
             return $day;
         });
+    }
+
+    /**
+     * حساب إحصائيات الغياب الأسبوعي (دالة مشتركة)
+     * تُستخدم في getMonthlyStats و getDailyBreakdown
+     *
+     * @param  Collection  $workingDays  أيام العمل المفترضة
+     * @param  Collection  $records      سجلات الحضور
+     * @param  string      $periodStart  تاريخ بداية الفترة (Y-m-d)
+     * @param  string      $periodEnd    تاريخ نهاية الفترة (Y-m-d)
+     * @return array{fully_absent_weeks: array, full_attendance_weeks: int}
+     */
+    private function calculateWeekAbsenceStats(Collection $workingDays, Collection $records, string $periodStart, string $periodEnd): array
+    {
+        $weekWorkingDaysCount = [];
+        $weekAbsentDaysCount  = [];   // غياب حقيقي فقط (لحساب fullyAbsentWeeks وخصم أيام الغياب)
+        $weekNonPresentCount  = [];   // غياب + إجازة أسبوعية (لحساب بونص الحضور الكامل)
+
+        foreach ($workingDays as $day) {
+            $dateStr          = $day->toDateString();
+            $record           = $records->get($dateStr);
+            $dow              = $day->dayOfWeek;
+            $daysFromSaturday = ($dow + 1) % 7;
+            $weekKey          = $day->copy()->subDays($daysFromSaturday)->toDateString();
+
+            $weekWorkingDaysCount[$weekKey] = ($weekWorkingDaysCount[$weekKey] ?? 0) + 1;
+
+            // غياب حقيقي (manual absent | auto absent)
+            $isAbsent = $this->resolveIsAbsent($record);
+
+            // غير حاضر: يشمل الغياب الحقيقي + الإجازة الأسبوعية (يدوية أو تلقائية)
+            $isNonPresent = $isAbsent || $record?->manual_status === 'weekly_leave';
+
+            if ($isAbsent) {
+                $weekAbsentDaysCount[$weekKey] = ($weekAbsentDaysCount[$weekKey] ?? 0) + 1;
+            }
+            if ($isNonPresent) {
+                $weekNonPresentCount[$weekKey] = ($weekNonPresentCount[$weekKey] ?? 0) + 1;
+            }
+        }
+
+        // أسبوع "غياب كامل" = كل أيام العمل فيه غياب حقيقي (لا يستحق إجازة أسبوعية)
+        $fullyAbsentWeeks    = [];
+        // أسبوع "حضور كامل" = لا يوجد أي يوم غير حاضر (لا غياب ولا إجازة أسبوعية)
+        $fullAttendanceWeeks = 0;
+
+        foreach ($weekWorkingDaysCount as $weekKey => $total) {
+            if (($weekAbsentDaysCount[$weekKey] ?? 0) === $total) {
+                // كل أيام الأسبوع غياب حقيقي → أسبوع غياب كامل
+                $fullyAbsentWeeks[$weekKey] = true;
+            } elseif (($weekNonPresentCount[$weekKey] ?? 0) === 0) {
+                // لا يوجد أي يوم غير حاضر → أهلٌ لبونص الحضور الكامل
+                $weekSaturday  = Carbon::parse($weekKey);
+                $weekThursday  = $weekSaturday->copy()->addDays(5);
+                $isFullWeek    = $weekSaturday->toDateString() >= $periodStart
+                              && $weekThursday->toDateString() <= $periodEnd;
+
+                if ($isFullWeek) {
+                    $fullAttendanceWeeks++;
+                }
+            }
+        }
+
+        return [
+            'fully_absent_weeks'    => $fullyAbsentWeeks,
+            'full_attendance_weeks' => $fullAttendanceWeeks,
+        ];
     }
 }

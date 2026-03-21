@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\Excel\ExcelReaderService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UploadFileRequest extends FormRequest
@@ -26,10 +27,11 @@ class UploadFileRequest extends FormRequest
                         $fail('يجب أن يكون الملف بصيغة Excel (.xlsx أو .xls).');
                         return;
                     }
-                    // قائمة شاملة بأنواع MIME المقبولة لملفات Excel
+                    // قائمة أنواع MIME المقبولة لملفات Excel فقط
+                    // تم إزالة application/octet-stream و application/zip لأسباب أمنية
                     $allowedMimes = [
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        'application/vnd.ms-excel',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+                        'application/vnd.ms-excel',                                           // .xls
                         'application/msexcel',
                         'application/x-msexcel',
                         'application/x-ms-excel',
@@ -37,12 +39,23 @@ class UploadFileRequest extends FormRequest
                         'application/x-dos_ms_excel',
                         'application/xls',
                         'application/x-xls',
-                        'application/octet-stream',
-                        'application/zip',
                     ];
                     $detectedMime = $value->getMimeType();
                     if (!in_array($detectedMime, $allowedMimes)) {
                         $fail('يجب أن يكون الملف بصيغة Excel (.xlsx أو .xls). (النوع المكتشف: ' . $detectedMime . ')');
+                    }
+
+                    // التحقق من محتوى الملف: محاولة قراءة الملف للتأكد من أنه ملف Excel صالح
+                    try {
+                        $reader = app(ExcelReaderService::class);
+                        $rows = $reader->readUploadedFile($value);
+
+                        // التحقق من أن الملف يحتوي على بيانات
+                        if (empty($rows) || !is_array($rows)) {
+                            $fail('الملف فارغ أو تالف. يرجى رفع ملف Excel صالح.');
+                        }
+                    } catch (\Exception $e) {
+                        $fail('فشل في قراءة محتوى الملف. يرجى التأكد من أن الملف هو Excel صالح وغير تالف.');
                     }
                 },
             ],

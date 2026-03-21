@@ -4,6 +4,7 @@ namespace App\Services\Excel;
 
 use App\DTOs\AttendanceRowDTO;
 use App\DTOs\EmployeeAttendanceDTO;
+use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -227,10 +228,6 @@ class ExcelParserService
      */
     private function getPayrollMonth(Carbon $date): array
     {
-        if ($date->day >= 22) {
-            $next = $date->copy()->addMonthNoOverflow();
-            return ['month' => $next->month, 'year' => $next->year];
-        }
-        return ['month' => $date->month, 'year' => $date->year];
+        return PayrollPeriod::monthForDate($date);
     }
 }

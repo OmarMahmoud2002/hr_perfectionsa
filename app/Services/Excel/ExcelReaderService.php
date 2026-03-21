@@ -2,10 +2,17 @@
 
 namespace App\Services\Excel;
 
+use Closure;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Row;
 use Maatwebsite\Excel\Concerns\ToArray;
+use Maatwebsite\Excel\Concerns\OnEachRow;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterImport;
 use Illuminate\Http\UploadedFile;
 
 /**
@@ -13,6 +20,8 @@ use Illuminate\Http\UploadedFile;
  */
 class ExcelReaderService
 {
+    private const DEFAULT_CHUNK_SIZE = 1000;
+
     /**
      * قراءة ملف Excel وإرجاع جميع الصفوف
      *
@@ -23,23 +32,20 @@ class ExcelReaderService
     public function readFromPath(string $filePath): array
     {
         try {
-            $importer = new class implements ToArray, WithCalculatedFormulas {
-                private array $data = [];
+            $rows = [];
+
+            $importer = new class ($rows) implements ToArray, WithCalculatedFormulas {
+                public function __construct(private array &$rows) {}
 
                 public function array(array $array): void
                 {
-                    $this->data = $array;
-                }
-
-                public function getData(): array
-                {
-                    return $this->data;
+                    $this->rows = $array;
                 }
             };
 
             Excel::import($importer, $filePath, 'local');
 
-            return $importer->getData();
+            return $rows;
         } catch (\Exception $e) {
             Log::error('ExcelReaderService: فشل في قراءة الملف', [
                 'path'    => $filePath,
@@ -142,5 +148,86 @@ class ExcelReaderService
 
         // يجب أن يكون هناك على الأقل صفان (Header + بيانات) أو صف واحد إن لم يكن هناك header
         return count($rows) >= 1;
+    }
+
+    /**
+     * معالجة صفوف ملف Excel على دفعات صغيرة لتقليل استهلاك الذاكرة.
+     *
+     * @param  callable(array<int, array<int, mixed>>): void  $onChunk
+     * @throws \Exception
+     */
+    public function processRowsFromPath(string $filePath, callable $onChunk, int $chunkSize = self::DEFAULT_CHUNK_SIZE): void
+    {
+        try {
+            $importer = new class (Closure::fromCallable($onChunk), $chunkSize) implements OnEachRow, WithChunkReading, WithCalculatedFormulas, SkipsEmptyRows, WithEvents {
+                /** @var array<int, array<int, mixed>> */
+                private array $buffer = [];
+
+                private Closure $onChunk;
+
+                /**
+                 * @param  Closure(array<int, array<int, mixed>>): void  $onChunk
+                 */
+                public function __construct(
+                    Closure $onChunk,
+                    private readonly int $chunkSize,
+                ) {
+                    $this->onChunk = $onChunk;
+                }
+
+                public function onRow(Row $row): void
+                {
+                    $rowValues = array_values($row->toArray());
+
+                    if ($this->isEmptyRow($rowValues)) {
+                        return;
+                    }
+
+                    $this->buffer[] = $rowValues;
+
+                    if (count($this->buffer) >= $this->chunkSize) {
+                        ($this->onChunk)($this->buffer);
+                        $this->buffer = [];
+                    }
+                }
+
+                public function chunkSize(): int
+                {
+                    return $this->chunkSize;
+                }
+
+                public function registerEvents(): array
+                {
+                    return [
+                        AfterImport::class => function (): void {
+                            if (!empty($this->buffer)) {
+                                ($this->onChunk)($this->buffer);
+                                $this->buffer = [];
+                            }
+                        },
+                    ];
+                }
+
+                private function isEmptyRow(array $row): bool
+                {
+                    foreach ($row as $value) {
+                        if ($value !== null && $value !== '' && $value !== false) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            };
+
+            Excel::import($importer, $filePath, 'local');
+        } catch (\Exception $e) {
+            Log::error('ExcelReaderService: فشل في المعالجة المتدرجة للملف', [
+                'path'    => $filePath,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new \Exception('فشل في معالجة ملف Excel: ' . $e->getMessage());
+        }
     }
 }

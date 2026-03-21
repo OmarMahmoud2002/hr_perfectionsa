@@ -3,7 +3,6 @@
 namespace App\Services\Import;
 
 use App\DTOs\AttendanceRowDTO;
-use App\DTOs\EmployeeAttendanceDTO;
 use App\Enums\ImportStatus;
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
@@ -13,12 +12,15 @@ use App\Services\Attendance\AttendanceCalculationService;
 use App\Services\Attendance\PublicHolidayService;
 use App\Services\Dashboard\DashboardStatisticsService;
 use App\Services\Employee\EmployeeService;
+use App\Services\Excel\ExcelTimeHelper;
 use App\Services\Excel\ExcelParserService;
 use App\Services\Excel\ExcelReaderService;
+use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ImportService
 {
@@ -45,38 +47,37 @@ class ImportService
      */
     public function uploadAndPreview($file, int $userId): array
     {
-        // قراءة الملف
-        $rows = $this->reader->readUploadedFile($file);
+        // تنظيف اسم الملف من أي محتوى خطير (XSS Prevention)
+        // إزالة أي أحرف خاصة وعلامات HTML المحتملة
+        $originalName = $file->getClientOriginalName();
+        $fileName = $this->sanitizeFileName($originalName);
+        $filePath = $file->store('imports', 'local');
 
-        if (empty($rows)) {
-            throw new \Exception('الملف فارغ أو لا يحتوي على بيانات.');
+        try {
+            [$month, $year] = $this->detectDominantPayrollPeriodFromFile($filePath);
+
+            if ($month === null || $year === null) {
+                throw new \Exception('لم يتم العثور على بيانات صالحة في الملف.');
+            }
+
+            [$recordsCount, $employeesCount, $employeeNames, $parseErrors] = $this->collectPreviewStatsFromFile(
+                $filePath,
+                $month,
+                $year
+            );
+
+            if ($employeesCount === 0) {
+                throw new \Exception('لم يتم العثور على أي موظفين في الملف.');
+            }
+        } catch (\Throwable $e) {
+            Storage::disk('local')->delete($filePath);
+            throw $e;
         }
-
-        // اكتشاف الأعمدة
-        $columns = $this->parser->detectColumns($rows[0] ?? []);
-
-        // تحليل البيانات
-        $result = $this->parser->parse($rows, $columns);
-
-        if ($result['month'] === null) {
-            throw new \Exception('لم يتم العثور على بيانات صالحة في الملف.');
-        }
-
-        /** @var \Illuminate\Support\Collection $employees */
-        $employees = $result['employees'];
-
-        if ($employees->isEmpty()) {
-            throw new \Exception('لم يتم العثور على أي موظفين في الملف.');
-        }
-
-        // حفظ الملف في Storage
-        $fileName  = $file->getClientOriginalName();
-        $filePath  = $file->store('imports', 'local');
 
         // حذف أي دفعات قديمة في حالة الانتظار أو المعالجة لنفس الشهر
         // (تنظيف الرفعات الناقصة السابقة قبل إنشاء الجديدة)
-        ImportBatch::where('month', $result['month'])
-            ->where('year', $result['year'])
+        ImportBatch::where('month', $month)
+            ->where('year', $year)
             ->whereIn('status', [ImportStatus::Pending, ImportStatus::Processing])
             ->each(function ($oldBatch) {
                 Storage::disk('local')->delete($oldBatch->file_path);
@@ -88,27 +89,27 @@ class ImportService
         $batch = ImportBatch::create([
             'file_name'       => $fileName,
             'file_path'       => $filePath,
-            'month'           => $result['month'],
-            'year'            => $result['year'],
+            'month'           => $month,
+            'year'            => $year,
             'status'          => ImportStatus::Pending,
-            'records_count'   => $employees->sum(fn ($e) => $e->records->count()),
-            'employees_count' => $employees->count(),
+            'records_count'   => $recordsCount,
+            'employees_count' => $employeesCount,
             'uploaded_by'     => $userId,
         ]);
 
         // معاينة مختصرة
         $preview = [
-            'month'            => $result['month'],
-            'year'             => $result['year'],
-            'employees_count'  => $employees->count(),
+            'month'            => $month,
+            'year'             => $year,
+            'employees_count'  => $employeesCount,
             'records_count'    => $batch->records_count,
-            'employee_names'   => $employees->take(5)->pluck('name')->all(),
-            'parse_errors'     => $result['errors'],
+            'employee_names'   => $employeeNames,
+            'parse_errors'     => $parseErrors,
         ];
 
         // هل يوجد بيانات مكررة لنفس الشهر؟
-        $existingBatch = ImportBatch::where('month', $result['month'])
-            ->where('year', $result['year'])
+        $existingBatch = ImportBatch::where('month', $month)
+            ->where('year', $year)
             ->where('status', ImportStatus::Completed)
             ->where('id', '!=', $batch->id)
             ->first();
@@ -119,7 +120,7 @@ class ImportService
         return [
             'batch'   => $batch,
             'preview' => $preview,
-            'errors'  => $result['errors'],
+            'errors'  => $parseErrors,
         ];
     }
 
@@ -128,11 +129,13 @@ class ImportService
     // ===================================================
 
     /**
-     * تنفيذ الاستيراد الكامل بعد تأكيد المستخدم
+     * تنفيذ الاستيراد الكامل بعد تأكيد المستخدم.
+     *
+     * السلوك الحالي: overwrite-only لنفس فترة الرواتب.
      *
      * @param  ImportBatch  $batch
      * @param  array        $importSettings   إعدادات مخصصة لهذا الشهر
-     * @param  bool         $replaceExisting  هل تستبدل البيانات القديمة
+     * @param  bool         $replaceExisting  متروك للتوافق الخلفي (لا يؤثر)
      * @return ImportBatch
      * @throws \Exception
      */
@@ -149,101 +152,114 @@ class ImportService
         // بدء المعالجة
         $batch->update(['status' => ImportStatus::Processing]);
 
-        DB::beginTransaction();
         try {
-            // حذف البيانات القديمة إن طُلب ذلك
-            if ($replaceExisting) {
-                $this->deleteExistingDataForMonth($batch->month, $batch->year, $batch->id);
-            }
+            DB::transaction(function () use ($batch, $settings): void {
+                // overwrite-only: احذف كل سجلات الفترة أولاً.
+                $this->deleteAttendanceRecordsForPayrollPeriod($batch->month, $batch->year);
+                // تنظيف دفعات الشهر السابقة حتى تبقى دفعة مكتملة واحدة للشهر.
+                $this->cleanupPreviousBatchesForMonth($batch->month, $batch->year, $batch->id);
 
-            // إعادة قراءة الملف
-            $rows    = $this->reader->readFromPath($batch->file_path);
-            $columns = $this->parser->detectColumns($rows[0] ?? []);
-            $result  = $this->parser->parse($rows, $columns);
+                // جلب الإجازات الرسمية
+                $publicHolidays = $this->holidayService->getHolidayDates($batch);
 
-            /** @var \Illuminate\Support\Collection $employees */
-            $employees = $result['employees'];
+                $totalRecords   = 0;
+                $totalEmployees = 0;
 
-            // جلب الإجازات الرسمية
-            $publicHolidays = $this->holidayService->getHolidayDates($batch);
+                $columns = null;
+                $seenEmployeeIds = [];
+                $employeeCache = [];
+                $employeeSettingsCache = [];
+                $recordsBuffer = [];
 
-            $totalRecords  = 0;
-            $totalEmployees = 0;
+                $this->reader->processRowsFromPath($batch->file_path, function (array $rows) use (
+                    &$columns,
+                    &$seenEmployeeIds,
+                    &$employeeCache,
+                    &$employeeSettingsCache,
+                    &$recordsBuffer,
+                    &$totalRecords,
+                    &$totalEmployees,
+                    $batch,
+                    $settings,
+                    $publicHolidays
+                ) {
+                    foreach ($rows as $row) {
+                        if ($this->isEmptyExcelRow($row)) {
+                            continue;
+                        }
 
-            foreach ($employees as $employeeDTO) {
-                /** @var EmployeeAttendanceDTO $employeeDTO */
+                        if ($columns === null) {
+                            $columns = $this->parser->detectColumns($row);
 
-                // إنشاء/تحديث الموظف
-                $employee = $this->employeeService->findOrCreateFromExcel(
-                    $employeeDTO->acNo,
-                    $employeeDTO->name
-                );
+                            // إذا الصف الأول Header نتخطاه، وإن كان Data نكمل مع نفس الصف.
+                            if (!$this->isDataRow($row, $columns)) {
+                                continue;
+                            }
+                        }
 
-                // إعدادات الشيفت الخاصة بهذا الموظف تتجاوز إعدادات الدفعة
-                $employeeSettings = $this->resolveEmployeeSettings($employee, $settings);
+                        $rowDTO = $this->buildAttendanceRowDTO($row, $columns, $batch->month, $batch->year);
+                        if ($rowDTO === null) {
+                            continue;
+                        }
 
-                $totalEmployees++;
-                $recordsToInsert = [];
+                        // تجاهل أيام الجمعة
+                        if ($rowDTO->date->dayOfWeek === 5) {
+                            continue;
+                        }
 
-                foreach ($employeeDTO->records as $rowDTO) {
-                    /** @var AttendanceRowDTO $rowDTO */
+                        $employee = $employeeCache[$rowDTO->acNo] ??= $this->employeeService->findOrCreateFromExcel(
+                            $rowDTO->acNo,
+                            $rowDTO->name
+                        );
 
-                    // حساب التأخير والـ OT بإعدادات الموظف الخاص
-                    $calc = $this->calculator->calculateDay(
-                        $rowDTO,
-                        $employeeSettings,
-                        $publicHolidays
-                    );
+                        if (!isset($seenEmployeeIds[$employee->id])) {
+                            $seenEmployeeIds[$employee->id] = true;
+                            $totalEmployees++;
+                        }
 
-                    // تجاهل أيام الجمعة
-                    if ($rowDTO->date->dayOfWeek === 5) {
-                        continue;
+                        $employeeSettings = $employeeSettingsCache[$employee->id]
+                            ??= $this->resolveEmployeeSettings($employee, $settings);
+
+                        $calc = $this->calculator->calculateDay($rowDTO, $employeeSettings, $publicHolidays);
+
+                        $recordsBuffer[] = [
+                            'employee_id'      => $employee->id,
+                            'date'             => $rowDTO->date->toDateString(),
+                            'clock_in'         => $rowDTO->clockIn?->format('H:i:s'),
+                            'clock_out'        => $rowDTO->clockOut?->format('H:i:s'),
+                            'is_absent'        => $calc['is_absent'],
+                            'late_minutes'     => $calc['late_minutes'],
+                            'overtime_minutes' => $calc['overtime_minutes'],
+                            'work_minutes'     => $calc['work_minutes'],
+                            'notes'            => $calc['notes'],
+                            'import_batch_id'  => $batch->id,
+                            'created_at'       => now(),
+                            'updated_at'       => now(),
+                        ];
+
+                        $totalRecords++;
+
+                        if (count($recordsBuffer) >= 1000) {
+                            $this->flushAttendanceBuffer($recordsBuffer);
+                        }
                     }
+                }, 1000);
 
-                    $recordsToInsert[] = [
-                        'employee_id'      => $employee->id,
-                        'date'             => $rowDTO->date->toDateString(),
-                        'clock_in'         => $rowDTO->clockIn?->format('H:i:s'),
-                        'clock_out'        => $rowDTO->clockOut?->format('H:i:s'),
-                        'is_absent'        => $calc['is_absent'],
-                        'late_minutes'     => $calc['late_minutes'],
-                        'overtime_minutes' => $calc['overtime_minutes'],
-                        'work_minutes'     => $calc['work_minutes'],
-                        'notes'            => $calc['notes'],
-                        'import_batch_id'  => $batch->id,
-                        'created_at'       => now(),
-                        'updated_at'       => now(),
-                    ];
+                $this->flushAttendanceBuffer($recordsBuffer);
 
-                    $totalRecords++;
-                }
-
-                // إدراج بالجملة مع تجاهل المكرر (upsert على employee_id + date)
-                if (!empty($recordsToInsert)) {
-                    AttendanceRecord::upsert(
-                        $recordsToInsert,
-                        ['employee_id', 'date'],
-                        ['clock_in', 'clock_out', 'is_absent', 'late_minutes', 'overtime_minutes', 'work_minutes', 'notes', 'import_batch_id', 'updated_at']
-                    );
-                }
-            }
-
-            // تحديث الدفعة
-            $batch->update([
-                'status'          => ImportStatus::Completed,
-                'records_count'   => $totalRecords,
-                'employees_count' => $totalEmployees,
-            ]);
-
-            DB::commit();
+                // تحديث الدفعة
+                $batch->update([
+                    'status'          => ImportStatus::Completed,
+                    'records_count'   => $totalRecords,
+                    'employees_count' => $totalEmployees,
+                ]);
+            });
 
             $this->dashboardStats->clearCache();
 
             return $batch->fresh();
 
         } catch (\Exception $e) {
-            DB::rollBack();
-
             $batch->update([
                 'status'    => ImportStatus::Failed,
                 'error_log' => $e->getMessage(),
@@ -298,9 +314,21 @@ class ImportService
     // ===================================================
 
     /**
-     * حذف البيانات القديمة لنفس الشهر (عند الاستبدال)
+     * overwrite-only: حذف كل سجلات الحضور لفترة الرواتب المطلوبة.
      */
-    private function deleteExistingDataForMonth(int $month, int $year, int $excludeBatchId): void
+    private function deleteAttendanceRecordsForPayrollPeriod(int $month, int $year): void
+    {
+        [$periodStart, $periodEnd] = PayrollPeriod::resolve($month, $year);
+
+        AttendanceRecord::query()
+            ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->delete();
+    }
+
+    /**
+     * تنظيف دفعات الشهر السابقة بعد الاستبدال الكامل.
+     */
+    private function cleanupPreviousBatchesForMonth(int $month, int $year, int $excludeBatchId): void
     {
         $existingBatches = ImportBatch::where('month', $month)
             ->where('year', $year)
@@ -308,7 +336,6 @@ class ImportService
             ->get();
 
         foreach ($existingBatches as $oldBatch) {
-            AttendanceRecord::where('import_batch_id', $oldBatch->id)->delete();
             $oldBatch->publicHolidays()->delete();
 
             if ($oldBatch->file_path && Storage::disk('local')->exists($oldBatch->file_path)) {
@@ -324,11 +351,13 @@ class ImportService
      */
     private function resolveSettings(array $importSettings): array
     {
+        $allSettings = Setting::getAllAsArray();
+
         $defaults = [
-            'work_start_time'     => Setting::getValue('work_start_time', '09:00'),
-            'work_end_time'       => Setting::getValue('work_end_time', '17:00'),
-            'overtime_start_time' => Setting::getValue('overtime_start_time', '17:30'),
-            'late_grace_minutes'  => (int) Setting::getValue('late_grace_minutes', 30),
+            'work_start_time'     => $allSettings['work_start_time'] ?? '09:00',
+            'work_end_time'       => $allSettings['work_end_time'] ?? '17:00',
+            'overtime_start_time' => $allSettings['overtime_start_time'] ?? '17:30',
+            'late_grace_minutes'  => (int) ($allSettings['late_grace_minutes'] ?? 30),
         ];
 
         return array_merge($defaults, array_filter($importSettings, fn ($v) => $v !== null && $v !== ''));
@@ -341,5 +370,249 @@ class ImportService
     private function resolveEmployeeSettings(Employee $employee, array $batchSettings): array
     {
         return array_merge($batchSettings, $employee->getShiftOverrides());
+    }
+
+    /**
+     * تجهيز صف Excel إلى DTO بعد التحقق من الشهر/السنة المطلوبة.
+     */
+    private function buildAttendanceRowDTO(array $row, array $columns, int $batchMonth, int $batchYear): ?AttendanceRowDTO
+    {
+        $acNo    = trim((string) ($row[$columns['ac_no']] ?? ''));
+        $name    = trim((string) ($row[$columns['name']] ?? ''));
+        $dateRaw = $row[$columns['date']] ?? null;
+
+        if ($acNo === '' || $dateRaw === null || $dateRaw === '') {
+            return null;
+        }
+
+        $date = ExcelTimeHelper::parseDate($dateRaw);
+        if (!$date) {
+            return null;
+        }
+
+        $payrollMonth = PayrollPeriod::monthForDate($date);
+        if ($payrollMonth['month'] !== $batchMonth || $payrollMonth['year'] !== $batchYear) {
+            return null;
+        }
+
+        $clockInRaw  = $row[$columns['clock_in']] ?? null;
+        $clockOutRaw = $row[$columns['clock_out']] ?? null;
+
+        $clockIn  = ExcelTimeHelper::parseTime($clockInRaw, $date);
+        $clockOut = ExcelTimeHelper::parseTime($clockOutRaw, $date);
+
+        $notes = null;
+        if ($clockIn && $clockOut && $clockOut->lt($clockIn)) {
+            $clockOut = null;
+            $notes = 'وقت انصراف غير صالح - تم تجاهله';
+        }
+
+        $isAbsent = ($clockIn === null && $clockOut === null);
+
+        if (!$isAbsent) {
+            if ($clockIn === null) {
+                $notes = ($notes ? $notes . '، ' : '') . 'حضور بدون بصمة (افتراضي 09:00)';
+            }
+            if ($clockOut === null) {
+                $notes = ($notes ? $notes . '، ' : '') . 'انصراف بدون بصمة (افتراضي 17:00)';
+            }
+        }
+
+        return new AttendanceRowDTO(
+            acNo: $acNo,
+            name: $name ?: $acNo,
+            date: $date,
+            clockIn: $clockIn,
+            clockOut: $clockOut,
+            isAbsent: $isAbsent,
+            notes: $notes,
+        );
+    }
+
+    /**
+     * تنفيذ upsert على دفعة سجلات الحضور ثم تفريغ الذاكرة.
+     */
+    private function flushAttendanceBuffer(array &$recordsBuffer): void
+    {
+        if (empty($recordsBuffer)) {
+            return;
+        }
+
+        AttendanceRecord::upsert(
+            $recordsBuffer,
+            ['employee_id', 'date'],
+            ['clock_in', 'clock_out', 'is_absent', 'late_minutes', 'overtime_minutes', 'work_minutes', 'notes', 'import_batch_id', 'updated_at']
+        );
+
+        $recordsBuffer = [];
+    }
+
+    private function isDataRow(array $row, array $columns): bool
+    {
+        $acNoValue = $row[$columns['ac_no']] ?? null;
+
+        return is_numeric($acNoValue) && $acNoValue > 0;
+    }
+
+    private function isEmptyExcelRow(array $row): bool
+    {
+        foreach ($row as $cell) {
+            if ($cell !== null && $cell !== '' && $cell !== false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * المرور الأول: تحديد شهر الراتب السائد بدون تحميل الملف بالكامل.
+     *
+     * @return array{0: int|null, 1: int|null}
+     */
+    private function detectDominantPayrollPeriodFromFile(string $filePath): array
+    {
+        $columns = null;
+        $monthCounts = [];
+
+        $this->reader->processRowsFromPath($filePath, function (array $rows) use (&$columns, &$monthCounts) {
+            foreach ($rows as $row) {
+                if ($this->isEmptyExcelRow($row)) {
+                    continue;
+                }
+
+                if ($columns === null) {
+                    $columns = $this->parser->detectColumns($row);
+
+                    if (!$this->isDataRow($row, $columns)) {
+                        continue;
+                    }
+                }
+
+                $dateRaw = $row[$columns['date']] ?? null;
+                $acNo    = trim((string) ($row[$columns['ac_no']] ?? ''));
+
+                if ($acNo === '' || $dateRaw === null || $dateRaw === '') {
+                    continue;
+                }
+
+                $date = ExcelTimeHelper::parseDate($dateRaw);
+                if (!$date) {
+                    continue;
+                }
+
+                $payrollMonth = PayrollPeriod::monthForDate($date);
+                $key = $payrollMonth['year'] . '_' . str_pad((string) $payrollMonth['month'], 2, '0', STR_PAD_LEFT);
+                $monthCounts[$key] = ($monthCounts[$key] ?? 0) + 1;
+            }
+        }, 1000);
+
+        if (empty($monthCounts)) {
+            return [null, null];
+        }
+
+        arsort($monthCounts);
+        [$year, $month] = explode('_', array_key_first($monthCounts));
+
+        return [(int) $month, (int) $year];
+    }
+
+    /**
+     * المرور الثاني: إحصائيات المعاينة للشهر السائد فقط.
+     *
+     * @return array{0: int, 1: int, 2: array<int, string>, 3: array<int, string>}
+     */
+    private function collectPreviewStatsFromFile(string $filePath, int $targetMonth, int $targetYear): array
+    {
+        $columns = null;
+        $recordsCount = 0;
+        $employeeNamesByAcNo = [];
+        $errors = [];
+
+        $this->reader->processRowsFromPath($filePath, function (array $rows) use (
+            &$columns,
+            &$recordsCount,
+            &$employeeNamesByAcNo,
+            &$errors,
+            $targetMonth,
+            $targetYear
+        ) {
+            foreach ($rows as $row) {
+                if ($this->isEmptyExcelRow($row)) {
+                    continue;
+                }
+
+                if ($columns === null) {
+                    $columns = $this->parser->detectColumns($row);
+
+                    if (!$this->isDataRow($row, $columns)) {
+                        continue;
+                    }
+                }
+
+                $acNo    = trim((string) ($row[$columns['ac_no']] ?? ''));
+                $name    = trim((string) ($row[$columns['name']] ?? ''));
+                $dateRaw = $row[$columns['date']] ?? null;
+
+                if ($acNo === '' || $dateRaw === null || $dateRaw === '') {
+                    continue;
+                }
+
+                $date = ExcelTimeHelper::parseDate($dateRaw);
+                if (!$date) {
+                    if (count($errors) < 20) {
+                        $errors[] = 'تاريخ غير صالح للموظف: ' . ($name ?: $acNo);
+                    }
+                    continue;
+                }
+
+                $payrollMonth = PayrollPeriod::monthForDate($date);
+                if ($payrollMonth['month'] !== $targetMonth || $payrollMonth['year'] !== $targetYear) {
+                    continue;
+                }
+
+                $recordsCount++;
+                if (!isset($employeeNamesByAcNo[$acNo])) {
+                    $employeeNamesByAcNo[$acNo] = $name ?: $acNo;
+                }
+            }
+        }, 1000);
+
+        return [
+            $recordsCount,
+            count($employeeNamesByAcNo),
+            array_slice(array_values($employeeNamesByAcNo), 0, 5),
+            $errors,
+        ];
+    }
+
+    /**
+     * تنظيف اسم الملف من أي محتوى خطير لمنع XSS
+     * يزيل العلامات الخطيرة ويحافظ على الأحرف الآمنة فقط
+     */
+    private function sanitizeFileName(string $fileName): string
+    {
+        // إزالة أي HTML/JavaScript tags
+        $fileName = strip_tags($fileName);
+
+        // إزالة الأحرف الخاصة الخطيرة (< > " ' / \ & ; | $ ` )
+        $fileName = preg_replace('/[<>"\'\/\\\&;|$`]/', '', $fileName);
+
+        // إزالة محاولات null bytes
+        $fileName = str_replace("\0", '', $fileName);
+
+        // الحد من الطول (أقصى 255 حرف)
+        if (mb_strlen($fileName) > 255) {
+            $extension = pathinfo($fileName, PATHINFO_EXTENSION);
+            $baseName = mb_substr(pathinfo($fileName, PATHINFO_FILENAME), 0, 250);
+            $fileName = $baseName . '.' . $extension;
+        }
+
+        // إذا أصبح الاسم فارغاً بعد التنظيف، استخدم اسم افتراضي
+        if (empty(trim($fileName))) {
+            $fileName = 'upload_' . time() . '.xlsx';
+        }
+
+        return $fileName;
     }
 }

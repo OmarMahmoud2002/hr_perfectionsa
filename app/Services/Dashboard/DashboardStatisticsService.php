@@ -6,6 +6,8 @@ use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\AttendanceRecord;
 use App\Models\PayrollReport;
+use App\Services\Payroll\PayrollPeriod;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -65,12 +67,15 @@ class DashboardStatisticsService
 
     private function getCurrentMonthStats(): array
     {
-        $currentMonth = now()->month;
-        $currentYear  = now()->year;
+        $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
+        $currentMonth = $currentPayrollMonth['month'];
+        $currentYear  = $currentPayrollMonth['year'];
+        [$periodStart, $periodEnd] = PayrollPeriod::resolve($currentMonth, $currentYear);
 
         $batch = ImportBatch::where('month', $currentMonth)
             ->where('year', $currentYear)
             ->where('status', 'completed')
+            ->latest('id')
             ->first();
 
         if (! $batch) {
@@ -86,7 +91,10 @@ class DashboardStatisticsService
             ];
         }
 
-        $records = AttendanceRecord::where('import_batch_id', $batch->id);
+        $records = AttendanceRecord::whereBetween('date', [
+            $periodStart->toDateString(),
+            $periodEnd->toDateString(),
+        ]);
 
         // استبعاد أيام الجمعة (DAYOFWEEK = 6 في MySQL) من حساب نسبة الحضور
         // نحسب فقط من أيام العمل (5 أيام في الأسبوع)
@@ -127,19 +135,13 @@ class DashboardStatisticsService
      */
     private function getTopLateEmployees(int $limit = 5): \Illuminate\Support\Collection
     {
-        $currentMonth = now()->month;
-        $currentYear  = now()->year;
+        $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
+        [$periodStart, $periodEnd] = PayrollPeriod::resolve($currentPayrollMonth['month'], $currentPayrollMonth['year']);
 
-        $batch = ImportBatch::where('month', $currentMonth)
-            ->where('year', $currentYear)
-            ->where('status', 'completed')
-            ->first();
-
-        if (! $batch) {
-            return collect();
-        }
-
-        return AttendanceRecord::where('import_batch_id', $batch->id)
+        return AttendanceRecord::whereBetween('date', [
+                $periodStart->toDateString(),
+                $periodEnd->toDateString(),
+            ])
             ->where('late_minutes', '>', 0)
             ->select('employee_id', DB::raw('SUM(late_minutes) as total_late'))
             ->groupBy('employee_id')
@@ -161,19 +163,13 @@ class DashboardStatisticsService
      */
     private function getTopOTEmployees(int $limit = 5): \Illuminate\Support\Collection
     {
-        $currentMonth = now()->month;
-        $currentYear  = now()->year;
+        $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
+        [$periodStart, $periodEnd] = PayrollPeriod::resolve($currentPayrollMonth['month'], $currentPayrollMonth['year']);
 
-        $batch = ImportBatch::where('month', $currentMonth)
-            ->where('year', $currentYear)
-            ->where('status', 'completed')
-            ->first();
-
-        if (! $batch) {
-            return collect();
-        }
-
-        return AttendanceRecord::where('import_batch_id', $batch->id)
+        return AttendanceRecord::whereBetween('date', [
+                $periodStart->toDateString(),
+                $periodEnd->toDateString(),
+            ])
             ->where('overtime_minutes', '>', 0)
             ->select('employee_id', DB::raw('SUM(overtime_minutes) as total_ot'))
             ->groupBy('employee_id')

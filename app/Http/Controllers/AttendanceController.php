@@ -8,6 +8,7 @@ use App\Models\ImportBatch;
 use App\Enums\ImportStatus;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
+use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -166,14 +167,9 @@ class AttendanceController extends Controller
         $status  = $request->input('status');
         $dateObj = Carbon::parse($date);
 
-        // تحديد الـ batch المرتبط بهذا التاريخ (22 سابق → 21 حالي)
-        if ($dateObj->day >= 22) {
-            $payrollMonth = $dateObj->month === 12 ? 1 : $dateObj->month + 1;
-            $payrollYear  = $dateObj->month === 12 ? $dateObj->year + 1 : $dateObj->year;
-        } else {
-            $payrollMonth = $dateObj->month;
-            $payrollYear  = $dateObj->year;
-        }
+        $payrollMonthData = PayrollPeriod::monthForDate($dateObj);
+        $payrollMonth = $payrollMonthData['month'];
+        $payrollYear  = $payrollMonthData['year'];
 
         $batch = ImportBatch::where('month', $payrollMonth)
             ->where('year', $payrollYear)

@@ -8,9 +8,9 @@ use App\Models\ImportBatch;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
 use App\Services\Employee\EmployeeService;
+use App\Services\Payroll\PayrollPeriod;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -62,9 +62,9 @@ class EmployeeController extends Controller
         $month = (int) $request->input('month', now()->month);
         $year  = (int) $request->input('year', now()->year);
 
-        // فترة الراتب: من 22 الشهر السابق حتى 21 الشهر الحالي
-        $periodStart = Carbon::create($year, $month, 22)->subMonthNoOverflow()->toDateString();
-        $periodEnd   = Carbon::create($year, $month, 21)->toDateString();
+        [$periodStartDate, $periodEndDate] = PayrollPeriod::resolve($month, $year);
+        $periodStart = $periodStartDate->toDateString();
+        $periodEnd   = $periodEndDate->toDateString();
 
         // جلب batch والإجازات الرسمية
         $batch = ImportBatch::where('month', $month)

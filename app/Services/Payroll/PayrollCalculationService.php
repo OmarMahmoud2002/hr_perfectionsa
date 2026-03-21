@@ -37,113 +37,118 @@ class PayrollCalculationService
      *   تكلفة الساعة = تكلفة اليوم ÷ 8
      *   خصم/مكافأة ساعة التأخير أو الأوفرتايم = تكلفة الساعة × 1.5
      *
-     * @param  Employee  $employee
-     * @param  int       $month
-     * @param  int       $year
+     * @param  Employee       $employee
+     * @param  int            $month
+     * @param  int            $year
+     * @param  ImportBatch|null  $batch  (optional) تمرير الدفعة لتجنب الاستعلام المتكرر
      * @return PayrollReport
      */
-    public function calculateForEmployee(Employee $employee, int $month, int $year): PayrollReport
+    public function calculateForEmployee(Employee $employee, int $month, int $year, ?ImportBatch $batch = null): PayrollReport
     {
-        // جلب إجازات الشهر
-        $batch = ImportBatch::where('month', $month)
-            ->where('year', $year)
-            ->where('status', ImportStatus::Completed)
-            ->first();
+        return DB::transaction(function () use ($employee, $month, $year, $batch) {
+            // جلب إجازات الشهر (إذا لم يتم تمرير الدفعة، استعلم عنها)
+            if ($batch === null) {
+                $batch = ImportBatch::where('month', $month)
+                    ->where('year', $year)
+                    ->where('status', ImportStatus::Completed)
+                    ->first();
+            }
 
-        $publicHolidays = $batch ? $this->holidayService->getHolidayDates($batch) : [];
+            $publicHolidays = $batch ? $this->holidayService->getHolidayDates($batch) : [];
 
-        // إحصائيات الحضور
-        $stats = $this->absenceService->getMonthlyStats($employee, $month, $year, $publicHolidays);
+            // إحصائيات الحضور
+            $stats = $this->absenceService->getMonthlyStats($employee, $month, $year, $publicHolidays);
 
-        // ============ الحساب المالي ============
-        $basicSalary           = (float) $employee->basic_salary;
-        $totalLateMinutes      = (int) $stats['total_late_minutes'];
-        $totalOtMinutes        = (int) $stats['total_overtime_minutes'];
-        $absentDays            = $stats['total_absent_days'];
-        $fullAttendanceWeeks   = $stats['total_full_attendance_weeks'];
+            // ============ الحساب المالي ============
+            $basicSalary           = (float) $employee->basic_salary;
+            $totalLateMinutes      = (int) $stats['total_late_minutes'];
+            $totalOtMinutes        = (int) $stats['total_overtime_minutes'];
+            $absentDays            = $stats['total_absent_days'];
+            $fullAttendanceWeeks   = $stats['total_full_attendance_weeks'];
 
-        // معدلات مبنية على راتب الموظف
-        // تكلفة اليوم = الراتب ÷ 30
-        // تكلفة الساعة = تكلفة اليوم ÷ 8
-        // معدل التأخير / الأوفرتايم = تكلفة الساعة × 1.5
-        $dailyRate         = $basicSalary / 30;
-        $hourlyRate        = $dailyRate / 8;
-        $hourlyRateWith1_5 = $hourlyRate * 1.5;
+            // معدلات مبنية على راتب الموظف
+            // تكلفة اليوم = الراتب ÷ 30
+            // تكلفة الساعة = تكلفة اليوم ÷ 8
+            // معدل التأخير / الأوفرتايم = تكلفة الساعة × 1.5
+            $dailyRate         = $basicSalary / 30;
+            $hourlyRate        = $dailyRate / 8;
+            $hourlyRateWith1_5 = $hourlyRate * 1.5;
 
-        /*
-         * قاعدة الأوفرتايم والتأخير:
-         *
-         * حالة 1 — التأخير > الأوفرتايم (صافي التأخير موجب):
-         *   • الأوفرتايم يُعوّض التأخير أولاً
-         *   • إذا كان صافي التأخير < 4 ساعات  → لا يُخصم شيء، لا مكافأة OT
-         *   • إذا كان صافي التأخير ≥ 4 ساعات  → يُخصم صافي التأخير × سعر الساعة، لا مكافأة OT
-         *
-         * حالة 2 — الأوفرتايم ≥ التأخير (الفرق في صالح OT):
-         *   • لا يوجد خصم تأخير
-         *   • مكافأة OT = إجمالي ساعات الأوفرتايم × سعر الساعة × 1.5 (مهما كانت المدة)
-         */
-        $netLateMinutes = $totalLateMinutes - $totalOtMinutes;
+            /*
+             * قاعدة الأوفرتايم والتأخير:
+             *
+             * حالة 1 — التأخير > الأوفرتايم (صافي التأخير موجب):
+             *   • الأوفرتايم يُعوّض التأخير أولاً
+             *   • إذا كان صافي التأخير < 4 ساعات  → لا يُخصم شيء، لا مكافأة OT
+             *   • إذا كان صافي التأخير ≥ 4 ساعات  → يُخصم صافي التأخير × سعر الساعة، لا مكافأة OT
+             *
+             * حالة 2 — الأوفرتايم ≥ التأخير (الفرق في صالح OT):
+             *   • لا يوجد خصم تأخير
+             *   • مكافأة OT = إجمالي ساعات الأوفرتايم × سعر الساعة × 1.5 (مهما كانت المدة)
+             */
+            $netLateMinutes = $totalLateMinutes - $totalOtMinutes;
 
-        if ($netLateMinutes > 0) {
-            // صافي التأخير موجب — تطبيق فترة السماح (4 ساعات)
-            $graceLimitMinutes    = 4 * 60; // 240 دقيقة
-            $effectiveLateMinutes = ($netLateMinutes < $graceLimitMinutes) ? 0 : $netLateMinutes;
-            $lateDeduction        = round(($effectiveLateMinutes / 60) * $hourlyRateWith1_5, 2);
-            $overtimeBonus        = 0; // الأوفرتايم استُنفد في تعويض التأخير
-        } else {
-            // صافي الأوفرتايم — لا خصم، ومكافأة على إجمالي ساعات OT
-            $lateDeduction = 0;
-            $overtimeBonus = round(($totalOtMinutes / 60) * $hourlyRateWith1_5, 2);
-        }
+            if ($netLateMinutes > 0) {
+                // صافي التأخير موجب — تطبيق فترة السماح (4 ساعات)
+                $graceLimitMinutes    = 4 * 60; // 240 دقيقة
+                $effectiveLateMinutes = ($netLateMinutes < $graceLimitMinutes) ? 0 : $netLateMinutes;
+                $lateDeduction        = round(($effectiveLateMinutes / 60) * $hourlyRateWith1_5, 2);
+                $overtimeBonus        = 0; // الأوفرتايم استُنفد في تعويض التأخير
+            } else {
+                // صافي الأوفرتايم — لا خصم، ومكافأة على إجمالي ساعات OT
+                $lateDeduction = 0;
+                $overtimeBonus = round(($totalOtMinutes / 60) * $hourlyRateWith1_5, 2);
+            }
 
-        $absentDeduction = round($absentDays * $dailyRate, 2);
+            $absentDeduction = round($absentDays * $dailyRate, 2);
 
-        // بونص الحضور الكامل الأسبوعي:
-        // إذا حضر الموظف جميع أيام الأسبوع (السبت → الخميس) بدون أي غياب
-        // يُضاف له يوم راتب إضافي لكل أسبوع كامل
-        $attendanceBonus = round($fullAttendanceWeeks * $dailyRate, 2);
+            // بونص الحضور الكامل الأسبوعي:
+            // إذا حضر الموظف جميع أيام الأسبوع (السبت → الخميس) بدون أي غياب
+            // يُضاف له يوم راتب إضافي لكل أسبوع كامل
+            $attendanceBonus = round($fullAttendanceWeeks * $dailyRate, 2);
 
-        $netSalary = $basicSalary - $lateDeduction - $absentDeduction + $overtimeBonus + $attendanceBonus;
+            $netSalary = $basicSalary - $lateDeduction - $absentDeduction + $overtimeBonus + $attendanceBonus;
 
-        // لا يمكن أن يكون المرتب النهائي بالسالب
-        if ($netSalary < 0) {
-            Log::warning("PayrollCalculationService: الراتب النهائي سالب للموظف #{$employee->id} — تم تصحيحه إلى 0", [
-                'employee_id' => $employee->id,
-                'month'       => $month,
-                'year'        => $year,
-                'net_salary'  => $netSalary,
-            ]);
-            $netSalary = 0;
-        }
+            // لا يمكن أن يكون المرتب النهائي بالسالب
+            if ($netSalary < 0) {
+                Log::warning("PayrollCalculationService: الراتب النهائي سالب للموظف #{$employee->id} — تم تصحيحه إلى 0", [
+                    'employee_id' => $employee->id,
+                    'month'       => $month,
+                    'year'        => $year,
+                    'net_salary'  => $netSalary,
+                ]);
+                $netSalary = 0;
+            }
 
-        // حفظ أو تحديث كشف الراتب
-        $report = PayrollReport::updateOrCreate(
-            [
-                'employee_id' => $employee->id,
-                'month'       => $month,
-                'year'        => $year,
-            ],
-            [
-                'total_working_days'     => $stats['total_working_days'],
-                'total_present_days'     => $stats['total_present_days'],
-                'total_absent_days'      => $absentDays,
-                'total_late_minutes'     => $stats['total_late_minutes'],
-                'total_overtime_minutes' => $stats['total_overtime_minutes'],
-                'full_attendance_weeks'  => $fullAttendanceWeeks,
-                'basic_salary'           => $basicSalary,
-                'late_deduction'         => $lateDeduction,
-                'absent_deduction'       => $absentDeduction,
-                'overtime_bonus'         => $overtimeBonus,
-                'attendance_bonus'       => $attendanceBonus,
-                'net_salary'             => $netSalary,
-                'extra_bonus'            => 0,
-                'extra_deduction'        => 0,
-                'adjustment_note'        => null,
-                // لا نعيد ضبط is_locked إذا كان محفوظاً — فقط نحدّثه إذا لم يكن مؤمناً
-            ]
-        );
+            // حفظ أو تحديث كشف الراتب
+            $report = PayrollReport::updateOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'month'       => $month,
+                    'year'        => $year,
+                ],
+                [
+                    'total_working_days'     => $stats['total_working_days'],
+                    'total_present_days'     => $stats['total_present_days'],
+                    'total_absent_days'      => $absentDays,
+                    'total_late_minutes'     => $stats['total_late_minutes'],
+                    'total_overtime_minutes' => $stats['total_overtime_minutes'],
+                    'full_attendance_weeks'  => $fullAttendanceWeeks,
+                    'basic_salary'           => $basicSalary,
+                    'late_deduction'         => $lateDeduction,
+                    'absent_deduction'       => $absentDeduction,
+                    'overtime_bonus'         => $overtimeBonus,
+                    'attendance_bonus'       => $attendanceBonus,
+                    'net_salary'             => $netSalary,
+                    'extra_bonus'            => 0,
+                    'extra_deduction'        => 0,
+                    'adjustment_note'        => null,
+                    // لا نعيد ضبط is_locked إذا كان محفوظاً — فقط نحدّثه إذا لم يكن مؤمناً
+                ]
+            );
 
-        return $report->fresh();
+            return $report->fresh();
+        });
     }
 
     // =========================================================
@@ -159,7 +164,7 @@ class PayrollCalculationService
      */
     public function calculateForAll(int $month, int $year): Collection
     {
-        // التحقق من وجود بيانات للشهر
+        // التحقق من وجود بيانات للشهر (استعلام واحد فقط)
         $batch = ImportBatch::where('month', $month)
             ->where('year', $year)
             ->where('status', ImportStatus::Completed)
@@ -178,10 +183,9 @@ class PayrollCalculationService
             throw new \Exception("لا يوجد موظفون بسجلات حضور في هذا الشهر.");
         }
 
-        $reports = collect();
+        return DB::transaction(function () use ($employees, $month, $year, $batch) {
+            $reports = collect();
 
-        DB::beginTransaction();
-        try {
             foreach ($employees as $employee) {
                 // تجاهل الرواتب المؤمّنة
                 $existingReport = PayrollReport::where('employee_id', $employee->id)
@@ -195,17 +199,13 @@ class PayrollCalculationService
                     continue;
                 }
 
-                $report = $this->calculateForEmployee($employee, $month, $year);
+                // تمرير الدفعة لتجنب الاستعلام المتكرر
+                $report = $this->calculateForEmployee($employee, $month, $year, $batch);
                 $reports->push($report);
             }
 
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-        return $reports;
+            return $reports;
+        });
     }
 
     // =========================================================

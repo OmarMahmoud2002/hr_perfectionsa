@@ -4,6 +4,7 @@ namespace App\Services\Attendance;
 
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,9 +24,7 @@ class WorkingDaysService
      */
     public function getWorkingDays(int $month, int $year, array $publicHolidays = []): Collection
     {
-        // فترة الراتب: 22 من الشهر السابق → 21 من الشهر الحالي
-        $periodStart = Carbon::create($year, $month, 22)->subMonthNoOverflow()->startOfDay();
-        $periodEnd   = Carbon::create($year, $month, 21)->endOfDay();
+        [$periodStart, $periodEnd] = PayrollPeriod::resolve($month, $year);
 
         $holidaySet = collect($publicHolidays)->map(fn($d) => Carbon::parse($d)->toDateString())->all();
 

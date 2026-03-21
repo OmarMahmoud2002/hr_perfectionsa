@@ -61,12 +61,15 @@ class ImportController extends Controller
 
         $batch->load('publicHolidays');
 
-        // جلب الإعدادات الافتراضية
+        // جلب جميع الإعدادات بـ query واحد
+        $allSettings = \App\Models\Setting::getAllAsArray();
+
+        // الإعدادات الافتراضية
         $defaultSettings = [
-            'work_start_time'     => \App\Models\Setting::getValue('work_start_time', '09:00'),
-            'work_end_time'       => \App\Models\Setting::getValue('work_end_time', '17:00'),
-            'overtime_start_time' => \App\Models\Setting::getValue('overtime_start_time', '17:30'),
-            'late_grace_minutes'  => \App\Models\Setting::getValue('late_grace_minutes', '30'),
+            'work_start_time'     => $allSettings['work_start_time'] ?? '09:00',
+            'work_end_time'       => $allSettings['work_end_time'] ?? '17:00',
+            'overtime_start_time' => $allSettings['overtime_start_time'] ?? '17:30',
+            'late_grace_minutes'  => $allSettings['late_grace_minutes'] ?? '30',
         ];
 
         // جلب الإعدادات المحفوظة في الدفعة (إن وُجدت)
