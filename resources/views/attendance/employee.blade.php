@@ -2,7 +2,10 @@
 
 @php
     $monthName = \Carbon\Carbon::create($year, $month, 1)->locale('ar')->isoFormat('MMMM YYYY');
-    $isAdmin   = auth()->user()->role === 'admin';
+    $isAdmin   = auth()->user()->isAdminLike();
+    $avatarUrl = $employee->user?->profile?->avatar_path
+        ? route('media.avatar', ['path' => $employee->user->profile->avatar_path])
+        : null;
 @endphp
 
 @section('title', 'حضور ' . $employee->name . ' — ' . $monthName)
@@ -28,9 +31,13 @@
         {{-- بيانات الموظف --}}
         <div class="card p-5">
             <div class="flex items-center gap-4 mb-4">
-                <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl font-black flex-shrink-0"
+                <div class="w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white text-2xl font-black flex-shrink-0"
                      style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-                    {{ mb_substr($employee->name, 0, 1) }}
+                    @if($avatarUrl)
+                        <img src="{{ $avatarUrl }}" alt="{{ $employee->name }}" class="w-full h-full object-cover">
+                    @else
+                        {{ mb_substr($employee->name, 0, 1) }}
+                    @endif
                 </div>
                 <div>
                     <h2 class="font-bold text-base text-slate-800">{{ $employee->name }}</h2>
@@ -40,23 +47,20 @@
 
             {{-- فلتر الشهر --}}
             <form action="{{ route('attendance.employee', $employee->id) }}" method="GET" class="space-y-2">
-                <div class="flex gap-2">
-                    <select name="month" class="form-input flex-1 text-sm py-1.5">
+                <div class="flex flex-wrap items-center gap-2">
+                    <select name="month" onchange="this.form.submit()" class="form-input !w-auto !min-w-0 text-sm py-1.5 !px-4">
                         @foreach(range(1, 12) as $m)
                             <option value="{{ $m }}" {{ $month == $m ? 'selected' : '' }}>
                                 {{ \Carbon\Carbon::create(null, $m, 1)->locale('ar')->isoFormat('MMMM') }}
                             </option>
                         @endforeach
                     </select>
-                    <select name="year" class="form-input w-24 text-sm py-1.5">
+                    <select name="year" onchange="this.form.submit()" class="form-input !w-auto !min-w-0 text-sm py-1.5 !px-4">
                         @foreach(range(now()->year, now()->year - 2) as $y)
                             <option value="{{ $y }}" {{ $year == $y ? 'selected' : '' }}>{{ $y }}</option>
                         @endforeach
                     </select>
                 </div>
-                <button type="submit" class="btn-primary w-full justify-center btn-sm">
-                    عرض
-                </button>
             </form>
         </div>
 

@@ -3,6 +3,9 @@
 @php
     $monthName      = \Carbon\Carbon::create($year, $month, 1)->locale('ar')->isoFormat('MMMM YYYY');
     $singleEmployee = $singleEmployee ?? null;
+    $singleEmployeeAvatar = $singleEmployee?->user?->profile?->avatar_path
+        ? route('media.avatar', ['path' => $singleEmployee->user->profile->avatar_path])
+        : null;
 @endphp
 
 @section('title', 'كشف مرتبات — ' . $monthName)
@@ -59,9 +62,13 @@
 {{-- شريط الموظف المفرد (عند التصفية بموظف واحد) --}}
 @if($singleEmployee)
 <div class="flex items-center gap-4 p-4 bg-secondary-50 border border-secondary-200 rounded-2xl mb-5">
-    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+    <div class="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
          style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-        {{ mb_substr($singleEmployee->name, 0, 1) }}
+        @if($singleEmployeeAvatar)
+            <img src="{{ $singleEmployeeAvatar }}" alt="{{ $singleEmployee->name }}" class="w-full h-full object-cover">
+        @else
+            {{ mb_substr($singleEmployee->name, 0, 1) }}
+        @endif
     </div>
     <div class="flex-1 min-w-0">
         <p class="font-bold text-secondary-800 text-sm">عرض راتب: {{ $singleEmployee->name }}</p>
@@ -122,7 +129,7 @@
 
 {{-- شريط الإجراءات --}}
 <div class="flex flex-wrap items-center gap-3 mb-4">
-    @if(auth()->user()->isAdmin())
+    @if(auth()->user()->isAdminLike())
     <a href="{{ route('payroll.calculate.form', ['month' => $month, 'year' => $year]) }}"
        class="btn-gold btn-sm">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,7 +163,7 @@
 @if($reports->isEmpty())
 <div class="card p-10 text-center">
     <p class="text-slate-500">لا توجد بيانات مرتبات لهذا الشهر.</p>
-    @if(auth()->user()->isAdmin())
+    @if(auth()->user()->isAdminLike())
     <a href="{{ route('payroll.calculate.form', ['month' => $month, 'year' => $year]) }}"
        class="btn-primary btn-sm mt-3 inline-flex">احسب الآن</a>
     @endif
@@ -184,13 +191,22 @@
             </thead>
             <tbody>
                 @foreach($reports as $report)
+                @php
+                    $reportAvatarUrl = $report->employee?->user?->profile?->avatar_path
+                        ? route('media.avatar', ['path' => $report->employee->user->profile->avatar_path])
+                        : null;
+                @endphp
                 <tr class="{{ $report->is_locked ? 'bg-emerald-50/30' : '' }}">
                     {{-- الموظف --}}
                     <td>
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                            <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                                  style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-                                {{ mb_substr($report->employee?->name ?? '?', 0, 1) }}
+                                @if($reportAvatarUrl)
+                                    <img src="{{ $reportAvatarUrl }}" alt="{{ $report->employee?->name ?? 'employee' }}" class="w-full h-full object-cover">
+                                @else
+                                    {{ mb_substr($report->employee?->name ?? '?', 0, 1) }}
+                                @endif
                             </div>
                             <div>
                                 @if($report->employee)
@@ -331,7 +347,7 @@
                             $adjAmount = $report->extra_bonus > 0 ? (float)$report->extra_bonus : ((float)$report->extra_deduction > 0 ? (float)$report->extra_deduction : '');
                         @endphp
 
-                        @if(auth()->user()->isAdmin())
+                        @if(auth()->user()->isAdminLike())
                         <div x-data="{ open: false, type: '{{ $adjType }}', amount: '{{ $adjAmount }}' }">
 
                             {{-- عرض القيمة الحالية --}}

@@ -54,7 +54,7 @@ class AttendanceController extends Controller
         if ($batch) {
             $publicHolidays = $this->holidayService->getHolidayDates($batch);
 
-            $employees = Employee::whereHas('attendanceRecords', function ($q) use ($batch) {
+            $employees = Employee::with('user.profile')->whereHas('attendanceRecords', function ($q) use ($batch) {
                 $q->where('import_batch_id', $batch->id);
             })->orderBy('name')->get();
 
@@ -86,6 +86,8 @@ class AttendanceController extends Controller
      */
     public function employeeReport(Employee $employee, Request $request): View
     {
+        $employee->loadMissing('user.profile');
+
         $month = (int) $request->input('month', now()->month);
         $year  = (int) $request->input('year', now()->year);
 

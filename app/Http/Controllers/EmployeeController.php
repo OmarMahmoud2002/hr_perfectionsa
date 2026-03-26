@@ -48,10 +48,12 @@ class EmployeeController extends Controller
     public function store(StoreEmployeeRequest $request): RedirectResponse
     {
         $employee = $this->employeeService->create($request->validated());
+        $account = $employee->user;
 
         return redirect()
             ->route('employees.show', $employee)
-            ->with('success', "تم إضافة الموظف «{$employee->name}» بنجاح.");
+            ->with('success', "تم إضافة الموظف «{$employee->name}» بنجاح.")
+            ->with('info', "بيانات الدخول: {$account->email} | كلمة السر الأولية: 123456789");
     }
 
     /**
@@ -59,6 +61,12 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee, Request $request): View
     {
+        if ($request->user()?->isViewer()) {
+            abort(403, 'ليس لديك صلاحية للوصول إلى هذه الصفحة.');
+        }
+
+        $employee->loadMissing('user.profile');
+
         $month = (int) $request->input('month', now()->month);
         $year  = (int) $request->input('year', now()->year);
 
@@ -101,6 +109,8 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): View
     {
+        $employee->loadMissing('user');
+
         return view('employees.edit', compact('employee'));
     }
 
@@ -109,11 +119,13 @@ class EmployeeController extends Controller
      */
     public function update(UpdateEmployeeRequest $request, Employee $employee): RedirectResponse
     {
-        $this->employeeService->update($employee, $request->validated());
+        $employee = $this->employeeService->update($employee, $request->validated());
+        $account = $employee->user;
 
         return redirect()
             ->route('employees.show', $employee)
-            ->with('success', "تم تحديث بيانات الموظف «{$employee->name}» بنجاح.");
+            ->with('success', "تم تحديث بيانات الموظف «{$employee->name}» بنجاح.")
+            ->with('info', "البريد المرتبط بالحساب: {$account->email}");
     }
 
     /**

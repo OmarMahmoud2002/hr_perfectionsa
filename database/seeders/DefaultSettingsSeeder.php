@@ -43,6 +43,48 @@ class DefaultSettingsSeeder extends Seeder
                 'value' => '0',
                 'group' => 'payroll',
             ],
+
+            // Employee of Month defaults
+            [
+                'key'   => 'employee_of_month.weights.vote',
+                'value' => '0.25',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.weights.admin',
+                'value' => '0.00',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.weights.work_hours',
+                'value' => '0.20',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.weights.punctuality',
+                'value' => '0.15',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.weights.overtime',
+                'value' => '0.00',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.weights.tasks',
+                'value' => '0.40',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.formula_version',
+                'value' => 'v2_tasks',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.criteria',
+                'value' => '[{"key":"tasks","enabled":true},{"key":"punctuality","enabled":true},{"key":"work_hours","enabled":true},{"key":"vote","enabled":true}]',
+                'group' => 'employee_of_month',
+            ],
         ];
 
         foreach ($settings as $setting) {

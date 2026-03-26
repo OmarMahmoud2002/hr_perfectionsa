@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\JobTitle;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
@@ -14,6 +17,7 @@ class Employee extends Model
     protected $fillable = [
         'ac_no',
         'name',
+        'job_title',
         'basic_salary',
         'is_active',
         'work_start_time',
@@ -26,6 +30,7 @@ class Employee extends Model
         'basic_salary'       => 'decimal:2',
         'is_active'          => 'boolean',
         'late_grace_minutes' => 'integer',
+        'job_title'          => JobTitle::class,
     ];
 
     // ========================
@@ -40,6 +45,37 @@ class Employee extends Model
     public function payrollReports(): HasMany
     {
         return $this->hasMany(PayrollReport::class);
+    }
+
+    public function user(): HasOne
+    {
+        return $this->hasOne(User::class);
+    }
+
+    public function monthVotesReceived(): HasMany
+    {
+        return $this->hasMany(EmployeeMonthVote::class, 'voted_employee_id');
+    }
+
+    public function monthAdminScores(): HasMany
+    {
+        return $this->hasMany(EmployeeMonthAdminScore::class);
+    }
+
+    public function monthResults(): HasMany
+    {
+        return $this->hasMany(EmployeeOfMonthResult::class);
+    }
+
+    public function monthTaskAssignments(): HasMany
+    {
+        return $this->hasMany(EmployeeMonthTaskAssignment::class, 'employee_id');
+    }
+
+    public function monthTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(EmployeeMonthTask::class, 'employee_month_task_assignments', 'employee_id', 'task_id')
+            ->withTimestamps();
     }
 
     // ========================
@@ -67,5 +103,10 @@ class Employee extends Model
             'overtime_start_time' => $this->overtime_start_time,
             'late_grace_minutes'  => $this->late_grace_minutes,
         ], fn ($v) => $v !== null);
+    }
+
+    public function getJobTitleLabelAttribute(): ?string
+    {
+        return $this->job_title?->label();
     }
 }

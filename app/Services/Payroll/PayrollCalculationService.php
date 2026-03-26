@@ -241,7 +241,7 @@ class PayrollCalculationService
      */
     public function getMonthlyPayroll(int $month, int $year): Collection
     {
-        return PayrollReport::with('employee')
+        return PayrollReport::with('employee.user.profile')
             ->where('month', $month)
             ->where('year', $year)
             ->orderBy('employee_id')

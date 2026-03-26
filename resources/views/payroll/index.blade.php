@@ -29,7 +29,7 @@
         <h1 class="section-title">كشوف المرتبات</h1>
         <p class="section-subtitle">{{ $payrollMonths->count() }} شهر محسوب</p>
     </div>
-    @if(auth()->user()->isAdmin())
+    @if(auth()->user()->isAdminLike())
     <a href="{{ route('payroll.calculate.form') }}" class="btn-primary">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -49,7 +49,7 @@
     </div>
     <h3 class="text-lg font-bold text-slate-700 mb-2">لم يتم حساب أي رواتب بعد</h3>
     <p class="text-slate-500 text-sm mb-5">ابدأ بحساب رواتب الموظفين لأي شهر متاح.</p>
-    @if(auth()->user()->isAdmin())
+    @if(auth()->user()->isAdminLike())
     <a href="{{ route('payroll.calculate.form') }}" class="btn-primary">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -84,10 +84,30 @@
             <span class="text-sm font-normal text-slate-400">ج.م</span>
         </p>
         <p class="text-xs text-slate-500 mb-3">إجمالي صافي المرتبات</p>
-        <a href="{{ route('payroll.report', [$pm->month, $pm->year]) }}"
-           class="btn-teal w-full justify-center btn-sm">
-            عرض الكشف
-        </a>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <a href="{{ route('payroll.report', [$pm->month, $pm->year]) }}"
+               class="btn-teal w-full justify-center btn-sm">
+                عرض الكشف
+            </a>
+            <a href="{{ route('attendance.report', ['month' => $pm->month, 'year' => $pm->year]) }}"
+               class="btn-ghost w-full justify-center btn-sm">
+                عرض الحضور
+            </a>
+        </div>
+
+        @if(auth()->user()->isAdminLike())
+        <form action="{{ route('payroll.destroy.month', ['month' => $pm->month, 'year' => $pm->year]) }}" method="POST"
+              data-confirm="هل تريد حذف كشف رواتب شهر {{ $monthName }} بالكامل؟"
+              data-confirm-title="تأكيد الحذف"
+              data-confirm-btn="حذف الشهر"
+              data-confirm-type="danger">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn-danger w-full justify-center btn-sm">
+                حذف كشف الشهر
+            </button>
+        </form>
+        @endif
     </div>
     @endforeach
 </div>

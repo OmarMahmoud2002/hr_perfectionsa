@@ -11,6 +11,13 @@
 </head>
 <body class="bg-slate-50 font-sans">
 
+    @php
+        $navUser = auth()->user()->loadMissing('profile');
+        $navAvatarUrl = $navUser->profile?->avatar_path
+            ? route('media.avatar', ['path' => $navUser->profile->avatar_path])
+            : null;
+    @endphp
+
     <div class="flex h-screen overflow-hidden">
 
         {{-- Sidebar --}}
@@ -57,13 +64,19 @@
 
                         {{-- User Avatar + Name --}}
                         <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-bold"
+                            <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-white text-sm font-bold"
                                  style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-                                {{ mb_substr(auth()->user()->name, 0, 1) }}
+                                @if($navAvatarUrl)
+                                    <img src="{{ $navAvatarUrl }}" alt="{{ $navUser->name }}" class="w-full h-full object-cover">
+                                @else
+                                    {{ mb_substr($navUser->name, 0, 1) }}
+                                @endif
                             </div>
                             <div class="hidden sm:block">
-                                <p class="text-xs font-semibold text-slate-700 leading-tight">{{ auth()->user()->name }}</p>
-                                <p class="text-xs text-slate-400">{{ auth()->user()->role === 'admin' ? 'مدير النظام' : 'مشرف' }}</p>
+                                <p class="text-xs font-semibold text-slate-700 leading-tight">{{ $navUser->name }}</p>
+                                <p class="text-xs text-slate-400">
+                                    {{ $navUser->isAdminLike() ? 'إدارة النظام' : 'موظف' }}
+                                </p>
                             </div>
                         </div>
 

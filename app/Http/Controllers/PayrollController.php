@@ -131,7 +131,7 @@ class PayrollController extends Controller
         $employeeId = $request->integer('employee_id', 0);
         if ($employeeId > 0) {
             $reports       = $reports->filter(fn ($r) => $r->employee_id === $employeeId);
-            $singleEmployee = Employee::find($employeeId);
+            $singleEmployee = Employee::with('user.profile')->find($employeeId);
         }
 
         $summary = $this->payrollService->getSummary($reports);
@@ -226,5 +226,27 @@ class PayrollController extends Controller
             new \App\Exports\PayrollExport($reports, $month, $year),
             $fileName
         );
+    }
+
+    /**
+     * حذف كشف شهر كامل.
+     */
+    public function destroyMonth(int $month, int $year): RedirectResponse
+    {
+        if ($month < 1 || $month > 12 || $year < 2020) {
+            return back()->with('error', 'قيم الشهر أو السنة غير صحيحة.');
+        }
+
+        $deleted = PayrollReport::where('month', $month)
+            ->where('year', $year)
+            ->delete();
+
+        if ($deleted === 0) {
+            return back()->with('error', 'لا توجد بيانات رواتب لهذا الشهر.');
+        }
+
+        $monthLabel = \Carbon\Carbon::create($year, $month, 1)->locale('ar')->isoFormat('MMMM YYYY');
+
+        return back()->with('success', "تم حذف كشف رواتب شهر {$monthLabel} بنجاح.");
     }
 }

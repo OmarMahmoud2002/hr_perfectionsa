@@ -1,0 +1,169 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Employee;
+use App\Models\EmployeeMonthVote;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class EmployeeOfMonthVoteEndpointTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
+    public function test_employee_can_get_vote_status(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
+
+        [$user] = $this->createEmployeeUser('Voter One', 'AC-V1');
+
+        $response = $this->actingAs($user)->getJson(route('employee-of-month.vote.status'));
+
+        $response->assertOk()
+            ->assertJson([
+                'month' => 3,
+                'year' => 2026,
+                'has_voted' => false,
+                'can_vote' => true,
+                'reason' => 'ok',
+            ])
+            ->assertJsonStructure([
+                'voted_employee_id',
+                'voting_closes_at',
+                'seconds_remaining_to_close',
+            ]);
+    }
+
+    public function test_employee_can_open_vote_page_and_not_see_self_as_candidate(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
+
+        [$voterUser, $voterEmployee] = $this->createEmployeeUser('Voter Page', 'AC-VP');
+        [, $candidate] = $this->createEmployeeUser('Candidate Page', 'AC-CP');
+
+        $response = $this->actingAs($voterUser)->get(route('employee-of-month.vote.page'));
+
+        $response->assertOk();
+        $response->assertSee($candidate->name);
+        $response->assertDontSee($voterEmployee->ac_no);
+    }
+
+    public function test_employee_can_submit_vote_and_receive_payload(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
+
+        [$voterUser] = $this->createEmployeeUser('Voter Two', 'AC-V2');
+        [, $candidate] = $this->createEmployeeUser('Candidate Two', 'AC-C2');
+
+        $response = $this->actingAs($voterUser)->postJson(route('employee-of-month.vote.store'), [
+            'voted_employee_id' => $candidate->id,
+        ]);
+
+        $response->assertCreated()
+            ->assertJson([
+                'status' => 'created',
+                'has_voted' => true,
+                'voted_employee_id' => $candidate->id,
+            ]);
+
+        $this->assertDatabaseHas('employee_month_votes', [
+            'voter_user_id' => $voterUser->id,
+            'voted_employee_id' => $candidate->id,
+            'vote_month' => 3,
+            'vote_year' => 2026,
+        ]);
+    }
+
+    public function test_duplicate_vote_returns_already_voted_without_new_row(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
+
+        [$voterUser] = $this->createEmployeeUser('Voter Three', 'AC-V3');
+        [, $candidate] = $this->createEmployeeUser('Candidate Three', 'AC-C3');
+
+        EmployeeMonthVote::create([
+            'voter_user_id' => $voterUser->id,
+            'voted_employee_id' => $candidate->id,
+            'vote_month' => 3,
+            'vote_year' => 2026,
+        ]);
+
+        $response = $this->actingAs($voterUser)->postJson(route('employee-of-month.vote.store'), [
+            'voted_employee_id' => $candidate->id,
+        ]);
+
+        $response->assertOk()->assertJson([
+            'status' => 'already_voted',
+            'has_voted' => true,
+            'voted_employee_id' => $candidate->id,
+        ]);
+
+        $this->assertDatabaseCount('employee_month_votes', 1);
+    }
+
+    public function test_vote_cycle_rolls_over_on_day_twenty_two_and_remains_open(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 22, 10, 0, 0, config('app.timezone')));
+
+        [$voterUser] = $this->createEmployeeUser('Voter Four', 'AC-V4');
+        [, $candidate] = $this->createEmployeeUser('Candidate Four', 'AC-C4');
+
+        $response = $this->actingAs($voterUser)->postJson(route('employee-of-month.vote.store'), [
+            'voted_employee_id' => $candidate->id,
+        ]);
+
+        $response->assertCreated()
+            ->assertJson([
+                'status' => 'created',
+                'has_voted' => true,
+                'voted_employee_id' => $candidate->id,
+            ]);
+
+        $this->assertDatabaseHas('employee_month_votes', [
+            'voter_user_id' => $voterUser->id,
+            'voted_employee_id' => $candidate->id,
+            'vote_month' => 4,
+            'vote_year' => 2026,
+        ]);
+    }
+
+    public function test_non_employee_cannot_access_vote_endpoints(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'must_change_password' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson(route('employee-of-month.vote.status'))
+            ->assertStatus(403);
+    }
+
+    private function createEmployeeUser(string $name, string $acNo): array
+    {
+        $employee = Employee::factory()->create([
+            'name' => $name,
+            'ac_no' => $acNo,
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->create([
+            'name' => $name,
+            'role' => 'employee',
+            'employee_id' => $employee->id,
+            'must_change_password' => false,
+        ]);
+
+        return [$user, $employee];
+    }
+}

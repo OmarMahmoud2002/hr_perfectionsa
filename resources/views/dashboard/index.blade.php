@@ -2,7 +2,7 @@
 
 @section('title', 'لوحة التحكم')
 @section('page-title', 'لوحة التحكم')
-@section('page-subtitle')مرحباً، {{ auth()->user()->name }} — {{ now()->locale('ar')->isoFormat('MMMM YYYY') }}@endsection
+@section('page-subtitle')مرحباً، {{ auth()->user()->name }} — {{ $dashboardMonthLabel ?? now()->locale('ar')->isoFormat('MMMM YYYY') }}@endsection
 
 @section('content')
 
@@ -83,10 +83,10 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
         <p class="text-sm text-amber-700 font-medium">
-            لا توجد بيانات حضور لشهر <strong>{{ now()->locale('ar')->isoFormat('MMMM YYYY') }}</strong> بعد.
+            لا توجد بيانات حضور لشهر <strong>{{ $dashboardMonthLabel ?? now()->locale('ar')->isoFormat('MMMM YYYY') }}</strong> بعد.
         </p>
     </div>
-    @if(auth()->user()->isAdmin())
+    @if(auth()->user()->isAdminLike())
     <a href="{{ route('import.form') }}"
        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold
               hover:bg-amber-600 transition whitespace-nowrap w-full sm:w-auto justify-center">
@@ -103,7 +103,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 mb-5">
 
     {{-- إجراءات سريعة --}}
-    @if(auth()->user()->isAdmin())
+    @if(auth()->user()->isAdminLike())
     <div class="lg:col-span-2 card p-4 sm:p-6">
         <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" style="color: #4596cf;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,7 +175,7 @@
     @endif
 
     {{-- آخر استيراد --}}
-    <div class="{{ auth()->user()->isAdmin() ? '' : 'lg:col-span-3' }} card p-4 sm:p-6 flex flex-col">
+    <div class="{{ auth()->user()->isAdminLike() ? '' : 'lg:col-span-3' }} card p-4 sm:p-6 flex flex-col">
         <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" style="color: #4d9b97;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
@@ -225,7 +225,7 @@
             </div>
             <p class="text-sm font-medium text-slate-500 mb-1">لا يوجد استيراد بعد</p>
             <p class="text-xs text-slate-400 mb-4">ابدأ برفع أول ملف Excel</p>
-            @if(auth()->user()->isAdmin())
+            @if(auth()->user()->isAdminLike())
             <a href="{{ route('import.form') }}" class="btn-primary btn-sm">
                 رفع ملف الآن
             </a>
@@ -258,11 +258,24 @@
         </div>
         <div class="divide-y divide-slate-100">
             @forelse($topLateEmployees ?? [] as $idx => $item)
+            @php
+                $lateAvatarUrl = $item['employee']?->user?->profile?->avatar_path
+                    ? route('media.avatar', ['path' => $item['employee']->user->profile->avatar_path])
+                    : null;
+            @endphp
             <div class="flex items-center gap-3 px-4 py-3">
                 <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
                     {{ $idx === 0 ? 'bg-red-100 text-red-600' : ($idx === 1 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500') }}">
                     {{ $idx + 1 }}
                 </span>
+                <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-xs font-bold text-slate-700 flex-shrink-0"
+                     style="background:#fff;border:1.5px solid #e2e8f0;">
+                    @if($lateAvatarUrl)
+                        <img src="{{ $lateAvatarUrl }}" alt="{{ $item['employee']->name }}" class="w-full h-full object-cover">
+                    @else
+                        {{ mb_substr($item['employee']->name, 0, 1) }}
+                    @endif
+                </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-slate-800 truncate">{{ $item['employee']->name }}</p>
                     <p class="text-xs text-slate-400">{{ $item['employee']->ac_no }}</p>
@@ -301,11 +314,24 @@
         </div>
         <div class="divide-y divide-slate-100">
             @forelse($topOTEmployees ?? [] as $idx => $item)
+            @php
+                $otAvatarUrl = $item['employee']?->user?->profile?->avatar_path
+                    ? route('media.avatar', ['path' => $item['employee']->user->profile->avatar_path])
+                    : null;
+            @endphp
             <div class="flex items-center gap-3 px-4 py-3">
                 <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
                     {{ $idx === 0 ? 'bg-blue-100 text-blue-600' : ($idx === 1 ? 'bg-sky-100 text-sky-600' : 'bg-slate-100 text-slate-500') }}">
                     {{ $idx + 1 }}
                 </span>
+                <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-xs font-bold text-slate-700 flex-shrink-0"
+                     style="background:#fff;border:1.5px solid #e2e8f0;">
+                    @if($otAvatarUrl)
+                        <img src="{{ $otAvatarUrl }}" alt="{{ $item['employee']->name }}" class="w-full h-full object-cover">
+                    @else
+                        {{ mb_substr($item['employee']->name, 0, 1) }}
+                    @endif
+                </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-slate-800 truncate">{{ $item['employee']->name }}</p>
                     <p class="text-xs text-slate-400">{{ $item['employee']->ac_no }}</p>
@@ -352,6 +378,7 @@
                     <th>السجلات</th>
                     <th>الحالة</th>
                     <th>تاريخ الرفع</th>
+                    <th class="text-center">التفاصيل</th>
                 </tr>
             </thead>
             <tbody>
@@ -367,6 +394,11 @@
                         <span class="{{ $sc[$batch->status->value] ?? 'badge-gray' }}">{{ $batch->status->label() }}</span>
                     </td>
                     <td class="text-slate-500">{{ $batch->created_at->format('Y-m-d') }}</td>
+                    <td class="text-center">
+                        <a href="{{ route('attendance.report', ['month' => $batch->month, 'year' => $batch->year]) }}" class="btn-ghost btn-sm">
+                            عرض
+                        </a>
+                    </td>
                 </tr>
                 @endforeach
             </tbody>
@@ -389,6 +421,9 @@
             <div class="flex flex-col items-end gap-1 flex-shrink-0">
                 <span class="{{ $sc[$batch->status->value] ?? 'badge-gray' }}">{{ $batch->status->label() }}</span>
                 <p class="text-xs text-slate-400">{{ $batch->created_at->format('Y-m-d') }}</p>
+                <a href="{{ route('attendance.report', ['month' => $batch->month, 'year' => $batch->year]) }}" class="btn-ghost btn-sm mt-1">
+                    عرض
+                </a>
             </div>
         </div>
         @endforeach

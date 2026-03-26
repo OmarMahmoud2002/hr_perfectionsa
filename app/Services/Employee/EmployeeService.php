@@ -3,17 +3,22 @@
 namespace App\Services\Employee;
 
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 class EmployeeService
 {
+    public function __construct(
+        private readonly EmployeeAccountService $accountService,
+    ) {}
+
     /**
      * جلب قائمة الموظفين مع بحث وفلترة وتقسيم صفحات
      */
     public function getEmployees(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Employee::query();
+        $query = Employee::query()->with('user.profile');
 
         // البحث بالاسم أو الرقم
         if (!empty($filters['search'])) {
@@ -41,9 +46,10 @@ class EmployeeService
      */
     public function create(array $data): Employee
     {
-        return Employee::create([
+        $employee = Employee::create([
             'ac_no'               => $data['ac_no'],
             'name'                => $data['name'],
+            'job_title'           => $data['job_title'] ?? null,
             'basic_salary'        => $data['basic_salary'] ?? 0,
             'is_active'           => true,
             'work_start_time'     => $data['work_start_time'] ?? null,
@@ -51,6 +57,10 @@ class EmployeeService
             'overtime_start_time' => $data['overtime_start_time'] ?? null,
             'late_grace_minutes'  => isset($data['late_grace_minutes']) && $data['late_grace_minutes'] !== '' ? (int) $data['late_grace_minutes'] : null,
         ]);
+
+        $this->accountService->provisionForEmployee($employee);
+
+        return $employee->fresh();
     }
 
     /**
@@ -61,12 +71,15 @@ class EmployeeService
         $employee->update([
             'ac_no'               => $data['ac_no'],
             'name'                => $data['name'],
+            'job_title'           => $data['job_title'] ?? null,
             'basic_salary'        => $data['basic_salary'] ?? 0,
             'work_start_time'     => $data['work_start_time'] ?? null,
             'work_end_time'       => $data['work_end_time'] ?? null,
             'overtime_start_time' => $data['overtime_start_time'] ?? null,
             'late_grace_minutes'  => isset($data['late_grace_minutes']) && $data['late_grace_minutes'] !== '' ? (int) $data['late_grace_minutes'] : null,
         ]);
+
+        $this->accountService->provisionForEmployee($employee);
 
         return $employee->fresh();
     }
@@ -107,15 +120,24 @@ class EmployeeService
                 $employee->restore();
                 $employee->update(['is_active' => true]);
             }
+
+            // ضمان وجود حساب مستخدم للموظف أثناء الاستيراد.
+            $this->accountService->provisionForEmployee($employee);
+
             return $employee;
         }
 
-        return Employee::create([
+        $employee = Employee::create([
             'ac_no'        => $acNo,
             'name'         => $name,
             'basic_salary' => 0,
             'is_active'    => true,
         ]);
+
+        // إنشاء حساب المستخدم تلقائياً للموظف الجديد من الإكسيل.
+        $this->accountService->provisionForEmployee($employee);
+
+        return $employee;
     }
 
     /**

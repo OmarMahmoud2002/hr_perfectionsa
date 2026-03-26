@@ -20,10 +20,10 @@
 {{-- فلترة الشهر --}}
 <div class="card mb-5">
     <div class="card-body">
-        <form action="{{ route('attendance.report') }}" method="GET" class="flex flex-wrap items-end gap-4">
+        <form action="{{ route('attendance.report') }}" method="GET" class="flex flex-wrap items-end gap-2">
             <div class="form-group mb-0">
                 <label class="form-label">الشهر</label>
-                <select name="month" class="form-input sm:w-40">
+                <select name="month" onchange="this.form.submit()" class="form-input !w-auto !min-w-0 !px-4">
                     @foreach(range(1, 12) as $m)
                         <option value="{{ $m }}" {{ $month == $m ? 'selected' : '' }}>
                             {{ \Carbon\Carbon::create(null, $m, 1)->locale('ar')->isoFormat('MMMM') }}
@@ -33,21 +33,12 @@
             </div>
             <div class="form-group mb-0">
                 <label class="form-label">السنة</label>
-                <select name="year" class="form-input sm:w-32">
+                <select name="year" onchange="this.form.submit()" class="form-input !w-auto !min-w-0 !px-4">
                     @foreach(range(now()->year, now()->year - 3) as $y)
                         <option value="{{ $y }}" {{ $year == $y ? 'selected' : '' }}>{{ $y }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="form-group mb-0">
-                <button type="submit" class="btn-primary">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
-                    </svg>
-                    عرض التقرير
-                </button>
-            </div>
-
             {{-- روابط سريعة للشهور المتاحة --}}
             @if($availableMonths->isNotEmpty())
             <div class="mr-auto flex flex-wrap gap-2 items-center">
@@ -77,7 +68,7 @@
     </div>
     <h3 class="text-base font-bold text-slate-700 mb-1">لا توجد بيانات لـ {{ $monthName }}</h3>
     <p class="text-sm text-slate-500">لم يتم رفع ملف الحضور لهذا الشهر بعد.</p>
-    @if(auth()->user()->isAdmin())
+    @if(auth()->user()->isAdminLike())
     <div class="mt-4">
         <a href="{{ route('import.form') }}" class="btn-primary btn-sm">رفع ملف الشهر</a>
     </div>
@@ -188,7 +179,7 @@
                     <th class="text-center">أيام الغياب</th>
                     <th class="text-center">التأخير</th>
                     <th class="text-center">Overtime</th>
-                    <th class="text-center">نسبة الحضور</th>
+                    <th class="text-center">عدد ساعات العمل</th>
                     <th class="text-center">التفاصيل</th>
                 </tr>
             </thead>
@@ -196,22 +187,29 @@
                 @foreach($employeeStats as $stat)
                 @php
                     $emp         = $stat['employee'];
+                    $avatarUrl   = $emp->user?->profile?->avatar_path
+                        ? route('media.avatar', ['path' => $emp->user->profile->avatar_path])
+                        : null;
                     $workDays    = $stat['total_working_days'];
                     $presentDays = $stat['total_present_days'];
                     $absentDays  = $stat['total_absent_days'];
                     $lateMin     = $stat['total_late_minutes'];
                     $otMin       = $stat['total_overtime_minutes'];
-                    $weeklyLeaveDays = $stat['total_weekly_leave_days'] ?? 0;
-                    $effectiveWorkDays = $workDays - $weeklyLeaveDays;
-                    $rate        = $effectiveWorkDays > 0 ? round(($presentDays / $effectiveWorkDays) * 100) : 0;
+                    $workMin     = $stat['total_work_minutes'] ?? 0;
+                    $workHours   = floor($workMin / 60);
+                    $workRemain  = $workMin % 60;
                 @endphp
                 <tr>
                     {{-- الموظف --}}
                     <td>
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                            <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                                  style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-                                {{ mb_substr($emp->name, 0, 1) }}
+                                @if($avatarUrl)
+                                    <img src="{{ $avatarUrl }}" alt="{{ $emp->name }}" class="w-full h-full object-cover">
+                                @else
+                                    {{ mb_substr($emp->name, 0, 1) }}
+                                @endif
                             </div>
                             <div>
                                 <p class="font-semibold text-slate-800 text-sm">{{ $emp->name }}</p>
@@ -261,20 +259,15 @@
                         @endif
                     </td>
 
-                    {{-- نسبة الحضور --}}
+                    {{-- عدد ساعات العمل --}}
                     <td class="text-center">
-                        <div class="flex items-center justify-center gap-2">
-                            <div class="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                <div class="h-full rounded-full transition-all"
-                                     style="width: {{ $rate }}%;
-                                            background: {{ $rate >= 90 ? '#10b981' : ($rate >= 70 ? '#f59e0b' : '#ef4444') }};">
-                                </div>
-                            </div>
-                            <span class="text-xs font-semibold
-                                         {{ $rate >= 90 ? 'text-emerald-600' : ($rate >= 70 ? 'text-amber-600' : 'text-red-500') }}">
-                                {{ $rate }}%
+                        @if($workMin > 0)
+                            <span class="font-semibold text-xs" style="color: #31719d;">
+                                {{ $workHours }}:{{ str_pad($workRemain, 2, '0', STR_PAD_LEFT) }}
                             </span>
-                        </div>
+                        @else
+                            <span class="text-slate-400">—</span>
+                        @endif
                     </td>
 
                     {{-- التفاصيل --}}

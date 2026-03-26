@@ -21,6 +21,12 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
+                $user = Auth::guard($guard)->user();
+
+                if ($user?->role === 'user') {
+                    return redirect()->route('tasks.evaluator.index');
+                }
+
                 return redirect(RouteServiceProvider::HOME);
             }
         }

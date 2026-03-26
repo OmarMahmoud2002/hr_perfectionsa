@@ -6,6 +6,12 @@
 
 @section('content')
 
+@php
+    $avatarUrl = $employee->user?->profile?->avatar_path
+        ? route('media.avatar', ['path' => $employee->user->profile->avatar_path])
+        : null;
+@endphp
+
 {{-- Breadcrumb --}}
 <nav class="breadcrumb">
     <a href="{{ route('employees.index') }}">الموظفين</a>
@@ -22,15 +28,32 @@
         <div class="px-6 py-5 border-b border-slate-100"
              style="background: linear-gradient(135deg, rgba(231,197,57,0.06), rgba(69,150,207,0.06));">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg font-black"
+                <div class="w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center text-white text-lg font-black"
                      style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-                    {{ mb_substr($employee->name, 0, 1) }}
+                    @if($avatarUrl)
+                        <img src="{{ $avatarUrl }}" alt="{{ $employee->name }}" class="w-full h-full object-cover">
+                    @else
+                        {{ mb_substr($employee->name, 0, 1) }}
+                    @endif
                 </div>
                 <div>
                     <h2 class="font-bold text-slate-800">{{ $employee->name }}</h2>
                     <p class="text-xs text-slate-500">AC-No: {{ $employee->ac_no }}</p>
                 </div>
             </div>
+
+            @if($employee->user)
+            <div class="mt-3 pt-3 border-t border-slate-200/70">
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="badge-gray">{{ $employee->job_title?->label() ?? 'غير محدد' }}</span>
+                    <span class="text-slate-500">الحساب:</span>
+                    <span class="font-mono text-slate-700">{{ $employee->user->email }}</span>
+                    <span class="{{ $employee->user->must_change_password ? 'badge-warning' : 'badge-success' }}">
+                        {{ $employee->user->must_change_password ? 'بانتظار أول تغيير' : 'نشط' }}
+                    </span>
+                </div>
+            </div>
+            @endif
         </div>
 
         {{-- Form --}}
@@ -70,6 +93,26 @@
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                         {{ $message }}
                     </p>
+                @enderror
+            </div>
+
+            {{-- الوظيفة --}}
+            <div class="form-group">
+                <label for="job_title" class="form-label">
+                    الوظيفة
+                    <span class="text-red-500">*</span>
+                </label>
+                <select id="job_title" name="job_title" class="form-input @error('job_title') border-red-400 focus:ring-red-300 @enderror">
+                    <option value="">اختر الوظيفة</option>
+                    @foreach(\App\Enums\JobTitle::cases() as $job)
+                        <option value="{{ $job->value }}"
+                            {{ old('job_title', $employee->job_title?->value) === $job->value ? 'selected' : '' }}>
+                            {{ $job->label() }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('job_title')
+                    <p class="form-error">{{ $message }}</p>
                 @enderror
             </div>
 

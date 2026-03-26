@@ -147,7 +147,7 @@ class DashboardStatisticsService
             ->groupBy('employee_id')
             ->orderByDesc('total_late')
             ->limit($limit)
-            ->with('employee:id,name,ac_no')
+            ->with('employee.user.profile')
             ->get()
             ->map(function ($item) {
                 return [
@@ -175,7 +175,7 @@ class DashboardStatisticsService
             ->groupBy('employee_id')
             ->orderByDesc('total_ot')
             ->limit($limit)
-            ->with('employee:id,name,ac_no')
+            ->with('employee.user.profile')
             ->get()
             ->map(function ($item) {
                 return [

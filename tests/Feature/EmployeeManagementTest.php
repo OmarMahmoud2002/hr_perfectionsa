@@ -16,9 +16,9 @@ class EmployeeManagementTest extends TestCase
         return User::factory()->create(['role' => 'admin']);
     }
 
-    private function makeViewer(): User
+    private function makeEmployee(): User
     {
-        return User::factory()->create(['role' => 'viewer']);
+        return User::factory()->create(['role' => 'employee']);
     }
 
     public function test_admin_can_create_employee(): void
@@ -28,6 +28,7 @@ class EmployeeManagementTest extends TestCase
         $response = $this->actingAs($admin)->post(route('employees.store'), [
             'ac_no'        => 'AC-1001',
             'name'         => 'موظف تجريبي',
+            'job_title'    => 'developer',
             'basic_salary' => 5000,
         ]);
 
@@ -42,7 +43,7 @@ class EmployeeManagementTest extends TestCase
 
     public function test_viewer_cannot_access_employee_creation(): void
     {
-        $viewer = $this->makeViewer();
+        $viewer = $this->makeEmployee();
 
         $this->actingAs($viewer)
             ->get(route('employees.create'))
@@ -52,6 +53,7 @@ class EmployeeManagementTest extends TestCase
             ->post(route('employees.store'), [
                 'ac_no'        => 'AC-999',
                 'name'         => 'Should Fail',
+                'job_title'    => 'developer',
                 'basic_salary' => 1000,
             ])
             ->assertStatus(403);

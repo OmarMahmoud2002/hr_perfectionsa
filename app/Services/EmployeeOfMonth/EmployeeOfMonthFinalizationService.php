@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Services\EmployeeOfMonth;
+
+use App\Models\EmployeeOfMonthResult;
+use Illuminate\Support\Facades\DB;
+
+class EmployeeOfMonthFinalizationService
+{
+    public function __construct(
+        private readonly EmployeeOfMonthScoringService $scoringService,
+    ) {}
+
+    public function finalizeMonth(int $month, int $year): array
+    {
+        $scoring = $this->scoringService->calculateForMonth($month, $year);
+        $rows = $scoring['scored_rows'];
+        $generatedAt = now();
+
+        DB::transaction(function () use ($rows, $scoring, $month, $year, $generatedAt) {
+            $payload = $rows->map(function (array $row) use ($scoring, $month, $year, $generatedAt) {
+                return [
+                    'employee_id' => $row['employee_id'],
+                    'month' => $month,
+                    'year' => $year,
+                    'final_score' => $row['final_score'],
+                    'breakdown' => json_encode($row['breakdown'], JSON_THROW_ON_ERROR),
+                    'formula_version' => $scoring['formula_version'],
+                    'generated_at' => $generatedAt,
+                    'created_at' => $generatedAt,
+                    'updated_at' => $generatedAt,
+                ];
+            })->all();
+
+            if (count($payload) === 0) {
+                return;
+            }
+
+            EmployeeOfMonthResult::query()->upsert(
+                $payload,
+                ['employee_id', 'month', 'year'],
+                ['final_score', 'breakdown', 'formula_version', 'generated_at', 'updated_at']
+            );
+        });
+
+        return [
+            'month' => $month,
+            'year' => $year,
+            'formula_version' => $scoring['formula_version'],
+            'rows_count' => $rows->count(),
+            'rows' => $rows,
+        ];
+    }
+}

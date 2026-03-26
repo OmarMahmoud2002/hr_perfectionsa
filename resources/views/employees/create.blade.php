@@ -75,6 +75,25 @@
                 @enderror
             </div>
 
+            {{-- الوظيفة --}}
+            <div class="form-group">
+                <label for="job_title" class="form-label">
+                    الوظيفة
+                    <span class="text-red-500">*</span>
+                </label>
+                <select id="job_title" name="job_title" class="form-input @error('job_title') border-red-400 focus:ring-red-300 @enderror">
+                    <option value="">اختر الوظيفة</option>
+                    @foreach(\App\Enums\JobTitle::cases() as $job)
+                        <option value="{{ $job->value }}" {{ old('job_title') === $job->value ? 'selected' : '' }}>
+                            {{ $job->label() }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('job_title')
+                    <p class="form-error">{{ $message }}</p>
+                @enderror
+            </div>
+
             {{-- Divider --}}
             <hr class="border-slate-100">
 
@@ -148,6 +167,16 @@
                         </div>
                         @error('late_grace_minutes')<p class="form-error text-xs">{{ $message }}</p>@enderror
                     </div>
+                </div>
+            </div>
+
+            <div class="alert-info">
+                <div>
+                    <p class="font-semibold mb-1">إنشاء الحساب يتم تلقائياً</p>
+                    <p class="text-xs">
+                        سيتم إنشاء بريد الموظف تلقائياً بصيغة <span class="font-mono">name@perfection.com</span>
+                        مع كلمة مرور أولية <span class="font-mono">123456789</span> ويُطلب من الموظف تغييرها عند أول دخول.
+                    </p>
                 </div>
             </div>
 

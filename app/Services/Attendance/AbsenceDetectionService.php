@@ -116,6 +116,7 @@ class AbsenceDetectionService
         // الأيام ذات manual_status غير 'present' (أو null مع is_absent=true) لا تُضاف
         $totalLateMinutes = 0;
         $totalOtMinutes   = 0;
+        $totalWorkMinutes = 0;
 
         foreach ($records as $record) {
             $ms = $record->manual_status;
@@ -132,6 +133,7 @@ class AbsenceDetectionService
 
             $totalLateMinutes += $record->late_minutes;
             $totalOtMinutes   += $record->overtime_minutes;
+            $totalWorkMinutes += $record->work_minutes;
         }
 
         return [
@@ -142,6 +144,7 @@ class AbsenceDetectionService
             'total_full_attendance_weeks' => $fullAttendanceWeeks,
             'total_late_minutes'          => $totalLateMinutes,
             'total_overtime_minutes'      => $totalOtMinutes,
+            'total_work_minutes'          => $totalWorkMinutes,
             'records'                     => $records,
         ];
     }

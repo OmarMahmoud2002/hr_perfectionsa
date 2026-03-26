@@ -12,15 +12,15 @@ class AdminUserSeeder extends Seeder
     {
         // إنشاء مستخدم Admin افتراضي
         User::updateOrCreate(
-            ['email' => 'admin@attendance.com'],
+            ['email' => 'admin@perfection.com'],
             [
                 'name'     => 'System Admin',
-                'email'    => 'admin@attendance.com',
-                'password' => Hash::make('Admin@123'),
+                'email'    => 'admin@perfection.com',
+                'password' => Hash::make('123456789'),
                 'role'     => 'admin',
             ]
         );
 
-        $this->command->info('✅ Admin user created: admin@attendance.com / Admin@123');
+        $this->command->info('Admin user created: admin@perfection.com / 123456789');
     }
 }

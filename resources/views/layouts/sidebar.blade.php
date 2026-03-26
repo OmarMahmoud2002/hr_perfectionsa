@@ -31,8 +31,10 @@
             $linkClass = "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200";
             $activeClass = "bg-white/20 text-white shadow-inner";
             $inactiveClass = "text-white/70 hover:bg-white/10 hover:text-white";
+            $isAdminLike = auth()->user()->isAdminLike();
         @endphp
 
+        @if(!auth()->user()->isEvaluatorUser())
         {{-- Dashboard --}}
         <a href="{{ route('dashboard') }}"
            class="{{ $linkClass }} {{ request()->routeIs('dashboard') ? $activeClass : $inactiveClass }}">
@@ -45,6 +47,88 @@
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
+        @endif
+
+        {{-- My Account --}}
+        <a href="{{ route('account.my') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('account.my*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M5.121 17.804A14.94 14.94 0 0112 16c2.5 0 4.847.61 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>حسابي</span>
+            @if(request()->routeIs('account.my*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+
+        @if(auth()->user()->isEmployee())
+        <a href="{{ route('employee-of-month.vote.page') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('employee-of-month.vote.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.062 3.265a1 1 0 00.95.69h3.433c.969 0 1.371 1.24.588 1.81l-2.777 2.018a1 1 0 00-.363 1.118l1.062 3.266c.3.92-.755 1.688-1.538 1.118l-2.777-2.018a1 1 0 00-1.176 0l-2.777 2.018c-.783.57-1.838-.197-1.539-1.118l1.063-3.266a1 1 0 00-.364-1.118L2.98 8.692c-.783-.57-.38-1.81.588-1.81H7a1 1 0 00.951-.69l1.062-3.265z"/>
+            </svg>
+            <span>موظف الشهر</span>
+            @if(request()->routeIs('employee-of-month.vote.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+        @endif
+
+        @if(auth()->user()->isEmployee())
+        <a href="{{ route('tasks.my.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('tasks.my.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9l-4-4H9zM9 5v4h4"/>
+            </svg>
+            <span>مهامي</span>
+            @if(request()->routeIs('tasks.my.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+        @endif
+
+        @if(auth()->user()->isEvaluatorUser())
+        <a href="{{ route('tasks.evaluator.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('tasks.evaluator.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M11 5h7m-7 4h7m-7 4h7m-9 4h9M5 5h.01M5 9h.01M5 13h.01M5 17h.01"/>
+            </svg>
+            <span>تقييم المهام</span>
+            @if(request()->routeIs('tasks.evaluator.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+        @endif
+
+        @if($isAdminLike)
+        <a href="{{ route('employee-of-month.admin.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('employee-of-month.admin.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <span>لوحة موظف الشهر</span>
+            @if(request()->routeIs('employee-of-month.admin.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+
+        <a href="{{ route('tasks.admin.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('tasks.admin.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9l-4-4H9zM9 5v4h4"/>
+            </svg>
+            <span>إدارة المهام</span>
+            @if(request()->routeIs('tasks.admin.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+        @endif
 
         {{-- Divider --}}
         <div class="pt-2 pb-1">
@@ -65,7 +149,7 @@
         </a>
 
         {{-- Import --}}
-        @if(auth()->user()->isAdmin())
+        @if($isAdminLike)
         <a href="{{ route('import.form') }}"
            class="{{ $linkClass }} {{ request()->routeIs('import.*') ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,6 +164,7 @@
         @endif
 
         {{-- Divider --}}
+        @if($isAdminLike)
         <div class="pt-2 pb-1">
             <p class="px-3 text-xs text-white/40 font-semibold uppercase tracking-wider">التقارير</p>
         </div>
@@ -111,7 +196,6 @@
         </a>
 
         {{-- Settings --}}
-        @if(auth()->user()->isAdmin())
         <div class="pt-2 pb-1">
             <p class="px-3 text-xs text-white/40 font-semibold uppercase tracking-wider">النظام</p>
         </div>

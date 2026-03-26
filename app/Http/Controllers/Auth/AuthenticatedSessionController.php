@@ -29,6 +29,10 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        if ($request->user()?->isEvaluatorUser()) {
+            return redirect()->route('tasks.evaluator.index');
+        }
+
         return redirect()->intended(RouteServiceProvider::HOME);
     }
 

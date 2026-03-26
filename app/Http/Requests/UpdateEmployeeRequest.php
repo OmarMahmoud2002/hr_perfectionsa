@@ -2,13 +2,15 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\JobTitle;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
 
 class UpdateEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->isAdmin();
+        return $this->user()->isAdminLike();
     }
 
     public function rules(): array
@@ -18,6 +20,7 @@ class UpdateEmployeeRequest extends FormRequest
         return [
             'ac_no'               => ['required', 'string', 'max:50', "unique:employees,ac_no,{$employeeId}"],
             'name'                => ['required', 'string', 'max:255'],
+            'job_title'           => ['required', new Enum(JobTitle::class)],
             'basic_salary'        => ['required', 'numeric', 'min:0', 'max:999999.99'],
             'work_start_time'     => ['nullable', 'regex:/^\d{2}:\d{2}$/'],
             'work_end_time'       => ['nullable', 'regex:/^\d{2}:\d{2}$/'],
@@ -34,6 +37,7 @@ class UpdateEmployeeRequest extends FormRequest
             'ac_no.max'                  => 'رقم الموظف لا يتجاوز 50 حرفاً.',
             'name.required'              => 'اسم الموظف مطلوب.',
             'name.max'                   => 'اسم الموظف لا يتجاوز 255 حرفاً.',
+            'job_title.required'         => 'الوظيفة مطلوبة.',
             'basic_salary.required'      => 'المرتب الأساسي مطلوب.',
             'basic_salary.numeric'       => 'المرتب الأساسي يجب أن يكون رقماً.',
             'basic_salary.min'           => 'المرتب الأساسي لا يمكن أن يكون سالباً.',
@@ -51,6 +55,7 @@ class UpdateEmployeeRequest extends FormRequest
         return [
             'ac_no'               => 'رقم الموظف',
             'name'                => 'اسم الموظف',
+            'job_title'           => 'الوظيفة',
             'basic_salary'        => 'المرتب الأساسي',
             'work_start_time'     => 'وقت الحضور',
             'work_end_time'       => 'وقت الانصراف',
