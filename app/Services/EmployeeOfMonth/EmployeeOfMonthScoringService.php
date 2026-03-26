@@ -16,7 +16,7 @@ class EmployeeOfMonthScoringService
 
     private const SCORE_FLOOR = 20.0;
     private const SCORE_CEILING = 100.0;
-    private const NEUTRAL_SCORE = 60.0;
+    private const NEUTRAL_SCORE = 50.0;
 
     private const LEGACY_WEIGHTS = [
         // Kept for backward compatibility with older breakdown readers.

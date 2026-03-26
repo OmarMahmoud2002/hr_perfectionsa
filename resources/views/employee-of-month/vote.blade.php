@@ -30,6 +30,42 @@
         csrfToken: '{{ csrf_token() }}',
     })" x-init="init()" class="space-y-5">
 
+    <div x-show="popup.open"
+         x-transition:enter="transition ease-out duration-250"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4"
+         @click="closePopup()">
+           <div class="w-full max-w-md rounded-2xl p-5 text-white shadow-2xl border border-white/20"
+               style="background: radial-gradient(circle at 80% 20%, rgba(231,197,57,.22), transparent 40%), radial-gradient(circle at 10% 90%, rgba(77,155,151,.24), transparent 45%), linear-gradient(135deg, #2f6e98 0%, #2f7a76 100%);"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="opacity-0 scale-90"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-180"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             @click.stop>
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <svg x-show="popup.type === 'success'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <svg x-show="popup.type !== 'success'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="flex-1">
+                    <p class="text-lg font-black text-white" x-text="popup.title"></p>
+                    <p class="text-sm text-white/95 mt-1" x-text="popup.message"></p>
+                </div>
+                <button type="button" class="text-white/90 hover:text-white" @click="closePopup()">✕</button>
+            </div>
+        </div>
+    </div>
+
     <div class="card p-0 overflow-hidden relative">
         <div class="absolute inset-0 opacity-95"
              style="background: radial-gradient(circle at 80% 20%, rgba(231,197,57,.26), transparent 40%), radial-gradient(circle at 10% 90%, rgba(77,155,151,.28), transparent 45%), linear-gradient(135deg, #2f6e98 0%, #2f7a76 100%);"></div>
@@ -182,6 +218,13 @@ function employeeMonthVotePage(config) {
         submitting: false,
         fetchError: '',
         timer: null,
+        popup: {
+            open: false,
+            type: 'success',
+            title: '',
+            message: '',
+        },
+        popupTimer: null,
 
         init() {
             this.startCountdown();
@@ -209,7 +252,7 @@ function employeeMonthVotePage(config) {
         },
 
         get canSubmit() {
-            return this.canVote && !this.hasVoted && !this.submitting && this.selectedEmployeeId !== null;
+            return !this.submitting && this.selectedEmployeeId !== null;
         },
 
         get statusLabel() {
@@ -248,12 +291,30 @@ function employeeMonthVotePage(config) {
         },
 
         async submitVote() {
-            if (!this.canSubmit) {
+            if (this.submitting || this.selectedEmployeeId === null) {
+                return;
+            }
+
+            if (this.hasVoted) {
+                const votedCandidate = this.findCandidateById(this.status.voted_employee_id) || this.selectedCandidate;
+                this.showPopup(
+                    'warning',
+                    'تم التصويت بالفعل',
+                    votedCandidate
+                        ? `لا يمكن التصويت مرة أخرى. تم التصويت لـ ${votedCandidate.name}.`
+                        : 'لا يمكن التصويت مرة أخرى في نفس الدورة.'
+                );
+                return;
+            }
+
+            if (!this.canVote) {
+                this.showPopup('warning', 'التصويت غير متاح', this.statusLabel);
                 return;
             }
 
             this.submitting = true;
             this.fetchError = '';
+            const chosenCandidate = this.selectedCandidate;
 
             try {
                 const response = await fetch(config.voteUrl, {
@@ -278,10 +339,60 @@ function employeeMonthVotePage(config) {
                 this.status.reason = 'already_voted';
                 this.status.voted_employee_id = data.voted_employee_id;
                 this.status.seconds_remaining_to_close = data.seconds_remaining_to_close;
+
+                const votedCandidate = this.findCandidateById(data.voted_employee_id) || chosenCandidate;
+                if (data.status === 'already_voted') {
+                    this.showPopup(
+                        'warning',
+                        'تم التصويت بالفعل',
+                        votedCandidate
+                            ? `لا يمكن التصويت مرة أخرى. تم التصويت لـ ${votedCandidate.name}.`
+                            : 'لا يمكن التصويت مرة أخرى في نفس الدورة.'
+                    );
+                } else {
+                    this.showPopup(
+                        'success',
+                        'شكرا على التصويت',
+                        votedCandidate
+                            ? `تم التصويت لـ ${votedCandidate.name}.`
+                            : 'تم حفظ التصويت بنجاح.'
+                    );
+                }
             } catch (e) {
                 this.fetchError = 'تعذر الاتصال بالخادم. حاول مرة أخرى.';
             } finally {
                 this.submitting = false;
+            }
+        },
+
+        findCandidateById(id) {
+            if (id === null || id === undefined) {
+                return null;
+            }
+
+            return this.candidateCards.find(c => Number(c.id) === Number(id)) || null;
+        },
+
+        showPopup(type, title, message) {
+            this.popup.type = type;
+            this.popup.title = title;
+            this.popup.message = message;
+            this.popup.open = true;
+
+            if (this.popupTimer) {
+                clearTimeout(this.popupTimer);
+            }
+
+            this.popupTimer = setTimeout(() => {
+                this.popup.open = false;
+            }, 2500);
+        },
+
+        closePopup() {
+            this.popup.open = false;
+            if (this.popupTimer) {
+                clearTimeout(this.popupTimer);
+                this.popupTimer = null;
             }
         },
 

@@ -109,4 +109,18 @@ class Employee extends Model
     {
         return $this->job_title?->label();
     }
+
+    /**
+     * Admin-like roles (admin, manager, hr) are exempt from late/OT calculations.
+     */
+    public function isAdminLikeForAttendance(): bool
+    {
+        $role = $this->user?->role;
+        if (in_array($role, ['admin', 'manager', 'hr'], true)) {
+            return true;
+        }
+
+        $jobTitle = $this->job_title?->value;
+        return in_array($jobTitle, ['manager', 'hr'], true);
+    }
 }

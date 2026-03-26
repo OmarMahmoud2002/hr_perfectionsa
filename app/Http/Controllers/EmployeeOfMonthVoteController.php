@@ -22,13 +22,17 @@ class EmployeeOfMonthVoteController extends Controller
     {
         $user = request()->user()->loadMissing('employee');
 
-        $candidates = Employee::query()
+        $candidatesQuery = Employee::query()
             ->where('is_active', true)
-            ->whereKeyNot($user->employee_id)
             ->whereHas('user', fn ($q) => $q->where('role', 'employee'))
             ->with('user.profile')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($user->employee_id !== null) {
+            $candidatesQuery->whereKeyNot((int) $user->employee_id);
+        }
+
+        $candidates = $candidatesQuery->get();
 
         $status = $this->buildStatusPayload($user);
 

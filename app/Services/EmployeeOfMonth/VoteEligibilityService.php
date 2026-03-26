@@ -10,6 +10,8 @@ use Carbon\Carbon;
 
 class VoteEligibilityService
 {
+    private const VOTER_ROLES = ['employee', 'admin', 'manager', 'hr'];
+
     public function canUserVote(User $user, int $month, int $year, ?Carbon $now = null): array
     {
         $now ??= now();
@@ -67,7 +69,7 @@ class VoteEligibilityService
 
     public function isEligibleVoter(User $user): bool
     {
-        return $user->isEmployee() && $user->employee_id !== null;
+        return in_array($user->role, self::VOTER_ROLES, true);
     }
 
     public function isEligibleCandidate(Employee $employee): bool

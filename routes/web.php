@@ -62,8 +62,8 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     Route::get('/my-account', [MyAccountController::class, 'show'])->name('account.my');
     Route::put('/my-account', [MyAccountController::class, 'updateProfile'])->name('account.my.update');
 
-    // Employee of Month - Voting endpoint (employee only)
-    Route::middleware(['role:employee'])->group(function () {
+    // Employee of Month - Voting endpoint (employee + admin/manager/hr)
+    Route::middleware(['role:employee,admin,manager,hr'])->group(function () {
         Route::get('/employee-of-month/vote', [EmployeeOfMonthVoteController::class, 'page'])
             ->name('employee-of-month.vote.page');
         Route::get('/employee-of-month/vote/status', [EmployeeOfMonthVoteController::class, 'status'])

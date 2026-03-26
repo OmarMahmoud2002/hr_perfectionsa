@@ -66,6 +66,11 @@ class PayrollCalculationService
             $absentDays            = $stats['total_absent_days'];
             $fullAttendanceWeeks   = $stats['total_full_attendance_weeks'];
 
+            if ($employee->isAdminLikeForAttendance()) {
+                $totalLateMinutes = 0;
+                $totalOtMinutes = 0;
+            }
+
             // معدلات مبنية على راتب الموظف
             // تكلفة اليوم = الراتب ÷ 30
             // تكلفة الساعة = تكلفة اليوم ÷ 8
@@ -131,8 +136,8 @@ class PayrollCalculationService
                     'total_working_days'     => $stats['total_working_days'],
                     'total_present_days'     => $stats['total_present_days'],
                     'total_absent_days'      => $absentDays,
-                    'total_late_minutes'     => $stats['total_late_minutes'],
-                    'total_overtime_minutes' => $stats['total_overtime_minutes'],
+                    'total_late_minutes'     => $totalLateMinutes,
+                    'total_overtime_minutes' => $totalOtMinutes,
                     'full_attendance_weeks'  => $fullAttendanceWeeks,
                     'basic_salary'           => $basicSalary,
                     'late_deduction'         => $lateDeduction,

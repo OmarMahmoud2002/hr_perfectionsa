@@ -21,6 +21,7 @@ class EmployeeMonthTask extends Model
         'period_start_date',
         'period_end_date',
         'task_date',
+        'task_end_date',
         'created_by',
         'is_active',
     ];
@@ -31,6 +32,7 @@ class EmployeeMonthTask extends Model
         'period_start_date' => 'date',
         'period_end_date' => 'date',
         'task_date' => 'date',
+        'task_end_date' => 'date',
         'created_by' => 'integer',
         'is_active' => 'boolean',
     ];

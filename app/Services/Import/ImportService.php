@@ -222,6 +222,11 @@ class ImportService
 
                         $calc = $this->calculator->calculateDay($rowDTO, $employeeSettings, $publicHolidays);
 
+                        if ($employee->isAdminLikeForAttendance()) {
+                            $calc['late_minutes'] = 0;
+                            $calc['overtime_minutes'] = 0;
+                        }
+
                         $recordsBuffer[] = [
                             'employee_id'      => $employee->id,
                             'date'             => $rowDTO->date->toDateString(),

@@ -112,6 +112,11 @@
                            value="{{ old('task_date', now()->toDateString()) }}">
                 </div>
                 <div class="form-group mb-0">
+                    <label class="form-label" for="task_end_date">تاريخ انتهاء المهمة</label>
+                    <input id="task_end_date" name="task_end_date" type="date" class="form-input" required
+                           value="{{ old('task_end_date', now()->toDateString()) }}">
+                </div>
+                <div class="form-group mb-0">
                     <label class="form-label" for="employee_ids">إسناد لموظفين</label>
                     <select id="employee_ids" name="employee_ids[]" class="form-input" multiple size="5" required>
                         @foreach($employees as $employee)
@@ -142,7 +147,10 @@
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <h3 class="text-base font-bold text-slate-800">{{ $task->title }}</h3>
-                            <p class="text-xs text-slate-500 mt-1">تاريخ المهمة: {{ optional($task->task_date)->format('Y-m-d') ?? '—' }}</p>
+                            <p class="text-xs text-slate-500 mt-1">
+                                تاريخ البداية: {{ optional($task->task_date)->format('Y-m-d') ?? '—' }}
+                                | تاريخ الانتهاء: {{ optional($task->task_end_date)->format('Y-m-d') ?? '—' }}
+                            </p>
                             <p class="text-xs text-slate-500 mt-1">{{ $task->description ?: 'بدون وصف' }}</p>
                         </div>
                         <span class="{{ $task->is_active ? 'badge-success' : 'badge-gray' }}">{{ $task->is_active ? 'نشطة' : 'موقوفة' }}</span>
@@ -205,6 +213,12 @@
                                 <label class="form-label">تاريخ المهمة</label>
                                 <input type="date" name="task_date" class="form-input" required
                                        value="{{ optional($task->task_date)->format('Y-m-d') ?? now()->toDateString() }}">
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label class="form-label">تاريخ انتهاء المهمة</label>
+                                <input type="date" name="task_end_date" class="form-input" required
+                                       value="{{ optional($task->task_end_date)->format('Y-m-d') ?? optional($task->task_date)->format('Y-m-d') ?? now()->toDateString() }}">
                             </div>
 
                             <div class="form-group mb-0">

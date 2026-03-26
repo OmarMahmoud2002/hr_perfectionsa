@@ -8,7 +8,13 @@ class StoreEmployeeMonthVoteRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isEmployee() === true;
+        $user = $this->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return in_array($user->role, ['employee', 'admin', 'manager', 'hr'], true);
     }
 
     public function rules(): array

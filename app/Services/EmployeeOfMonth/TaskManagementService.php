@@ -25,6 +25,7 @@ class TaskManagementService
                 'period_start_date' => $periodStart->toDateString(),
                 'period_end_date' => $periodEnd->toDateString(),
                 'task_date' => isset($data['task_date']) ? Carbon::parse((string) $data['task_date'])->toDateString() : Carbon::now()->toDateString(),
+                'task_end_date' => isset($data['task_end_date']) ? Carbon::parse((string) $data['task_end_date'])->toDateString() : null,
                 'created_by' => $creator->id,
                 'is_active' => (bool) ($data['is_active'] ?? true),
             ]);
@@ -49,6 +50,9 @@ class TaskManagementService
                 'period_start_date' => $periodStart->toDateString(),
                 'period_end_date' => $periodEnd->toDateString(),
                 'task_date' => isset($data['task_date']) ? Carbon::parse((string) $data['task_date'])->toDateString() : ($task->task_date?->toDateString() ?? Carbon::now()->toDateString()),
+                'task_end_date' => array_key_exists('task_end_date', $data)
+                    ? Carbon::parse((string) $data['task_end_date'])->toDateString()
+                    : ($task->task_end_date?->toDateString()),
                 'is_active' => (bool) ($data['is_active'] ?? $task->is_active),
             ]);
 

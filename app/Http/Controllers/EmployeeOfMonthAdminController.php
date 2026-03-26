@@ -24,8 +24,11 @@ class EmployeeOfMonthAdminController extends Controller
 
     public function index(Request $request): View
     {
-        $month = (int) $request->input('month', now()->month);
-        $year = (int) $request->input('year', now()->year);
+        $month = (int) $request->input('month', (int) $request->session()->get('employee-of-month.admin.filters.month', now()->month));
+        $year = (int) $request->input('year', (int) $request->session()->get('employee-of-month.admin.filters.year', now()->year));
+
+        $request->session()->put('employee-of-month.admin.filters.month', $month);
+        $request->session()->put('employee-of-month.admin.filters.year', $year);
 
         $metrics = $this->metricsService->getMonthlyMetrics($month, $year);
         $scoring = $this->scoringService->calculateForMonth($month, $year, $metrics);
@@ -38,6 +41,12 @@ class EmployeeOfMonthAdminController extends Controller
         $topWorkHours = $performanceRows->sortByDesc('work_minutes')->first();
         $topPunctuality = $performanceRows->sortBy('late_minutes')->first();
         $topOvertime = $performanceRows->sortByDesc('overtime_minutes')->first();
+        $workHoursRanking = collect($metrics['rows'])
+            ->sortByDesc('work_minutes')
+            ->values();
+        $punctualityRanking = collect($metrics['rows'])
+            ->sortBy('late_minutes')
+            ->values();
 
         $taskCoverage = (float) ($metrics['task_period_totals']['coverage_ratio'] ?? 0.0);
         $explainRows = collect($scoring['scored_rows'])
@@ -81,6 +90,8 @@ class EmployeeOfMonthAdminController extends Controller
             'topWorkHours' => $topWorkHours,
             'topPunctuality' => $topPunctuality,
             'topOvertime' => $topOvertime,
+            'workHoursRanking' => $workHoursRanking,
+            'punctualityRanking' => $punctualityRanking,
             'taskCoverage' => $taskCoverage,
             'explainRows' => $explainRows,
             'scoring' => $scoring,

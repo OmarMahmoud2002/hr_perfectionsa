@@ -9,6 +9,7 @@ use App\Services\EmployeeOfMonth\TaskManagementService;
 use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -21,10 +22,13 @@ class TaskAdminController extends Controller
     public function index(Request $request): View
     {
         $period = PayrollPeriod::monthForDate(now());
-        $month = (int) $request->input('month', $period['month']);
-        $year = (int) $request->input('year', $period['year']);
+        $month = (int) $request->input('month', (int) $request->session()->get('tasks.admin.filters.month', $period['month']));
+        $year = (int) $request->input('year', (int) $request->session()->get('tasks.admin.filters.year', $period['year']));
         $taskDate = $request->input('task_date');
         $employeeId = (int) $request->input('employee_id', 0);
+
+        $request->session()->put('tasks.admin.filters.month', $month);
+        $request->session()->put('tasks.admin.filters.year', $year);
 
         $tasksQuery = EmployeeMonthTask::query()
             ->where('period_month', $month)
@@ -45,6 +49,7 @@ class TaskAdminController extends Controller
 
         $employees = Employee::query()
             ->where('is_active', true)
+            ->whereHas('user', fn ($query) => $query->where('role', 'employee'))
             ->orderBy('name')
             ->get(['id', 'name', 'ac_no']);
 
@@ -75,6 +80,7 @@ class TaskAdminController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'task_date' => ['required', 'date'],
+            'task_end_date' => ['required', 'date', 'after_or_equal:task_date'],
             'period_month' => ['required', 'integer', 'between:1,12'],
             'period_year' => ['required', 'integer', 'between:2000,2100'],
             'employee_ids' => ['required', 'array', 'min:1'],
@@ -82,9 +88,11 @@ class TaskAdminController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids']);
+
         $this->taskManagementService->createTask(
             $validated,
-            $validated['employee_ids'],
+            $employeeIds,
             $request->user()
         );
 
@@ -103,12 +111,15 @@ class TaskAdminController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'task_date' => ['required', 'date'],
+            'task_end_date' => ['required', 'date', 'after_or_equal:task_date'],
             'employee_ids' => ['required', 'array', 'min:1'],
             'employee_ids.*' => ['required', 'integer', 'exists:employees,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $this->taskManagementService->updateTask($task, $validated, $validated['employee_ids']);
+        $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids']);
+
+        $this->taskManagementService->updateTask($task, $validated, $employeeIds);
 
         return back()->with('success', 'تم تحديث المهمة بنجاح.');
     }
@@ -146,5 +157,30 @@ class TaskAdminController extends Controller
             new TasksEvaluationsExport($tasks, $month, $year),
             $fileName
         );
+    }
+
+    private function ensureEligibleEmployeeIds(array $employeeIds): array
+    {
+        $requestedIds = collect($employeeIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $eligibleIds = Employee::query()
+            ->where('is_active', true)
+            ->whereHas('user', fn ($query) => $query->where('role', 'employee'))
+            ->whereIn('id', $requestedIds->all())
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($eligibleIds->count() !== $requestedIds->count()) {
+            throw ValidationException::withMessages([
+                'employee_ids' => 'يجب إسناد المهمة لموظفين فقط (role = employee).',
+            ]);
+        }
+
+        return $eligibleIds->all();
     }
 }

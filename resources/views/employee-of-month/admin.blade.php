@@ -15,49 +15,51 @@
     };
 @endphp
 
-<div class="space-y-5" x-data="{ showHistoryDetails: false, showExplain: true }">
+<div class="space-y-5" x-data="{ showHistoryDetails: false, showExplain: true, showAllVotes: false, showAllFinalRanking: false, showAllExplainRows: false, showAllHistoryMonth: false, showAllHistoryWinners: false, showAllTaskPerformance: false, showAllWorkHours: false, showAllPunctuality: false }">
 
     <div class="card p-0 overflow-hidden relative animate-fade-in">
         <div class="absolute inset-0 opacity-95"
              style="background: radial-gradient(circle at 85% 20%, rgba(231,197,57,.24), transparent 40%), radial-gradient(circle at 10% 85%, rgba(77,155,151,.26), transparent 42%), linear-gradient(140deg, #2e6d98 0%, #2f7c77 100%);"></div>
 
         <div class="relative p-6 sm:p-7 text-white">
-            <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
                 <div>
                     <p class="text-xs uppercase tracking-[0.2em] text-white/70 mb-2">Employee Of The Month</p>
                     <h2 class="text-2xl sm:text-3xl font-black">النتائج النهائية لشهر {{ $monthLabel }}</h2>
                     <p class="text-sm text-white/80 mt-2">المعادلة الحالية: Tasks 40% + Punctuality 15% + Work Hours 20% + Vote 25%</p>
                 </div>
 
-                <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
-                    <form method="GET" class="flex flex-wrap items-center gap-2">
-                        <select name="month" onchange="this.form.submit()" class="form-input !w-auto !min-w-0 !px-4 !py-2 !text-sm !bg-white/95 !border-white/30">
+                <div class="w-full xl:w-auto space-y-2">
+                    <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 gap-2 xl:min-w-[280px]">
+                        <select name="month" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
                             @foreach(range(1, 12) as $m)
                                 <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>
                                     {{ \Carbon\Carbon::create(null, $m, 1)->locale('ar')->isoFormat('MMMM') }}
                                 </option>
                             @endforeach
                         </select>
-                        <select name="year" onchange="this.form.submit()" class="form-input !w-auto !min-w-0 !px-4 !py-2 !text-sm !bg-white/95 !border-white/30">
+                        <select name="year" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
                             @foreach(range(now()->year, now()->year - 4) as $y)
                                 <option value="{{ $y }}" {{ $year === $y ? 'selected' : '' }}>{{ $y }}</option>
                             @endforeach
                         </select>
                     </form>
 
-                    <a href="{{ route('employee-of-month.admin.export', ['month' => $month, 'year' => $year]) }}" class="btn-outline btn-sm bg-white/95">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 8l-3-3m3 3l3-3M5 20h14"/>
-                        </svg>
-                        تصدير Excel
-                    </a>
+                    <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+                        <a href="{{ route('employee-of-month.admin.export', ['month' => $month, 'year' => $year]) }}" class="btn-outline btn-sm bg-white/95 !h-9 !text-xs">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 8l-3-3m3 3l3-3M5 20h14"/>
+                            </svg>
+                            تصدير Excel
+                        </a>
 
-                    <form method="POST" action="{{ route('employee-of-month.admin.finalize') }}">
-                        @csrf
-                        <input type="hidden" name="month" value="{{ $month }}">
-                        <input type="hidden" name="year" value="{{ $year }}">
-                        <button type="submit" class="btn-primary btn-sm w-full">اعتماد النتائج</button>
-                    </form>
+                        <form method="POST" action="{{ route('employee-of-month.admin.finalize') }}">
+                            @csrf
+                            <input type="hidden" name="month" value="{{ $month }}">
+                            <input type="hidden" name="year" value="{{ $year }}">
+                            <button type="submit" class="btn-primary btn-sm !h-9 !text-xs">اعتماد النتائج</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -73,14 +75,6 @@
             <p class="text-2xl font-black text-slate-800 mt-1">{{ $metrics['voters_count'] }}</p>
         </div>
         <div class="card p-4 animate-slide-up" style="animation-delay:120ms; animation-fill-mode:both;">
-            <p class="text-xs text-slate-500">Coverage المهام</p>
-            <p class="text-2xl font-black text-secondary-700 mt-1">{{ number_format($taskCoverage, 2) }}%</p>
-        </div>
-        <div class="card p-4 animate-slide-up" style="animation-delay:160ms; animation-fill-mode:both;">
-            <p class="text-xs text-slate-500">نسخة المعادلة</p>
-            <p class="text-2xl font-black text-slate-800 mt-1">{{ $scoring['formula_version'] }}</p>
-        </div>
-        <div class="card p-4 animate-slide-up" style="animation-delay:200ms; animation-fill-mode:both;">
             <p class="text-xs text-slate-500">عدد المرشحين</p>
             <p class="text-2xl font-black text-slate-800 mt-1">{{ collect($metrics['rows'])->count() }}</p>
         </div>
@@ -88,8 +82,13 @@
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div class="xl:col-span-2 card overflow-hidden animate-slide-up">
-            <div class="card-header">
+            <div class="card-header flex items-center justify-between gap-3">
                 <h3>نتائج التصويت</h3>
+                @if($voteRanking->count() > 5)
+                    <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllVotes = !showAllVotes">
+                        <span x-text="showAllVotes ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                    </button>
+                @endif
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
@@ -110,7 +109,7 @@
                                 ? route('media.avatar', ['path' => $emp->user->profile->avatar_path])
                                 : null;
                         @endphp
-                        <tr>
+                        <tr x-show="{{ $idx < 5 ? 'true' : 'showAllVotes' }}" x-transition.opacity.duration.200ms>
                             <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                             <td>
                                 <div class="flex items-center gap-3">
@@ -140,39 +139,172 @@
         </div>
 
         <div class="space-y-4 animate-slide-up" style="animation-delay:70ms; animation-fill-mode:both;">
-            <div class="card p-4">
-                <p class="text-xs text-slate-500">أعلى ساعات عمل</p>
-                @if(is_array($topWorkHours))
-                    <p class="text-base font-bold text-slate-800 mt-1">{{ $topWorkHours['employee']->name }}</p>
-                    <p class="text-xs text-secondary-700 mt-1">{{ $formatMinutes((int) $topWorkHours['work_minutes']) }} ساعة</p>
-                @else
-                    <p class="text-sm text-slate-400 mt-1">—</p>
-                @endif
+            <div class="card overflow-hidden">
+                <div class="card-header flex items-center justify-between gap-2">
+                    <h3>أعلى ساعات عمل</h3>
+                    @if($workHoursRanking->count() > 5)
+                        <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllWorkHours = !showAllWorkHours">
+                            <span x-text="showAllWorkHours ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                        </button>
+                    @endif
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>الموظف</th>
+                                <th class="text-center">ساعات العمل</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($workHoursRanking as $idx => $row)
+                            <tr x-show="{{ $idx < 5 ? 'true' : 'showAllWorkHours' }}" x-transition.opacity.duration.200ms>
+                                <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
+                                <td>
+                                    <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
+                                    <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
+                                </td>
+                                <td class="text-center"><span class="badge-blue">{{ $formatMinutes((int) $row['work_minutes']) }}</span></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3" class="text-center text-slate-500 py-8">لا توجد بيانات ساعات عمل.</td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="card p-4">
-                <p class="text-xs text-slate-500">الأكثر انضباطا (Punctuality)</p>
-                @if(is_array($topPunctuality))
-                    <p class="text-base font-bold text-slate-800 mt-1">{{ $topPunctuality['employee']->name }}</p>
-                    <p class="text-xs text-emerald-700 mt-1">{{ (int) $topPunctuality['late_minutes'] }} دقيقة تأخير</p>
-                @else
-                    <p class="text-sm text-slate-400 mt-1">—</p>
-                @endif
-            </div>
-
-            <div class="card p-4">
-                <p class="text-xs text-slate-500">المهام المقيمة / الإجمالي</p>
-                <p class="text-base font-black text-slate-800 mt-1">
-                    {{ $metrics['task_period_totals']['evaluated_tasks_count'] ?? 0 }} / {{ $metrics['task_period_totals']['tasks_count'] ?? 0 }}
-                </p>
-                <p class="text-xs text-slate-500 mt-1">كل مهمة غير مقيمة يتم استبعادها من TaskScore.</p>
+            <div class="card overflow-hidden">
+                <div class="card-header flex items-center justify-between gap-2">
+                    <h3>الأكثر انضباطا (Punctuality)</h3>
+                    @if($punctualityRanking->count() > 5)
+                        <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllPunctuality = !showAllPunctuality">
+                            <span x-text="showAllPunctuality ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                        </button>
+                    @endif
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>الموظف</th>
+                                <th class="text-center">دقائق التأخير</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($punctualityRanking as $idx => $row)
+                            <tr x-show="{{ $idx < 5 ? 'true' : 'showAllPunctuality' }}" x-transition.opacity.duration.200ms>
+                                <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
+                                <td>
+                                    <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
+                                    <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
+                                </td>
+                                <td class="text-center"><span class="badge-success">{{ (int) $row['late_minutes'] }} دقيقة</span></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3" class="text-center text-slate-500 py-8">لا توجد بيانات انضباط.</td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
+    <div class="card overflow-hidden animate-slide-up" style="animation-delay:100ms; animation-fill-mode:both;">
+        <div class="card-header flex items-center justify-between gap-3">
+            <h3>إنجاز المهام لكل موظف</h3>
+            @if(collect($metrics['rows'])->count() > 5)
+                <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllTaskPerformance = !showAllTaskPerformance">
+                    <span x-text="showAllTaskPerformance ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                </button>
+            @endif
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>الموظف</th>
+                        <th class="text-center">المهام المسندة</th>
+                        <th class="text-center">المهام المقيمة</th>
+                        <th class="text-center">نسبة الإنجاز</th>
+                        <th class="text-center">متوسط تقييم المهام</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @php
+                    $taskPerformanceRows = collect($metrics['rows'])
+                        ->map(function (array $row) {
+                            $assigned = (int) ($row['assigned_tasks_count'] ?? 0);
+                            $evaluated = (int) ($row['evaluated_tasks_count'] ?? 0);
+                            $row['task_achievement_ratio'] = $assigned > 0 ? round(($evaluated / $assigned) * 100, 2) : 0.0;
+                            $row['task_avg_score'] = $row['task_score_raw'] !== null ? (float) $row['task_score_raw'] : null;
+
+                            return $row;
+                        })
+                        ->sort(function (array $a, array $b) {
+                            $aAvg = $a['task_avg_score'];
+                            $bAvg = $b['task_avg_score'];
+
+                            if ($aAvg === null && $bAvg === null) {
+                                return ($b['task_achievement_ratio'] <=> $a['task_achievement_ratio']);
+                            }
+
+                            if ($aAvg === null) {
+                                return 1;
+                            }
+
+                            if ($bAvg === null) {
+                                return -1;
+                            }
+
+                            $avgCompare = $bAvg <=> $aAvg;
+
+                            return $avgCompare !== 0
+                                ? $avgCompare
+                                : ($b['task_achievement_ratio'] <=> $a['task_achievement_ratio']);
+                        })
+                        ->values();
+                @endphp
+                @forelse($taskPerformanceRows as $idx => $row)
+                    @php
+                        $assigned = (int) ($row['assigned_tasks_count'] ?? 0);
+                        $evaluated = (int) ($row['evaluated_tasks_count'] ?? 0);
+                        $achievement = (float) ($row['task_achievement_ratio'] ?? 0);
+                        $avgTask = $row['task_score_raw'] !== null ? (float) $row['task_score_raw'] : null;
+                    @endphp
+                    <tr x-show="{{ $idx < 5 ? 'true' : 'showAllTaskPerformance' }}" x-transition.opacity.duration.200ms>
+                        <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
+                        <td>
+                            <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
+                            <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
+                        </td>
+                        <td class="text-center text-xs">{{ $assigned }}</td>
+                        <td class="text-center text-xs">{{ $evaluated }}</td>
+                        <td class="text-center"><span class="badge-blue">{{ number_format($achievement, 2) }}%</span></td>
+                        <td class="text-center text-xs font-semibold {{ $avgTask === null ? 'text-slate-400' : 'text-emerald-700' }}">
+                            {{ $avgTask === null ? '—' : number_format($avgTask, 2) }}
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="text-center text-slate-500 py-8">لا توجد بيانات مهام لعرض الإنجاز.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:120ms; animation-fill-mode:both;">
-        <div class="card-header">
+        <div class="card-header flex items-center justify-between gap-3">
             <h3>الترتيب النهائي حسب المعادلة</h3>
+            @if(collect($scoring['scored_rows'])->count() > 5)
+                <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllFinalRanking = !showAllFinalRanking">
+                    <span x-text="showAllFinalRanking ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                </button>
+            @endif
         </div>
         <div class="overflow-x-auto">
             <table class="data-table">
@@ -193,7 +325,7 @@
                         $emp = $row['employee'];
                         $b = $row['breakdown'];
                     @endphp
-                    <tr>
+                    <tr x-show="{{ $idx < 5 ? 'true' : 'showAllFinalRanking' }}" x-transition.opacity.duration.200ms>
                         <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $emp->name }}</p>
@@ -216,11 +348,18 @@
     </div>
 
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:150ms; animation-fill-mode:both;">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
             <h3 class="font-bold text-slate-800">Explain Score</h3>
-            <button type="button" class="btn-ghost btn-sm" @click="showExplain = !showExplain">
-                <span x-text="showExplain ? 'إخفاء' : 'عرض'"></span>
-            </button>
+            <div class="flex items-center gap-2">
+                @if($explainRows->count() > 5)
+                    <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllExplainRows = !showAllExplainRows">
+                        <span x-text="showAllExplainRows ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                    </button>
+                @endif
+                <button type="button" class="btn-ghost btn-sm" @click="showExplain = !showExplain">
+                    <span x-text="showExplain ? 'إخفاء' : 'عرض'"></span>
+                </button>
+            </div>
         </div>
 
         <div class="overflow-x-auto" x-show="showExplain" x-transition>
@@ -237,11 +376,11 @@
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($explainRows as $row)
+                @foreach($explainRows as $idx => $row)
                     @php
                         $raw = $row['raw_inputs'];
                     @endphp
-                    <tr>
+                    <tr x-show="{{ $idx < 5 ? 'true' : 'showAllExplainRows' }}" x-transition.opacity.duration.200ms>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
                             <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
@@ -264,10 +403,15 @@
             <h3>History النتائج الشهرية</h3>
         </div>
 
-        <div class="p-4 border-b border-slate-100">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
             <button type="button" class="btn-ghost btn-sm" @click="showHistoryDetails = !showHistoryDetails">
                 <span x-text="showHistoryDetails ? 'إخفاء تفاصيل الشهر الحالي' : 'عرض تفاصيل الشهر الحالي'"></span>
             </button>
+            @if($historyForSelectedMonth->count() > 5)
+                <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllHistoryMonth = !showAllHistoryMonth" x-show="showHistoryDetails" x-transition>
+                    <span x-text="showAllHistoryMonth ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                </button>
+            @endif
         </div>
 
         <div class="overflow-x-auto" x-show="showHistoryDetails" x-transition>
@@ -277,20 +421,20 @@
                         <th>#</th>
                         <th>الموظف</th>
                         <th class="text-center">Final Score</th>
-                        <th class="text-center">Formula</th>
+                        <!-- <th class="text-center">Formula</th> -->
                         <th class="text-center">Generated At</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse($historyForSelectedMonth as $idx => $row)
-                    <tr>
+                    <tr x-show="{{ $idx < 5 ? 'true' : 'showAllHistoryMonth' }}" x-transition.opacity.duration.200ms>
                         <td>{{ $idx + 1 }}</td>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $row->employee?->name }}</p>
                             <p class="text-xs text-slate-400">{{ $row->employee?->ac_no }}</p>
                         </td>
                         <td class="text-center"><span class="badge-success">{{ number_format((float) $row->final_score, 2) }}</span></td>
-                        <td class="text-center text-xs">{{ $row->formula_version }}</td>
+                        <!-- <td class="text-center text-xs">{{ $row->formula_version }}</td> -->
                         <td class="text-center text-xs">{{ $row->generated_at?->format('Y-m-d H:i') }}</td>
                     </tr>
                 @empty
@@ -307,20 +451,20 @@
                         <th>الشهر</th>
                         <th>الفائز</th>
                         <th class="text-center">Final Score</th>
-                        <th class="text-center">Formula</th>
+                        <!-- <th class="text-center">Formula</th> -->
                         <th class="text-center">Generated At</th>
                     </tr>
                 </thead>
                 <tbody>
-                @forelse($historyTopWinners as $winner)
-                    <tr>
+                @forelse($historyTopWinners as $idx => $winner)
+                    <tr x-show="{{ $idx < 5 ? 'true' : 'showAllHistoryWinners' }}" x-transition.opacity.duration.200ms>
                         <td class="text-sm text-slate-600">{{ \Carbon\Carbon::create($winner->year, $winner->month, 1)->locale('ar')->isoFormat('MMMM YYYY') }}</td>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $winner->employee?->name }}</p>
                             <p class="text-xs text-slate-400">{{ $winner->employee?->ac_no }}</p>
                         </td>
                         <td class="text-center"><span class="badge-success">{{ number_format((float) $winner->final_score, 2) }}</span></td>
-                        <td class="text-center text-xs">{{ $winner->formula_version }}</td>
+                        <!-- <td class="text-center text-xs">{{ $winner->formula_version }}</td> -->
                         <td class="text-center text-xs">{{ $winner->generated_at?->format('Y-m-d H:i') }}</td>
                     </tr>
                 @empty
@@ -329,6 +473,13 @@
                 </tbody>
             </table>
         </div>
+        @if($historyTopWinners->count() > 5)
+            <div class="p-4 border-t border-slate-100">
+                <button type="button" class="btn-ghost btn-sm !text-white !bg-slate-800/40 hover:!bg-slate-800/60" @click="showAllHistoryWinners = !showAllHistoryWinners">
+                    <span x-text="showAllHistoryWinners ? 'عرض أول 5 فقط' : 'عرض الباقي'"></span>
+                </button>
+            </div>
+        @endif
     </div>
 </div>
 @endsection

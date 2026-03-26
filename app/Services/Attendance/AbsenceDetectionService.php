@@ -136,6 +136,11 @@ class AbsenceDetectionService
             $totalWorkMinutes += $record->work_minutes;
         }
 
+        if ($employee->isAdminLikeForAttendance()) {
+            $totalLateMinutes = 0;
+            $totalOtMinutes = 0;
+        }
+
         return [
             'total_working_days'          => $workingDays->count(),
             'total_present_days'          => $presentDays,
@@ -188,6 +193,7 @@ class AbsenceDetectionService
     {
         [$firstDay, $lastDayRaw] = PayrollPeriod::resolve($month, $year);
         $lastDay = $lastDayRaw->copy()->startOfDay();
+        $excludeLateAndOt = $employee->isAdminLikeForAttendance();
 
         $records = AttendanceRecord::where('employee_id', $employee->id)
             ->whereBetween('date', [$firstDay->toDateString(), $lastDay->toDateString()])
@@ -210,6 +216,11 @@ class AbsenceDetectionService
             $record   = $records->get($dateStr);
             $isManual = $record && $record->manual_status;
 
+            if ($excludeLateAndOt && $record !== null) {
+                $record->setAttribute('late_minutes', 0);
+                $record->setAttribute('overtime_minutes', 0);
+            }
+
             // manual_status يأخذ الأولوية الكاملة على أي منطق تلقائي
             if ($isManual) {
                 $status = $record->manual_status;
@@ -220,7 +231,7 @@ class AbsenceDetectionService
             } else {
                 if ($record === null || $record->is_absent) {
                     $status = 'absent';
-                } elseif ($record->late_minutes > 0) {
+                } elseif (!$excludeLateAndOt && $record->late_minutes > 0) {
                     $status = 'late';
                 } else {
                     $status = 'present';
