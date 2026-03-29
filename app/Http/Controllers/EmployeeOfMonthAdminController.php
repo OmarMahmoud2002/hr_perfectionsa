@@ -32,6 +32,28 @@ class EmployeeOfMonthAdminController extends Controller
 
         $metrics = $this->metricsService->getMonthlyMetrics($month, $year);
         $scoring = $this->scoringService->calculateForMonth($month, $year, $metrics);
+        $scoredRows = collect($scoring['scored_rows']);
+
+        $topThreeRanking = $scoredRows->take(3)->values();
+        $firstPlaceRow = $topThreeRanking->first();
+        $firstPlaceEmployeeId = is_array($firstPlaceRow) ? (int) $firstPlaceRow['employee_id'] : null;
+
+        $pointsByEmployee = $scoredRows
+            ->mapWithKeys(function (array $row) {
+                $employeeId = (int) $row['employee_id'];
+                $breakdown = $row['breakdown'] ?? [];
+
+                return [
+                    $employeeId => [
+                        'task_points' => (float) ($breakdown['task_points'] ?? $breakdown['task_score'] ?? 0),
+                        'vote_points' => (float) ($breakdown['vote_points'] ?? $breakdown['vote_score'] ?? 0),
+                        'work_hours_points' => (float) ($breakdown['work_hours_points'] ?? $breakdown['work_hours_score'] ?? 0),
+                        'punctuality_points' => (float) ($breakdown['punctuality_points'] ?? $breakdown['punctuality_score'] ?? 0),
+                        'final_points' => (float) ($breakdown['final_points'] ?? $row['final_score'] ?? 0),
+                    ],
+                ];
+            })
+            ->all();
 
         $voteRanking = collect($metrics['rows'])
             ->sortByDesc('votes_count')
@@ -49,17 +71,17 @@ class EmployeeOfMonthAdminController extends Controller
             ->values();
 
         $taskCoverage = (float) ($metrics['task_period_totals']['coverage_ratio'] ?? 0.0);
-        $explainRows = collect($scoring['scored_rows'])
+        $explainRows = $scoredRows
             ->map(function (array $row) {
                 $breakdown = $row['breakdown'];
 
                 return [
                     'employee' => $row['employee'],
                     'final_score' => (float) $row['final_score'],
-                    'task_score' => (float) ($breakdown['task_score'] ?? 0),
-                    'vote_score' => (float) ($breakdown['vote_score'] ?? 0),
-                    'work_hours_score' => (float) ($breakdown['work_hours_score'] ?? 0),
-                    'punctuality_score' => (float) ($breakdown['punctuality_score'] ?? 0),
+                    'task_score' => (float) ($breakdown['task_points'] ?? $breakdown['task_score'] ?? 0),
+                    'vote_score' => (float) ($breakdown['vote_points'] ?? $breakdown['vote_score'] ?? 0),
+                    'work_hours_score' => (float) ($breakdown['work_hours_points'] ?? $breakdown['work_hours_score'] ?? 0),
+                    'punctuality_score' => (float) ($breakdown['punctuality_points'] ?? $breakdown['punctuality_score'] ?? 0),
                     'raw_inputs' => $breakdown['raw_inputs'] ?? [],
                 ];
             })
@@ -95,6 +117,9 @@ class EmployeeOfMonthAdminController extends Controller
             'taskCoverage' => $taskCoverage,
             'explainRows' => $explainRows,
             'scoring' => $scoring,
+            'topThreeRanking' => $topThreeRanking,
+            'firstPlaceEmployeeId' => $firstPlaceEmployeeId,
+            'pointsByEmployee' => $pointsByEmployee,
             'historyTopWinners' => $historyTopWinners,
             'historyForSelectedMonth' => $historyForSelectedMonth,
         ]);

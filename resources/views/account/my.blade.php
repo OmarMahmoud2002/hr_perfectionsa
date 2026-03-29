@@ -170,6 +170,41 @@
     </div>
 
     <div x-show="tab === 'stats'" x-transition class="space-y-5">
+        @if($user->employee)
+            <div class="card p-5 overflow-hidden relative">
+                <div class="absolute inset-0 opacity-80"
+                     style="background: radial-gradient(circle at 85% 20%, rgba(231,197,57,.18), transparent 45%), linear-gradient(140deg, #2f6e98 0%, #2f7a76 100%);"></div>
+
+                <div class="relative text-white">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <h3 class="text-sm font-bold">الإنجازات</h3>
+                        <span class="text-xs bg-white/20 border border-white/30 rounded-lg px-2.5 py-1">Employee Of The Month</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                        <div class="rounded-2xl bg-white/12 border border-white/20 p-4">
+                            <p class="text-xs text-white/80">عدد مرات الفوز</p>
+                            <p class="text-3xl font-black mt-1">{{ (int) $employeeOfMonthWinsCount }}</p>
+                            <p class="text-xs text-white/75 mt-1">مرة</p>
+                        </div>
+
+                        <div class="rounded-2xl bg-white/12 border border-white/20 p-4 lg:col-span-2">
+                            <p class="text-xs text-white/80 mb-2">أشهر الفوز</p>
+                            @if(($employeeOfMonthWinMonths ?? collect())->isNotEmpty())
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($employeeOfMonthWinMonths as $winMonth)
+                                        <span class="text-xs font-semibold rounded-full px-3 py-1 bg-white/15 border border-white/25">{{ $winMonth }}</span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="text-sm text-white/80">لم يتم تحقيق لقب موظف الشهر حتى الآن.</p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div class="card p-5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                 <div>

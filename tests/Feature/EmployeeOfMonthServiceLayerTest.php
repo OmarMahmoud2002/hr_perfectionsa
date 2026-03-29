@@ -158,15 +158,21 @@ class EmployeeOfMonthServiceLayerTest extends TestCase
             'employee_id' => $employeeOne->id,
             'month' => $month,
             'year' => $year,
-            'formula_version' => 'v2_tasks',
+            'formula_version' => 'v3_weighted_points',
         ]);
 
         $this->assertDatabaseHas('employee_of_month_results', [
             'employee_id' => $employeeTwo->id,
             'month' => $month,
             'year' => $year,
-            'formula_version' => 'v2_tasks',
+            'formula_version' => 'v3_weighted_points',
         ]);
+
+        $this->assertArrayHasKey('task_points', $top['breakdown']);
+        $this->assertArrayHasKey('vote_points', $top['breakdown']);
+        $this->assertArrayHasKey('work_hours_points', $top['breakdown']);
+        $this->assertArrayHasKey('punctuality_points', $top['breakdown']);
+        $this->assertArrayHasKey('final_points', $top['breakdown']);
     }
 
     private function createEmployeeUser(string $name, string $acNo): array

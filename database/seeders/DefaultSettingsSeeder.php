@@ -77,7 +77,12 @@ class DefaultSettingsSeeder extends Seeder
             ],
             [
                 'key'   => 'employee_of_month.formula_version',
-                'value' => 'v2_tasks',
+                'value' => 'v3_weighted_points',
+                'group' => 'employee_of_month',
+            ],
+            [
+                'key'   => 'employee_of_month.scoring_mode',
+                'value' => 'weighted_points_v1',
                 'group' => 'employee_of_month',
             ],
             [

@@ -95,21 +95,22 @@ class StageFQualityTest extends TestCase
         $response->assertDontSee('Sensitive Employee Name');
     }
 
-    public function test_scoring_fairness_applies_floor_and_neutral_fallback_without_zero_scores(): void
+    public function test_scoring_weighted_points_and_task_tie_breaker(): void
     {
         $service = app(EmployeeOfMonthScoringService::class);
 
         $metricsData = [
+            'total_valid_votes' => 2,
             'rows' => collect([
                 [
                     'employee_id' => 1,
                     'employee' => null,
-                    'votes_count' => 0,
-                    'work_minutes' => 100,
-                    'late_minutes' => 30,
+                    'votes_count' => 1,
+                    'work_minutes' => 480,
+                    'late_minutes' => 10,
                     'overtime_minutes' => 0,
                     'admin_score' => null,
-                    'task_score_raw' => 1.0,
+                    'task_score_raw' => 8.0,
                     'assigned_tasks_count' => 2,
                     'evaluated_tasks_count' => 2,
                 ],
@@ -117,20 +118,20 @@ class StageFQualityTest extends TestCase
                     'employee_id' => 2,
                     'employee' => null,
                     'votes_count' => 1,
-                    'work_minutes' => 450,
-                    'late_minutes' => 30,
+                    'work_minutes' => 480,
+                    'late_minutes' => 10,
                     'overtime_minutes' => 0,
                     'admin_score' => null,
-                    'task_score_raw' => 7.0,
+                    'task_score_raw' => 6.0,
                     'assigned_tasks_count' => 2,
                     'evaluated_tasks_count' => 2,
                 ],
                 [
                     'employee_id' => 3,
                     'employee' => null,
-                    'votes_count' => 1000,
-                    'work_minutes' => 100000,
-                    'late_minutes' => 30,
+                    'votes_count' => 0,
+                    'work_minutes' => 0,
+                    'late_minutes' => 10,
                     'overtime_minutes' => 0,
                     'admin_score' => null,
                     'task_score_raw' => null,
@@ -145,28 +146,36 @@ class StageFQualityTest extends TestCase
         /** @var Collection<int, array<string, mixed>> $scoredRows */
         $scoredRows = $result['scored_rows'];
         $this->assertCount(3, $scoredRows);
+        $this->assertSame('v3_weighted_points', $result['formula_version']);
 
         foreach ($scoredRows as $row) {
-            $this->assertGreaterThanOrEqual(20.0, (float) $row['final_score']);
+            $this->assertGreaterThanOrEqual(0.0, (float) $row['final_score']);
             $this->assertLessThanOrEqual(100.0, (float) $row['final_score']);
 
-            $this->assertGreaterThanOrEqual(20.0, (float) $row['breakdown']['task_score']);
-            $this->assertGreaterThanOrEqual(20.0, (float) $row['breakdown']['vote_score']);
-            $this->assertGreaterThanOrEqual(20.0, (float) $row['breakdown']['work_hours_score']);
-            $this->assertGreaterThanOrEqual(20.0, (float) $row['breakdown']['punctuality_score']);
+            $this->assertGreaterThanOrEqual(0.0, (float) $row['breakdown']['task_points']);
+            $this->assertGreaterThanOrEqual(0.0, (float) $row['breakdown']['vote_points']);
+            $this->assertGreaterThanOrEqual(0.0, (float) $row['breakdown']['work_hours_points']);
+            $this->assertGreaterThanOrEqual(0.0, (float) $row['breakdown']['punctuality_points']);
         }
 
         $employeeOne = $scoredRows->firstWhere('employee_id', 1);
         $employeeTwo = $scoredRows->firstWhere('employee_id', 2);
         $employeeThree = $scoredRows->firstWhere('employee_id', 3);
 
-        // All late minutes are equal, so fallback should be neutral (60) for everyone.
-        $this->assertSame(60.0, (float) $employeeOne['breakdown']['punctuality_score']);
-        $this->assertSame(60.0, (float) $employeeTwo['breakdown']['punctuality_score']);
-        $this->assertSame(60.0, (float) $employeeThree['breakdown']['punctuality_score']);
+        // All late minutes are equal and non-zero, so current formula gives 0 punctuality points للجميع.
+        $this->assertSame(0.0, (float) $employeeOne['breakdown']['punctuality_points']);
+        $this->assertSame(0.0, (float) $employeeTwo['breakdown']['punctuality_points']);
+        $this->assertSame(0.0, (float) $employeeThree['breakdown']['punctuality_points']);
 
-        // Unevaluated task score (null) should not collapse to zero; it should use neutral fallback.
-        $this->assertSame(60.0, (float) $employeeThree['breakdown']['task_score']);
+        // Missing task evaluation must start from zero (no neutral fallback).
+        $this->assertSame(0.0, (float) $employeeThree['breakdown']['task_points']);
+
+        // Employee 1 and 2 tie on vote/work/late; tasks decide ranking.
+        $this->assertSame(1, (int) $scoredRows->first()['employee_id']);
+        $this->assertGreaterThan(
+            (float) $employeeTwo['breakdown']['task_points'],
+            (float) $employeeOne['breakdown']['task_points']
+        );
     }
 
     private function createEmployeeUser(string $name, string $acNo): array

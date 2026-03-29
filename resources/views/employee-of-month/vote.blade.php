@@ -87,6 +87,49 @@
         </div>
     </div>
 
+    <div class="card overflow-hidden animate-slide-up" style="animation-delay:70ms; animation-fill-mode:both;">
+        <div class="card-header">
+            <h3>أوائل الشهر الماضي - {{ $previousMonthLabel }}</h3>
+        </div>
+        <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            @forelse($previousMonthTopThree as $idx => $result)
+                @php
+                    $emp = $result->employee;
+                    $avatarUrl = $emp?->user?->profile?->avatar_path
+                        ? route('media.avatar', ['path' => $emp->user->profile->avatar_path])
+                        : null;
+                    $isTitleHolder = (int) $titleHolderEmployeeId === (int) $result->employee_id;
+                @endphp
+                <div class="rounded-2xl border p-4 bg-white {{ $isTitleHolder ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-200' }}">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center text-white text-sm font-bold"
+                             style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
+                            @if($avatarUrl)
+                                <img src="{{ $avatarUrl }}" alt="{{ $emp?->name }}" class="w-full h-full object-cover">
+                            @else
+                                {{ mb_substr((string) ($emp?->name ?? '—'), 0, 1) }}
+                            @endif
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs text-slate-500">المركز {{ $idx + 1 }}</p>
+                            <p class="font-semibold text-slate-800 text-sm truncate">{{ $emp?->name ?? '—' }}</p>
+                            <p class="text-xs text-slate-400">{{ $emp?->ac_no ?? '—' }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 text-xs text-slate-600">
+                        <p>النقاط: <span class="font-bold text-emerald-700">{{ number_format((float) $result->final_score, 2) }}/100</span></p>
+                        @if($isTitleHolder)
+                            <p class="text-amber-600 font-semibold mt-1">حامل اللقب الحالي</p>
+                        @endif
+                    </div>
+                </div>
+            @empty
+                <div class="md:col-span-3 text-center text-slate-500 py-5">لا توجد نتائج معتمدة للشهر الماضي حتى الآن.</div>
+            @endforelse
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div class="xl:col-span-2 space-y-4">
             <template x-if="fetchError">

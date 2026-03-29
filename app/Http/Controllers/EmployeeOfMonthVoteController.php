@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreEmployeeMonthVoteRequest;
 use App\Models\Employee;
+use App\Models\EmployeeOfMonthResult;
 use App\Services\EmployeeOfMonth\EmployeeOfMonthVoteException;
 use App\Services\EmployeeOfMonth\VoteEligibilityService;
 use App\Services\EmployeeOfMonth\VoteSubmissionService;
 use App\Services\Payroll\PayrollPeriod;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
@@ -35,10 +37,36 @@ class EmployeeOfMonthVoteController extends Controller
         $candidates = $candidatesQuery->get();
 
         $status = $this->buildStatusPayload($user);
+        $currentMonthDate = Carbon::create((int) $status['year'], (int) $status['month'], 1);
+        $previousMonthDate = $currentMonthDate->copy()->subMonthNoOverflow();
+
+        $previousMonthTopThree = EmployeeOfMonthResult::query()
+            ->with('employee.user.profile')
+            ->where('month', (int) $previousMonthDate->month)
+            ->where('year', (int) $previousMonthDate->year)
+            ->get()
+            ->sort(function (EmployeeOfMonthResult $a, EmployeeOfMonthResult $b) {
+                $finalCompare = ((float) $b->final_score) <=> ((float) $a->final_score);
+                if ($finalCompare !== 0) {
+                    return $finalCompare;
+                }
+
+                $taskA = (float) data_get($a->breakdown, 'task_points', data_get($a->breakdown, 'task_score', 0));
+                $taskB = (float) data_get($b->breakdown, 'task_points', data_get($b->breakdown, 'task_score', 0));
+
+                return $taskB <=> $taskA;
+            })
+            ->take(3)
+            ->values();
+
+        $titleHolderEmployeeId = $previousMonthTopThree->first()?->employee_id;
 
         return view('employee-of-month.vote', [
             'candidates' => $candidates,
             'voteStatus' => $status,
+            'previousMonthLabel' => $previousMonthDate->locale('ar')->isoFormat('MMMM YYYY'),
+            'previousMonthTopThree' => $previousMonthTopThree,
+            'titleHolderEmployeeId' => $titleHolderEmployeeId,
         ]);
     }
 

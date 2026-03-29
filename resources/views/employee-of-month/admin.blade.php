@@ -7,6 +7,12 @@
 @section('content')
 @php
     $monthLabel = \Carbon\Carbon::create($year, $month, 1)->locale('ar')->isoFormat('MMMM YYYY');
+    $pointCaps = $scoring['points_caps'] ?? [
+        'tasks' => 40,
+        'vote' => 25,
+        'work_hours' => 20,
+        'punctuality' => 15,
+    ];
 
     $formatMinutes = function (int $minutes): string {
         $h = (int) floor($minutes / 60);
@@ -26,7 +32,7 @@
                 <div>
                     <p class="text-xs uppercase tracking-[0.2em] text-white/70 mb-2">Employee Of The Month</p>
                     <h2 class="text-2xl sm:text-3xl font-black">النتائج النهائية لشهر {{ $monthLabel }}</h2>
-                    <p class="text-sm text-white/80 mt-2">المعادلة الحالية: Tasks 40% + Punctuality 15% + Work Hours 20% + Vote 25%</p>
+                    <p class="text-sm text-white/80 mt-2">المعادلة الحالية بالنقاط: Tasks {{ $pointCaps['tasks'] }} + Vote {{ $pointCaps['vote'] }} + Work Hours {{ $pointCaps['work_hours'] }} + Punctuality {{ $pointCaps['punctuality'] }}</p>
                 </div>
 
                 <div class="w-full xl:w-auto space-y-2">
@@ -80,6 +86,47 @@
         </div>
     </div>
 
+    <div class="card overflow-hidden animate-slide-up" style="animation-delay:140ms; animation-fill-mode:both;">
+        <div class="card-header">
+            <h3>المراكز الثلاثة الأولى</h3>
+        </div>
+        <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            @forelse($topThreeRanking as $idx => $row)
+                @php
+                    $emp = $row['employee'];
+                    $avatarUrl = $emp->user?->profile?->avatar_path
+                        ? route('media.avatar', ['path' => $emp->user->profile->avatar_path])
+                        : null;
+                    $isFirst = $firstPlaceEmployeeId !== null && (int) $emp->id === (int) $firstPlaceEmployeeId;
+                    $cardBorderClass = $isFirst ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-200';
+                @endphp
+
+                <div class="rounded-2xl border p-4 bg-white {{ $cardBorderClass }}">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center text-white text-sm font-bold"
+                             style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
+                            @if($avatarUrl)
+                                <img src="{{ $avatarUrl }}" alt="{{ $emp->name }}" class="w-full h-full object-cover">
+                            @else
+                                {{ mb_substr($emp->name, 0, 1) }}
+                            @endif
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs text-slate-500">المركز {{ $idx + 1 }}</p>
+                            <p class="font-semibold text-slate-800 text-sm truncate">{{ $emp->name }}</p>
+                            <p class="text-xs text-slate-400">{{ $emp->ac_no }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-600">
+                        <p>الإجمالي: <span class="font-bold text-emerald-700">{{ number_format((float) $row['final_score'], 2) }}/100</span></p>
+                    </div>
+                </div>
+            @empty
+                <div class="md:col-span-3 text-center text-slate-500 py-6">لا توجد بيانات كافية لعرض أول 3 مراكز.</div>
+            @endforelse
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div class="xl:col-span-2 card overflow-hidden animate-slide-up">
             <div class="card-header flex items-center justify-between gap-3">
@@ -97,6 +144,7 @@
                             <th>#</th>
                             <th>الموظف</th>
                             <th class="text-center">عدد الأصوات</th>
+                            <th class="text-center">نقاط التصويت</th>
                             <th class="text-center">النسبة</th>
                         </tr>
                     </thead>
@@ -105,6 +153,8 @@
                         @php
                             $emp = $row['employee'];
                             $percent = $metrics['total_valid_votes'] > 0 ? round(($row['votes_count'] / $metrics['total_valid_votes']) * 100, 1) : 0;
+                            $points = $pointsByEmployee[$emp->id] ?? [];
+                            $votePoints = (float) ($points['vote_points'] ?? 0);
                             $avatarUrl = $emp->user?->profile?->avatar_path
                                 ? route('media.avatar', ['path' => $emp->user->profile->avatar_path])
                                 : null;
@@ -128,10 +178,11 @@
                                 </div>
                             </td>
                             <td class="text-center"><span class="badge-blue">{{ $row['votes_count'] }}</span></td>
+                            <td class="text-center"><span class="text-xs font-semibold text-slate-700">{{ number_format($votePoints, 2) }} / {{ (int) $pointCaps['vote'] }}</span></td>
                             <td class="text-center"><span class="text-xs font-bold text-secondary-700">{{ $percent }}%</span></td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="text-center text-slate-500 py-8">لا توجد أصوات لهذا الشهر بعد.</td></tr>
+                        <tr><td colspan="5" class="text-center text-slate-500 py-8">لا توجد أصوات لهذا الشهر بعد.</td></tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -155,10 +206,15 @@
                                 <th>#</th>
                                 <th>الموظف</th>
                                 <th class="text-center">ساعات العمل</th>
+                                <th class="text-center">نقاط ساعات العمل</th>
                             </tr>
                         </thead>
                         <tbody>
                         @forelse($workHoursRanking as $idx => $row)
+                            @php
+                                $points = $pointsByEmployee[$row['employee']->id] ?? [];
+                                $workHoursPoints = (float) ($points['work_hours_points'] ?? 0);
+                            @endphp
                             <tr x-show="{{ $idx < 5 ? 'true' : 'showAllWorkHours' }}" x-transition.opacity.duration.200ms>
                                 <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                                 <td>
@@ -166,9 +222,10 @@
                                     <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
                                 </td>
                                 <td class="text-center"><span class="badge-blue">{{ $formatMinutes((int) $row['work_minutes']) }}</span></td>
+                                <td class="text-center text-xs font-semibold text-slate-700">{{ number_format($workHoursPoints, 2) }} / {{ (int) $pointCaps['work_hours'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="text-center text-slate-500 py-8">لا توجد بيانات ساعات عمل.</td></tr>
+                            <tr><td colspan="4" class="text-center text-slate-500 py-8">لا توجد بيانات ساعات عمل.</td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -191,10 +248,15 @@
                                 <th>#</th>
                                 <th>الموظف</th>
                                 <th class="text-center">دقائق التأخير</th>
+                                <th class="text-center">نقاط الانضباط</th>
                             </tr>
                         </thead>
                         <tbody>
                         @forelse($punctualityRanking as $idx => $row)
+                            @php
+                                $points = $pointsByEmployee[$row['employee']->id] ?? [];
+                                $punctualityPoints = (float) ($points['punctuality_points'] ?? 0);
+                            @endphp
                             <tr x-show="{{ $idx < 5 ? 'true' : 'showAllPunctuality' }}" x-transition.opacity.duration.200ms>
                                 <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                                 <td>
@@ -202,9 +264,10 @@
                                     <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
                                 </td>
                                 <td class="text-center"><span class="badge-success">{{ (int) $row['late_minutes'] }} دقيقة</span></td>
+                                <td class="text-center text-xs font-semibold text-slate-700">{{ number_format($punctualityPoints, 2) }} / {{ (int) $pointCaps['punctuality'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="text-center text-slate-500 py-8">لا توجد بيانات انضباط.</td></tr>
+                            <tr><td colspan="4" class="text-center text-slate-500 py-8">لا توجد بيانات انضباط.</td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -232,6 +295,7 @@
                         <th class="text-center">المهام المقيمة</th>
                         <th class="text-center">نسبة الإنجاز</th>
                         <th class="text-center">متوسط تقييم المهام</th>
+                        <th class="text-center">نقاط المهام</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -275,6 +339,7 @@
                         $evaluated = (int) ($row['evaluated_tasks_count'] ?? 0);
                         $achievement = (float) ($row['task_achievement_ratio'] ?? 0);
                         $avgTask = $row['task_score_raw'] !== null ? (float) $row['task_score_raw'] : null;
+                        $taskPoints = (float) (($pointsByEmployee[$row['employee']->id]['task_points'] ?? 0));
                     @endphp
                     <tr x-show="{{ $idx < 5 ? 'true' : 'showAllTaskPerformance' }}" x-transition.opacity.duration.200ms>
                         <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
@@ -288,9 +353,10 @@
                         <td class="text-center text-xs font-semibold {{ $avgTask === null ? 'text-slate-400' : 'text-emerald-700' }}">
                             {{ $avgTask === null ? '—' : number_format($avgTask, 2) }}
                         </td>
+                        <td class="text-center text-xs font-semibold text-slate-700">{{ number_format($taskPoints, 2) }} / {{ (int) $pointCaps['tasks'] }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-slate-500 py-8">لا توجد بيانات مهام لعرض الإنجاز.</td></tr>
+                    <tr><td colspan="7" class="text-center text-slate-500 py-8">لا توجد بيانات مهام لعرض الإنجاز.</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -312,11 +378,11 @@
                     <tr>
                         <th>#</th>
                         <th>الموظف</th>
-                        <th class="text-center">النتيجة النهائية</th>
-                        <th class="text-center">درجة المهام</th>
-                        <th class="text-center">درجة التصويت</th>
-                        <th class="text-center">درجة ساعات العمل</th>
-                        <th class="text-center">درجة الانضباط</th>
+                        <th class="text-center">الإجمالي / 100</th>
+                        <th class="text-center">نقاط المهام / {{ (int) $pointCaps['tasks'] }}</th>
+                        <th class="text-center">نقاط التصويت / {{ (int) $pointCaps['vote'] }}</th>
+                        <th class="text-center">نقاط ساعات العمل / {{ (int) $pointCaps['work_hours'] }}</th>
+                        <th class="text-center">نقاط الانضباط / {{ (int) $pointCaps['punctuality'] }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -324,18 +390,38 @@
                     @php
                         $emp = $row['employee'];
                         $b = $row['breakdown'];
+                        $avatarUrl = $emp->user?->profile?->avatar_path
+                            ? route('media.avatar', ['path' => $emp->user->profile->avatar_path])
+                            : null;
+                        $isFirst = $firstPlaceEmployeeId !== null && (int) $emp->id === (int) $firstPlaceEmployeeId;
+                        $taskPoints = (float) ($b['task_points'] ?? $b['task_score'] ?? 0);
+                        $votePoints = (float) ($b['vote_points'] ?? $b['vote_score'] ?? 0);
+                        $workHoursPoints = (float) ($b['work_hours_points'] ?? $b['work_hours_score'] ?? 0);
+                        $punctualityPoints = (float) ($b['punctuality_points'] ?? $b['punctuality_score'] ?? 0);
                     @endphp
                     <tr x-show="{{ $idx < 5 ? 'true' : 'showAllFinalRanking' }}" x-transition.opacity.duration.200ms>
                         <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                         <td>
-                            <p class="font-semibold text-slate-800 text-sm">{{ $emp->name }}</p>
-                            <p class="text-xs text-slate-400">{{ $emp->ac_no }}</p>
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center text-white text-xs font-bold {{ $isFirst ? 'border-4 border-amber-400 ring-2 ring-amber-200' : '' }}"
+                                     style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
+                                    @if($avatarUrl)
+                                        <img src="{{ $avatarUrl }}" alt="{{ $emp->name }}" class="w-full h-full object-cover">
+                                    @else
+                                        {{ mb_substr($emp->name, 0, 1) }}
+                                    @endif
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-slate-800 text-sm">{{ $emp->name }}</p>
+                                    <p class="text-xs text-slate-400">{{ $emp->ac_no }}</p>
+                                </div>
+                            </div>
                         </td>
                         <td class="text-center"><span class="badge-success">{{ number_format((float) $row['final_score'], 2) }}</span></td>
-                        <td class="text-center text-xs font-semibold text-emerald-700">{{ number_format((float) ($b['task_score'] ?? 0), 1) }}</td>
-                        <td class="text-center text-xs">{{ number_format((float) $b['vote_score'], 1) }}</td>
-                        <td class="text-center text-xs">{{ number_format((float) $b['work_hours_score'], 1) }}</td>
-                        <td class="text-center text-xs">{{ number_format((float) $b['punctuality_score'], 1) }}</td>
+                        <td class="text-center text-xs font-semibold text-emerald-700">{{ number_format($taskPoints, 2) }}</td>
+                        <td class="text-center text-xs">{{ number_format($votePoints, 2) }}</td>
+                        <td class="text-center text-xs">{{ number_format($workHoursPoints, 2) }}</td>
+                        <td class="text-center text-xs">{{ number_format($punctualityPoints, 2) }}</td>
                     </tr>
                 @empty
                     <tr>

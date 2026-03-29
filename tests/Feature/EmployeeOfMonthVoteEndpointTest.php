@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EmployeeOfMonthResult;
 use App\Models\EmployeeMonthVote;
 use App\Models\User;
 use Carbon\Carbon;
@@ -54,6 +55,57 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
         $response->assertOk();
         $response->assertSee($candidate->name);
         $response->assertDontSee($voterEmployee->ac_no);
+    }
+
+    public function test_vote_page_shows_previous_month_top_three_and_title_holder_for_employees(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
+
+        [$viewerUser] = $this->createEmployeeUser('Viewer Employee', 'AC-VIEW');
+        [, $winnerOne] = $this->createEmployeeUser('Winner One', 'AC-W1');
+        [, $winnerTwo] = $this->createEmployeeUser('Winner Two', 'AC-W2');
+        [, $winnerThree] = $this->createEmployeeUser('Winner Three', 'AC-W3');
+
+        // Previous payroll month for March 2026 is February 2026.
+        EmployeeOfMonthResult::create([
+            'employee_id' => $winnerOne->id,
+            'month' => 2,
+            'year' => 2026,
+            'final_score' => 92.00,
+            'breakdown' => ['task_points' => 35],
+            'formula_version' => 'v3_weighted_points',
+            'generated_at' => now(),
+        ]);
+
+        EmployeeOfMonthResult::create([
+            'employee_id' => $winnerTwo->id,
+            'month' => 2,
+            'year' => 2026,
+            'final_score' => 89.50,
+            'breakdown' => ['task_points' => 32],
+            'formula_version' => 'v3_weighted_points',
+            'generated_at' => now(),
+        ]);
+
+        EmployeeOfMonthResult::create([
+            'employee_id' => $winnerThree->id,
+            'month' => 2,
+            'year' => 2026,
+            'final_score' => 88.20,
+            'breakdown' => ['task_points' => 30],
+            'formula_version' => 'v3_weighted_points',
+            'generated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($viewerUser)->get(route('employee-of-month.vote.page'));
+
+        $response->assertOk();
+        $response->assertSee('أوائل الشهر الماضي');
+        $response->assertSee('فبراير 2026');
+        $response->assertSee($winnerOne->name);
+        $response->assertSee($winnerTwo->name);
+        $response->assertSee($winnerThree->name);
+        $response->assertSee('حامل اللقب الحالي');
     }
 
     public function test_employee_can_submit_vote_and_receive_payload(): void
@@ -135,7 +187,7 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
         ]);
     }
 
-    public function test_non_employee_cannot_access_vote_endpoints(): void
+    public function test_admin_can_access_vote_status_but_is_marked_ineligible(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
 
@@ -146,7 +198,11 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
 
         $this->actingAs($admin)
             ->getJson(route('employee-of-month.vote.status'))
-            ->assertStatus(403);
+            ->assertOk()
+            ->assertJson([
+                'can_vote' => false,
+                'reason' => 'ineligible_voter',
+            ]);
     }
 
     private function createEmployeeUser(string $name, string $acNo): array

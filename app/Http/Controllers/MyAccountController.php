@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ImportStatus;
+use App\Models\EmployeeOfMonthResult;
 use App\Models\ImportBatch;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
 use App\Services\Payroll\PayrollPeriod;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
@@ -55,6 +57,8 @@ class MyAccountController extends Controller
 
         $stats = null;
         $dailyBreakdown = collect();
+        $employeeOfMonthWinsCount = 0;
+        $employeeOfMonthWinMonths = collect();
 
         if ($user->employee) {
             $batch = ImportBatch::where('month', $month)
@@ -76,6 +80,46 @@ class MyAccountController extends Controller
             ];
 
             $dailyBreakdown = $this->absenceService->getDailyBreakdown($user->employee, $month, $year, $publicHolidays);
+
+            $monthlyWinners = EmployeeOfMonthResult::query()
+                ->select(['employee_id', 'month', 'year', 'final_score', 'breakdown', 'generated_at'])
+                ->orderByDesc('year')
+                ->orderByDesc('month')
+                ->get()
+                ->groupBy(fn (EmployeeOfMonthResult $row) => sprintf('%04d-%02d', (int) $row->year, (int) $row->month))
+                ->map(function ($group) {
+                    return $group
+                        ->sort(function (EmployeeOfMonthResult $a, EmployeeOfMonthResult $b) {
+                            $finalCompare = ((float) $b->final_score) <=> ((float) $a->final_score);
+                            if ($finalCompare !== 0) {
+                                return $finalCompare;
+                            }
+
+                            $taskA = (float) data_get($a->breakdown, 'task_points', data_get($a->breakdown, 'task_score', 0));
+                            $taskB = (float) data_get($b->breakdown, 'task_points', data_get($b->breakdown, 'task_score', 0));
+                            $taskCompare = $taskB <=> $taskA;
+                            if ($taskCompare !== 0) {
+                                return $taskCompare;
+                            }
+
+                            $aTs = $a->generated_at?->getTimestamp() ?? 0;
+                            $bTs = $b->generated_at?->getTimestamp() ?? 0;
+
+                            return $bTs <=> $aTs;
+                        })
+                        ->first();
+                })
+                ->filter()
+                ->values();
+
+            $employeeWins = $monthlyWinners
+                ->where('employee_id', (int) $user->employee->id)
+                ->values();
+
+            $employeeOfMonthWinsCount = $employeeWins->count();
+            $employeeOfMonthWinMonths = $employeeWins
+                ->map(fn (EmployeeOfMonthResult $row) => Carbon::create((int) $row->year, (int) $row->month, 1)->locale('ar')->isoFormat('MMMM YYYY'))
+                ->values();
         }
 
         return view('account.my', [
@@ -86,6 +130,8 @@ class MyAccountController extends Controller
             'periodEnd' => $periodEndDate->toDateString(),
             'stats' => $stats,
             'dailyBreakdown' => $dailyBreakdown,
+            'employeeOfMonthWinsCount' => $employeeOfMonthWinsCount,
+            'employeeOfMonthWinMonths' => $employeeOfMonthWinMonths,
         ]);
     }
 
