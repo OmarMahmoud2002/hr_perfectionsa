@@ -16,6 +16,8 @@ use App\Http\Controllers\EmployeeOfMonthAdminController;
 use App\Http\Controllers\TaskAdminController;
 use App\Http\Controllers\TaskEvaluationController;
 use App\Http\Controllers\EmployeeMyTasksController;
+use App\Http\Controllers\DailyPerformanceEmployeeController;
+use App\Http\Controllers\DailyPerformanceReviewController;
 
 /*
 |--------------------------------------------------------------------------
@@ -52,6 +54,10 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     Route::get('/media/avatar/{path}', [MyAccountController::class, 'avatar'])
         ->where('path', '.*')
         ->name('media.avatar');
+
+    Route::get('/media/daily-performance/{path}', [DailyPerformanceEmployeeController::class, 'media'])
+        ->where('path', '.*')
+        ->name('media.daily-performance.file');
 
     // Dashboard
     Route::middleware(['role:admin,manager,hr,employee'])->group(function () {
@@ -109,6 +115,21 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     Route::middleware(['role:employee'])->group(function () {
         Route::get('/tasks/my', [EmployeeMyTasksController::class, 'index'])
             ->name('tasks.my.index');
+
+        Route::get('/daily-performance', [DailyPerformanceEmployeeController::class, 'index'])
+            ->name('daily-performance.employee.index');
+        Route::post('/daily-performance', [DailyPerformanceEmployeeController::class, 'upsert'])
+            ->name('daily-performance.employee.upsert');
+        Route::delete('/daily-performance/attachments/{attachment}', [DailyPerformanceEmployeeController::class, 'destroyAttachment'])
+            ->name('daily-performance.employee.attachment.destroy');
+    });
+
+    // Daily performance review page
+    Route::middleware(['role:admin,manager,hr,user'])->group(function () {
+        Route::get('/daily-performance/review', [DailyPerformanceReviewController::class, 'index'])
+            ->name('daily-performance.review.index');
+        Route::post('/daily-performance/review/{entry}/upsert', [DailyPerformanceReviewController::class, 'upsert'])
+            ->name('daily-performance.review.upsert');
     });
 
     // ================================

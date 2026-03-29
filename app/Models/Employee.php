@@ -78,6 +78,11 @@ class Employee extends Model
             ->withTimestamps();
     }
 
+    public function dailyPerformanceEntries(): HasMany
+    {
+        return $this->hasMany(DailyPerformanceEntry::class, 'employee_id');
+    }
+
     // ========================
     // Scopes
     // ========================

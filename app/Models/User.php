@@ -116,4 +116,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(EmployeeMonthTaskEvaluation::class, 'evaluator_user_id');
     }
+
+    public function dailyPerformanceReviewsGiven(): HasMany
+    {
+        return $this->hasMany(DailyPerformanceReview::class, 'reviewer_user_id');
+    }
 }

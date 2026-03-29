@@ -90,6 +90,20 @@
         </a>
         @endif
 
+        @if(auth()->user()->isEmployee())
+        <a href="{{ route('daily-performance.employee.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('daily-performance.employee.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"/>
+            </svg>
+            <span>الأداء اليومي</span>
+            @if(request()->routeIs('daily-performance.employee.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+        @endif
+
         @if(auth()->user()->isEvaluatorUser())
         <a href="{{ route('tasks.evaluator.index') }}"
            class="{{ $linkClass }} {{ request()->routeIs('tasks.evaluator.*') ? $activeClass : $inactiveClass }}">
@@ -99,6 +113,18 @@
             </svg>
             <span>تقييم المهام</span>
             @if(request()->routeIs('tasks.evaluator.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+
+        <a href="{{ route('daily-performance.review.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('daily-performance.review.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M11 5h7m-7 4h7m-7 4h7m-9 4h9M5 5h.01M5 9h.01M5 13h.01M5 17h.01"/>
+            </svg>
+            <span>تقييم الأداء اليومي</span>
+            @if(request()->routeIs('daily-performance.review.*'))
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
@@ -137,6 +163,18 @@
             </svg>
             <span>إدارة المهام</span>
             @if(request()->routeIs('tasks.admin.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+
+        <a href="{{ route('daily-performance.review.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('daily-performance.review.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M11 5h7m-7 4h7m-7 4h7m-9 4h9M5 5h.01M5 9h.01M5 13h.01M5 17h.01"/>
+            </svg>
+            <span>تقييم الأداء اليومي</span>
+            @if(request()->routeIs('daily-performance.review.*'))
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
