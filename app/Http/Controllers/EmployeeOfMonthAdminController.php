@@ -34,7 +34,10 @@ class EmployeeOfMonthAdminController extends Controller
         $scoring = $this->scoringService->calculateForMonth($month, $year, $metrics);
         $scoredRows = collect($scoring['scored_rows']);
 
-        $topThreeRanking = $scoredRows->take(3)->values();
+        $topThreeRanking = $scoredRows
+            ->filter(fn (array $row) => $row['final_score'] >= EmployeeOfMonthScoringService::MIN_RANKING_SCORE)
+            ->take(3)
+            ->values();
         $firstPlaceRow = $topThreeRanking->first();
         $firstPlaceEmployeeId = is_array($firstPlaceRow) ? (int) $firstPlaceRow['employee_id'] : null;
 

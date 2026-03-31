@@ -10,7 +10,7 @@ use Carbon\Carbon;
 
 class VoteEligibilityService
 {
-    private const VOTER_ROLES = ['employee'];
+    private const VOTER_ROLES = ['employee', 'admin', 'manager', 'hr'];
 
     public function canUserVote(User $user, int $month, int $year, ?Carbon $now = null): array
     {

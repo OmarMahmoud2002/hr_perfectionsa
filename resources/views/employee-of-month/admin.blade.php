@@ -87,42 +87,81 @@
     </div>
 
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:140ms; animation-fill-mode:both;">
-        <div class="card-header">
+        <div class="card-header flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             <h3>المراكز الثلاثة الأولى</h3>
         </div>
-        <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="p-5 flex flex-col gap-3" dir="rtl">
+            @php
+                $adminRankConfig = [
+                    0 => [
+                        'border'   => 'border-amber-400',
+                        'ring'     => 'ring-2 ring-amber-200',
+                        'gradient' => 'from-amber-50 via-yellow-50 to-white',
+                        'medal'    => asset('images/medal-first.png'),
+                        'label'    => 'المركز الأول',
+                        'text'     => 'text-amber-700',
+                    ],
+                    1 => [
+                        'border'   => 'border-slate-400',
+                        'ring'     => 'ring-2 ring-slate-200',
+                        'gradient' => 'from-slate-50 via-gray-50 to-white',
+                        'medal'    => asset('images/medal-second.png'),
+                        'label'    => 'المركز الثاني',
+                        'text'     => 'text-slate-600',
+                    ],
+                    2 => [
+                        'border'   => 'border-amber-700/50',
+                        'ring'     => 'ring-2 ring-amber-100',
+                        'gradient' => 'from-orange-50 via-amber-50 to-white',
+                        'medal'    => asset('images/medal-third.png'),
+                        'label'    => 'المركز الثالث',
+                        'text'     => 'text-amber-800',
+                    ],
+                ];
+            @endphp
             @forelse($topThreeRanking as $idx => $row)
                 @php
-                    $emp = $row['employee'];
+                    $emp   = $row['employee'];
+                    $cfg   = $adminRankConfig[$idx] ?? $adminRankConfig[2];
                     $avatarUrl = $emp->user?->profile?->avatar_path
                         ? route('media.avatar', ['path' => $emp->user->profile->avatar_path])
                         : null;
-                    $isFirst = $firstPlaceEmployeeId !== null && (int) $emp->id === (int) $firstPlaceEmployeeId;
-                    $cardBorderClass = $isFirst ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-200';
                 @endphp
 
-                <div class="rounded-2xl border p-4 bg-white {{ $cardBorderClass }}">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center text-white text-sm font-bold"
-                             style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-                            @if($avatarUrl)
-                                <img src="{{ $avatarUrl }}" alt="{{ $emp->name }}" class="w-full h-full object-cover">
-                            @else
-                                {{ mb_substr($emp->name, 0, 1) }}
-                            @endif
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-xs text-slate-500">المركز {{ $idx + 1 }}</p>
-                            <p class="font-semibold text-slate-800 text-sm truncate">{{ $emp->name }}</p>
-                            <p class="text-xs text-slate-400">{{ $emp->ac_no }}</p>
-                        </div>
+                {{-- Horizontal card: medal | info | avatar --}}
+                <div class="rounded-2xl border {{ $cfg['border'] }} {{ $cfg['ring'] }} bg-gradient-to-l {{ $cfg['gradient'] }} px-4 py-3 flex items-center gap-4 shadow-sm"
+                     style="animation: slideUp .4s ease {{ $idx * 80 }}ms both;">
+
+                    {{-- Medal on the left, bigger --}}
+                    <img src="{{ $cfg['medal'] }}" alt="medal"
+                         class="w-16 h-16 object-contain drop-shadow-lg flex-shrink-0">
+
+                    {{-- Info block: rank label (black) + name + job + score --}}
+                    <div class="flex-1 min-w-0 text-right">
+                        <p class="text-xs font-bold text-slate-900 mb-0.5">{{ $cfg['label'] }}</p>
+                        <p class="font-bold text-slate-800 truncate">{{ $emp->name }}</p>
+                        <p class="text-xs {{ $cfg['text'] }} font-semibold">
+                            {{ $emp->job_title?->label() ?? 'موظف' }}
+                        </p>
+                        <p class="text-sm font-black {{ $cfg['text'] }} mt-0.5">
+                            {{ number_format($row['final_score'], 1) }}
+                            <span class="text-xs font-medium opacity-70">نقطة</span>
+                        </p>
                     </div>
-                    <div class="mt-3 text-xs text-slate-600">
-                        <p>الإجمالي: <span class="font-bold text-emerald-700">{{ number_format((float) $row['final_score'], 2) }}/100</span></p>
+
+                    {{-- Avatar on the far right --}}
+                    <div class="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center text-white text-base font-black flex-shrink-0 shadow-md"
+                         style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
+                        @if($avatarUrl)
+                            <img src="{{ $avatarUrl }}" alt="{{ $emp->name }}" class="w-full h-full object-cover">
+                        @else
+                            {{ mb_substr($emp->name, 0, 1) }}
+                        @endif
                     </div>
                 </div>
             @empty
-                <div class="md:col-span-3 text-center text-slate-500 py-6">لا توجد بيانات كافية لعرض أول 3 مراكز.</div>
+                <div class="text-center text-slate-500 py-8">لا توجد بيانات كافية لعرض أول 3 مراكز.</div>
             @endforelse
         </div>
     </div>

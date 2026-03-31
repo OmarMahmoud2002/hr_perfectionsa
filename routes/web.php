@@ -60,7 +60,7 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
         ->name('media.daily-performance.file');
 
     // Dashboard
-    Route::middleware(['role:admin,manager,hr,employee'])->group(function () {
+    Route::middleware(['role:admin,manager,hr,employee,office_girl'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     });
 
@@ -112,7 +112,7 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     });
 
     // Employee tasks page
-    Route::middleware(['role:employee'])->group(function () {
+    Route::middleware(['role:employee,office_girl'])->group(function () {
         Route::get('/tasks/my', [EmployeeMyTasksController::class, 'index'])
             ->name('tasks.my.index');
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreEmployeeMonthVoteRequest;
 use App\Models\Employee;
 use App\Models\EmployeeOfMonthResult;
+use App\Services\EmployeeOfMonth\EmployeeOfMonthScoringService;
 use App\Services\EmployeeOfMonth\EmployeeOfMonthVoteException;
 use App\Services\EmployeeOfMonth\VoteEligibilityService;
 use App\Services\EmployeeOfMonth\VoteSubmissionService;
@@ -44,6 +45,7 @@ class EmployeeOfMonthVoteController extends Controller
             ->with('employee.user.profile')
             ->where('month', (int) $previousMonthDate->month)
             ->where('year', (int) $previousMonthDate->year)
+            ->where('final_score', '>=', EmployeeOfMonthScoringService::MIN_RANKING_SCORE)
             ->get()
             ->sort(function (EmployeeOfMonthResult $a, EmployeeOfMonthResult $b) {
                 $finalCompare = ((float) $b->final_score) <=> ((float) $a->final_score);
