@@ -14,7 +14,7 @@ class StoreDailyPerformanceEntryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'work_date' => ['nullable', 'date'],
+            'work_date' => ['nullable', 'date', 'date_equals:'.now()->toDateString()],
             'project_name' => ['required', 'string', 'max:255'],
             'work_description' => ['required', 'string', 'max:5000'],
             'attachments' => ['nullable', 'array', 'max:5'],
@@ -29,6 +29,7 @@ class StoreDailyPerformanceEntryRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'work_date.date_equals'  => 'لا يمكن تسجيل الأداء إلا ليوم الحالي فقط.',
             'project_name.required' => 'اسم المشروع مطلوب.',
             'work_description.required' => 'وصف ما تم إنجازه مطلوب.',
             'attachments.array' => 'المرفقات يجب أن تكون في صيغة قائمة ملفات.',

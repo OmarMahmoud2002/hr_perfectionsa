@@ -23,7 +23,13 @@ class DailyPerformanceEmployeeController extends Controller
 
     public function index(Request $request): View
     {
-        $selectedDate = $this->normalizeDate((string) $request->input('date', now()->toDateString()));
+        $today        = now()->toDateString();
+        $selectedDate = $this->normalizeDate((string) $request->input('date', $today));
+        // Future dates are clamped to today so employees cannot navigate ahead.
+        if ($selectedDate > $today) {
+            $selectedDate = $today;
+        }
+        $isToday = ($selectedDate === $today);
 
         $entry = $this->entryService->getEmployeeEntryByDate($request->user(), $selectedDate);
         $timeline = $this->entryService->getLastDaysTimeline($request->user(), 7);
@@ -38,10 +44,11 @@ class DailyPerformanceEmployeeController extends Controller
 
         return view('daily-performance.employee', [
             'selectedDate' => $selectedDate,
-            'prevDate' => Carbon::parse($selectedDate)->subDay()->toDateString(),
-            'nextDate' => Carbon::parse($selectedDate)->addDay()->toDateString(),
-            'entry' => $entry,
-            'timeline' => $timeline,
+            'isToday'      => $isToday,
+            'prevDate'     => Carbon::parse($selectedDate)->subDay()->toDateString(),
+            'nextDate'     => Carbon::parse($selectedDate)->addDay()->toDateString(),
+            'entry'        => $entry,
+            'timeline'     => $timeline,
             'ratingSummary' => $ratingSummary,
         ]);
     }

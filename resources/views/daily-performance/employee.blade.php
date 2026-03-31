@@ -39,8 +39,9 @@
 
                 <div class="flex flex-wrap gap-2">
                     <a href="{{ route('daily-performance.employee.index', ['date' => $prevDate]) }}" class="btn-outline btn-sm bg-white/95 !h-10 !px-4 !text-sm">اليوم السابق</a>
-                    <a href="{{ route('daily-performance.employee.index', ['date' => now()->toDateString()]) }}" class="btn-outline btn-sm bg-white/95 !h-10 !px-4 !text-sm">اليوم</a>
-                    <a href="{{ route('daily-performance.employee.index', ['date' => $nextDate]) }}" class="btn-outline btn-sm bg-white/95 !h-10 !px-4 !text-sm">اليوم التالي</a>
+                    @if(!$isToday)
+                        <a href="{{ route('daily-performance.employee.index', ['date' => now()->toDateString()]) }}" class="btn-outline btn-sm bg-white/95 !h-10 !px-4 !text-sm">العودة لليوم</a>
+                    @endif
                 </div>
             </div>
 
@@ -62,23 +63,37 @@
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div class="xl:col-span-2 space-y-5" x-data="{ openForm: {{ ($errors->any() || !$entry) ? 'true' : 'false' }} }">
+        <div class="xl:col-span-2 space-y-5" x-data="{ openForm: {{ ($isToday && ($errors->any() || !$entry)) ? 'true' : 'false' }} }">
             <div class="card p-5 animate-slide-up">
                 <div class="flex items-center justify-between gap-3 mb-4">
-                    <h3 class="text-lg font-extrabold text-slate-800">{{ $entry ? 'بطاقة الأداء اليومية' : 'إضافة سجل الأداء' }}</h3>
+                    <h3 class="text-lg font-extrabold text-slate-800">
+                        {{ $entry ? 'بطاقة الأداء اليومية' : ($isToday ? 'إضافة سجل الأداء' : 'لا يوجد سجل لهذا اليوم') }}
+                    </h3>
                     <div class="flex items-center gap-2">
                         @if($entry)
                             <span class="badge-success">محفوظ</span>
-                            <button type="button" @click="openForm = !openForm" class="btn-ghost btn-sm !h-8 !px-2" :title="openForm ? 'إخفاء نموذج التعديل' : 'تعديل السجل'">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h2M4 20h4l10-10-4-4L4 16v4z"/>
-                                </svg>
-                            </button>
-                        @else
+                            @if($isToday)
+                                <button type="button" @click="openForm = !openForm" class="btn-ghost btn-sm !h-8 !px-2" :title="openForm ? 'إخفاء نموذج التعديل' : 'تعديل السجل'">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h2M4 20h4l10-10-4-4L4 16v4z"/>
+                                    </svg>
+                                </button>
+                            @endif
+                        @elseif($isToday)
                             <span class="badge-warning">جديد</span>
                         @endif
                     </div>
                 </div>
+
+                {{-- Read-only banner for past days --}}
+                @if(!$isToday)
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-4 flex items-center gap-2 text-sm text-amber-800">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-11a7 7 0 110 14A7 7 0 0112 4z"/>
+                        </svg>
+                        <span>عرض فقط — لا يمكن تسجيل أو تعديل أداء يوم سابق.</span>
+                    </div>
+                @endif
 
                 @if($entry)
                     <div class="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 mb-4">
@@ -93,13 +108,16 @@
                     </div>
                 @endif
 
+                {{-- Form is only shown when viewing TODAY --}}
+                @if($isToday)
                 <form method="POST" action="{{ route('daily-performance.employee.upsert') }}" enctype="multipart/form-data" class="space-y-4" data-loading data-loading-text="جاري الحفظ..." x-show="openForm" x-transition>
                     @csrf
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="form-group mb-0">
                             <label class="form-label">تاريخ الأداء</label>
-                            <input type="date" name="work_date" class="form-input" value="{{ old('work_date', $selectedDate) }}" required>
+                            <input type="date" name="work_date" class="form-input bg-slate-100 cursor-not-allowed"
+                                   value="{{ now()->toDateString() }}" readonly>
                         </div>
 
                         <div class="form-group mb-0">
@@ -131,6 +149,7 @@
                         @endif
                     </div>
                 </form>
+                @endif
             </div>
 
             <div class="card p-5 animate-slide-up">
@@ -160,12 +179,14 @@
                                         <div class="flex items-center gap-2 mt-2">
                                             <a href="{{ $fileUrl }}" target="_blank" class="btn-outline btn-sm !h-8 !px-3 !text-xs">فتح</a>
 
+                                            @if($isToday)
                                             <form method="POST" action="{{ route('daily-performance.employee.attachment.destroy', $attachment) }}" data-confirm data-confirm-title="حذف المرفق"
                                                   data-confirm-message="هل أنت متأكد من حذف هذا المرفق؟" data-confirm-type="danger" data-confirm-text="حذف" data-cancel-text="إلغاء">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn-ghost btn-sm !h-8 !px-3 !text-xs text-red-600">حذف</button>
                                             </form>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
