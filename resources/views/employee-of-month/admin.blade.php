@@ -161,7 +161,7 @@
                     </div>
                 </div>
             @empty
-                <div class="text-center text-slate-500 py-8">لا توجد بيانات كافية لعرض أول 3 مراكز.</div>
+                <div class="text-center text-slate-500 py-8">لا يوجد موظف تخطي 85 نقطه حتي الان</div>
             @endforelse
         </div>
     </div>

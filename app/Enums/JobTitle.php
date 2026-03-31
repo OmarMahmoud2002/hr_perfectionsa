@@ -13,6 +13,7 @@ enum JobTitle: string
     case Admin = 'admin';
     case Manager = 'manager';
     case OfficeGirl = 'office_girl';
+    case Accountant = 'accountant';
 
     public function label(): string
     {
@@ -26,6 +27,7 @@ enum JobTitle: string
             self::Admin => 'Admin',
             self::Manager => 'مدير',
             self::OfficeGirl => 'Office Girl',
+            self::Accountant => 'محاسب',
         };
     }
 
