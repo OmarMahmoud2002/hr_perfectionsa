@@ -166,6 +166,27 @@
         </div>
     </div>
 
+    <div id="global-loading-overlay"
+         class="fixed inset-0 z-[1000] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+         aria-live="polite" aria-busy="true" role="status">
+        <div class="rounded-2xl shadow-2xl px-6 py-5 border border-white/20 text-white"
+             style="background: radial-gradient(circle at 20% 20%, rgba(255,255,255,.14), transparent 45%), linear-gradient(135deg, #2e6d98 0%, #2f7c77 100%);">
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <span class="absolute inset-0 rounded-full bg-white/20 animate-ping"></span>
+                    <svg class="relative w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-30"></circle>
+                        <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" class="opacity-100"></path>
+                    </svg>
+                </div>
+                <p id="global-loading-text" class="text-sm font-black tracking-wide">جاري التحميل</p>
+            </div>
+            <div class="mt-3 h-1.5 rounded-full bg-white/20 overflow-hidden" aria-hidden="true">
+                <div class="h-full w-1/2 rounded-full bg-white/80 animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
     (function () {
         var _open = null;
@@ -222,31 +243,105 @@
     </script>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('form[data-loading]').forEach(function (form) {
-            form.addEventListener('submit', function () {
+    (function () {
+        function getOverlay() {
+            return document.getElementById('global-loading-overlay');
+        }
+
+        function getOverlayText() {
+            return document.getElementById('global-loading-text');
+        }
+
+        function showGlobalLoading() {
+            var overlay = getOverlay();
+            if (!overlay) return;
+
+            var textEl = getOverlayText();
+            if (textEl) textEl.textContent = 'جاري التحميل';
+
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+        }
+
+        function hideGlobalLoading() {
+            var overlay = getOverlay();
+            if (!overlay) return;
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+        }
+
+        function decorateSubmitButton(form) {
+            var btn = null;
+            if (form.dataset.loadingTarget) {
+                btn = form.querySelector(form.dataset.loadingTarget);
+            }
+            if (!btn) {
+                btn = form.querySelector('button[type="submit"]');
+            }
+            if (!btn) return;
+
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'cursor-wait');
+
+            var text = 'جاري التحميل';
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" class="opacity-75"></path></svg><span class="ml-2">' + text + '</span>';
+        }
+
+        function shouldHandleLink(link, event) {
+            if (!link) return false;
+            if (event.defaultPrevented) return false;
+            if (event.button !== 0) return false;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+            if (link.hasAttribute('download')) return false;
+            if ((link.getAttribute('target') || '').toLowerCase() === '_blank') return false;
+            if (link.dataset.noLoading !== undefined) return false;
+
+            var href = link.getAttribute('href') || '';
+            if (!href || href === '#' || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return false;
+
+            var url;
+            try {
+                url = new URL(link.href, window.location.href);
+            } catch (e) {
+                return false;
+            }
+
+            if (url.origin !== window.location.origin) return false;
+            if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return false;
+
+            return true;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            window.showGlobalLoading = showGlobalLoading;
+            window.hideGlobalLoading = hideGlobalLoading;
+
+            document.addEventListener('submit', function (e) {
+                var form = e.target;
+                if (!(form instanceof HTMLFormElement)) return;
+                if (e.defaultPrevented) return;
                 if (form.dataset.confirm && !form._confirmed) return;
-                if (form.dataset.loadingSubmitted === '1') return;
+                if (form.dataset.loadingSubmitted === '1') {
+                    e.preventDefault();
+                    return;
+                }
+
                 form.dataset.loadingSubmitted = '1';
+                decorateSubmitButton(form);
+                showGlobalLoading();
+            }, true);
 
-                var btn = null;
-                if (form.dataset.loadingTarget) {
-                    btn = form.querySelector(form.dataset.loadingTarget);
-                }
-                if (!btn) {
-                    btn = form.querySelector('button[type="submit"]');
-                }
-                if (!btn) return;
+            document.addEventListener('click', function (e) {
+                var link = e.target.closest('a[href]');
+                if (!shouldHandleLink(link, e)) return;
+                showGlobalLoading();
+            }, true);
 
-                var original = btn.innerHTML;
-                btn.dataset.originalText = original;
-                var text = btn.dataset.loadingText || 'جاري المعالجة...';
-                btn.innerHTML = '<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" class="opacity-75"></path></svg><span class="ml-2">' + text + '</span>';
-                btn.disabled = true;
-                btn.classList.add('opacity-70', 'cursor-wait');
+            window.addEventListener('pageshow', function () {
+                hideGlobalLoading();
             });
         });
-    });
+    })();
     </script>
 
     @stack('scripts')

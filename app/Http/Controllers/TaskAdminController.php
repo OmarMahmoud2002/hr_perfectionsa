@@ -12,6 +12,7 @@ use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -240,6 +241,21 @@ class TaskAdminController extends Controller
         ]);
 
         return back()->with('success', 'تم تحديث حالة المهمة.');
+    }
+
+    public function destroy(EmployeeMonthTask $task): RedirectResponse
+    {
+        DB::transaction(function () use ($task): void {
+            $task->loadMissing('attachments');
+
+            foreach ($task->attachments as $attachment) {
+                Storage::disk($attachment->disk ?? 'public')->delete($attachment->path);
+            }
+
+            $task->delete();
+        });
+
+        return back()->with('success', 'تم حذف المهمة نهائياً.');
     }
 
     public function export(Request $request)

@@ -328,7 +328,7 @@
                             <p class="text-xs font-semibold text-slate-500 mb-1.5">المرفقات</p>
                             <div class="flex flex-wrap gap-1.5">
                                 @foreach($task->attachments as $att)
-                                    <a href="{{ Storage::disk('public')->url($att->path) }}" target="_blank"
+                                                <a href="{{ route('media.task-attachment.file', ['path' => $att->path]) }}" target="_blank"
                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium hover:bg-blue-100 transition">
                                         @if($att->is_image)
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15l-5-5L5 21"/></svg>
@@ -366,6 +366,16 @@
                             <button type="submit" class="btn-sm {{ $task->is_active ? 'btn-danger' : 'btn-teal' }}">
                                 {{ $task->is_active ? 'إيقاف' : 'تفعيل' }}
                             </button>
+                        </form>
+
+                        <form method="POST" action="{{ route('tasks.admin.destroy', $task) }}"
+                              data-confirm="هل تريد حذف هذه المهمة نهائياً؟ سيتم حذف التقييمات، الإسنادات، المرفقات والروابط المرتبطة بها ولا يمكن التراجع."
+                              data-confirm-title="حذف نهائي للمهمة"
+                              data-confirm-btn="حذف نهائي"
+                              data-confirm-type="danger">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn-sm btn-danger">حذف</button>
                         </form>
                     </div>
 
@@ -423,7 +433,7 @@
                                             <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200"
                                                  x-data="{ removed: false }" x-show="!removed">
                                                 <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 002.828 2.828L18 9.828"/></svg>
-                                                <a href="{{ Storage::disk('public')->url($att->path) }}" target="_blank"
+                                                                <a href="{{ route('media.task-attachment.file', ['path' => $att->path]) }}" target="_blank"
                                                    class="text-xs text-blue-600 hover:underline flex-1 truncate">{{ $att->original_name }}</a>
                                                 <button type="button"
                                                         @click="removed = true; deletedAttachments.push({{ $att->id }})"

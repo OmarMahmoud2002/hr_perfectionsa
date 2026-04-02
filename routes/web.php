@@ -59,6 +59,10 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
         ->where('path', '.*')
         ->name('media.daily-performance.file');
 
+    Route::get('/media/task-attachment/{path}', [MyAccountController::class, 'taskAttachment'])
+        ->where('path', '.*')
+        ->name('media.task-attachment.file');
+
     // Dashboard
     Route::middleware(['role:admin,manager,hr,employee,office_girl'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -95,6 +99,8 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
             ->name('tasks.admin.store');
         Route::put('/tasks/admin/{task}', [TaskAdminController::class, 'update'])
             ->name('tasks.admin.update');
+        Route::delete('/tasks/admin/{task}', [TaskAdminController::class, 'destroy'])
+            ->name('tasks.admin.destroy');
         Route::patch('/tasks/admin/{task}/toggle', [TaskAdminController::class, 'toggle'])
             ->name('tasks.admin.toggle');
         Route::get('/tasks/admin/export', [TaskAdminController::class, 'export'])

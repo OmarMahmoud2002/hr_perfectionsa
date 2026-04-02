@@ -181,4 +181,28 @@ class MyAccountController extends Controller
             'Cache-Control' => 'public, max-age=31536000',
         ]);
     }
+
+    public function taskAttachment(string $path): BinaryFileResponse
+    {
+        if (str_contains($path, '..')) {
+            abort(404);
+        }
+
+        $cleanPath = ltrim($path, '/');
+
+        // Restrict this endpoint to task attachments only.
+        if (! str_starts_with($cleanPath, 'task-attachments/')) {
+            abort(404);
+        }
+
+        if (! Storage::disk('public')->exists($cleanPath)) {
+            abort(404);
+        }
+
+        $fullPath = storage_path('app/public/' . $cleanPath);
+
+        return response()->file($fullPath, [
+            'Cache-Control' => 'public, max-age=31536000',
+        ]);
+    }
 }
