@@ -5,10 +5,14 @@ namespace App\Http\Controllers;
 use App\Exports\TasksEvaluationsExport;
 use App\Models\Employee;
 use App\Models\EmployeeMonthTask;
+use App\Models\EmployeeMonthTaskAttachment;
+use App\Models\EmployeeMonthTaskLink;
 use App\Services\EmployeeOfMonth\TaskManagementService;
 use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
@@ -33,7 +37,7 @@ class TaskAdminController extends Controller
         $tasksQuery = EmployeeMonthTask::query()
             ->where('period_month', $month)
             ->where('period_year', $year)
-            ->with(['creator:id,name', 'evaluation.evaluator:id,name', 'employees:id,name,ac_no'])
+            ->with(['creator:id,name', 'evaluation.evaluator:id,name', 'employees:id,name,ac_no', 'assignments.employee:id,name', 'attachments', 'links'])
             ->withCount('assignments')
             ->orderByDesc('id');
 
@@ -77,29 +81,63 @@ class TaskAdminController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'task_date' => ['required', 'date'],
-            'task_end_date' => ['required', 'date', 'after_or_equal:task_date'],
-            'period_month' => ['required', 'integer', 'between:1,12'],
-            'period_year' => ['required', 'integer', 'between:2000,2100'],
-            'employee_ids' => ['required', 'array', 'min:1'],
+            'title'          => ['required', 'string', 'max:255'],
+            'description'    => ['nullable', 'string', 'max:2000'],
+            'task_date'      => ['required', 'date'],
+            'task_end_date'  => ['required', 'date', 'after_or_equal:task_date'],
+            'period_month'   => ['required', 'integer', 'between:1,12'],
+            'period_year'    => ['required', 'integer', 'between:2000,2100'],
+            'employee_ids'   => ['required', 'array', 'min:1'],
             'employee_ids.*' => ['required', 'integer', 'exists:employees,id'],
-            'is_active' => ['nullable', 'boolean'],
+            'is_active'      => ['nullable', 'boolean'],
+            'attachments'    => ['nullable', 'array', 'max:10'],
+            'attachments.*'  => ['file', 'max:20480', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,txt,zip'],
+            'links'          => ['nullable', 'array', 'max:20'],
+            'links.*'        => ['nullable', 'url', 'max:2000'],
         ]);
 
         $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids']);
 
-        $this->taskManagementService->createTask(
+        $task = $this->taskManagementService->createTask(
             $validated,
             $employeeIds,
             $request->user()
         );
 
+        // Handle file attachments
+        $files = $request->file('attachments', []);
+        foreach ($files as $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+            $storedPath = $file->store('task-attachments/'.$task->id, 'public');
+            EmployeeMonthTaskAttachment::query()->create([
+                'task_id'       => $task->id,
+                'disk'          => 'public',
+                'path'          => $storedPath,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type'     => $file->getClientMimeType(),
+                'file_size'     => $file->getSize(),
+                'is_image'      => str_starts_with((string) $file->getClientMimeType(), 'image/'),
+            ]);
+        }
+
+        // Handle links
+        $links = $request->input('links', []);
+        foreach ($links as $url) {
+            $url = trim((string) ($url ?? ''));
+            if ($url !== '') {
+                EmployeeMonthTaskLink::query()->create([
+                    'task_id' => $task->id,
+                    'url'     => $url,
+                ]);
+            }
+        }
+
         return redirect()
             ->route('tasks.admin.index', [
-                'month' => (int) $validated['period_month'],
-                'year' => (int) $validated['period_year'],
+                'month'     => (int) $validated['period_month'],
+                'year'      => (int) $validated['period_year'],
                 'task_date' => (string) $validated['task_date'],
             ])
             ->with('success', 'تم إنشاء المهمة وإسنادها بنجاح.');
@@ -108,18 +146,89 @@ class TaskAdminController extends Controller
     public function update(Request $request, EmployeeMonthTask $task): RedirectResponse
     {
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'task_date' => ['required', 'date'],
-            'task_end_date' => ['required', 'date', 'after_or_equal:task_date'],
-            'employee_ids' => ['required', 'array', 'min:1'],
-            'employee_ids.*' => ['required', 'integer', 'exists:employees,id'],
-            'is_active' => ['nullable', 'boolean'],
+            'title'                   => ['required', 'string', 'max:255'],
+            'description'             => ['nullable', 'string', 'max:2000'],
+            'task_date'               => ['required', 'date'],
+            'task_end_date'           => ['required', 'date', 'after_or_equal:task_date'],
+            'employee_ids'            => ['required', 'array', 'min:1'],
+            'employee_ids.*'          => ['required', 'integer', 'exists:employees,id'],
+            'is_active'               => ['nullable', 'boolean'],
+            'delete_attachment_ids'   => ['nullable', 'array'],
+            'delete_attachment_ids.*' => ['integer'],
+            'new_attachments'         => ['nullable', 'array', 'max:10'],
+            'new_attachments.*'       => ['file', 'max:20480', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,txt,zip'],
+            'delete_link_ids'         => ['nullable', 'array'],
+            'delete_link_ids.*'       => ['integer'],
+            'existing_links'          => ['nullable', 'array'],
+            'existing_links.*'        => ['nullable', 'url', 'max:2000'],
+            'new_links'               => ['nullable', 'array', 'max:20'],
+            'new_links.*'             => ['nullable', 'url', 'max:2000'],
         ]);
 
         $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids']);
 
         $this->taskManagementService->updateTask($task, $validated, $employeeIds);
+
+        // Delete removed attachments
+        $deleteAttachmentIds = $validated['delete_attachment_ids'] ?? [];
+        if (! empty($deleteAttachmentIds)) {
+            $toDelete = EmployeeMonthTaskAttachment::query()
+                ->where('task_id', $task->id)
+                ->whereIn('id', $deleteAttachmentIds)
+                ->get();
+            foreach ($toDelete as $att) {
+                Storage::disk($att->disk ?? 'public')->delete($att->path);
+                $att->delete();
+            }
+        }
+
+        // Update existing links (in case URLs were edited)
+        foreach (($validated['existing_links'] ?? []) as $id => $url) {
+            $url = trim((string) ($url ?? ''));
+            if ($url !== '') {
+                EmployeeMonthTaskLink::query()
+                    ->where('task_id', $task->id)
+                    ->where('id', (int) $id)
+                    ->update(['url' => $url]);
+            }
+        }
+
+        // Delete removed links
+        $deleteLinkIds = $validated['delete_link_ids'] ?? [];
+        if (! empty($deleteLinkIds)) {
+            EmployeeMonthTaskLink::query()
+                ->where('task_id', $task->id)
+                ->whereIn('id', $deleteLinkIds)
+                ->delete();
+        }
+
+        // Add new attachments
+        foreach ($request->file('new_attachments', []) as $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+            $storedPath = $file->store('task-attachments/'.$task->id, 'public');
+            EmployeeMonthTaskAttachment::query()->create([
+                'task_id'       => $task->id,
+                'disk'          => 'public',
+                'path'          => $storedPath,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type'     => $file->getClientMimeType(),
+                'file_size'     => $file->getSize(),
+                'is_image'      => str_starts_with((string) $file->getClientMimeType(), 'image/'),
+            ]);
+        }
+
+        // Add new links
+        foreach (($validated['new_links'] ?? []) as $url) {
+            $url = trim((string) ($url ?? ''));
+            if ($url !== '') {
+                EmployeeMonthTaskLink::query()->create([
+                    'task_id' => $task->id,
+                    'url'     => $url,
+                ]);
+            }
+        }
 
         return back()->with('success', 'تم تحديث المهمة بنجاح.');
     }

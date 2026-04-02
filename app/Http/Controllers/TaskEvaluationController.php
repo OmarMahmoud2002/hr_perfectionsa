@@ -24,26 +24,29 @@ class TaskEvaluationController extends Controller
         $month = (int) $request->input('month', $period['month']);
         $year = (int) $request->input('year', $period['year']);
         $taskDate = $request->input('task_date');
+        $status = $request->input('status'); // 'evaluated' | 'not_evaluated' | null
 
         $tasks = $this->taskEvaluationService->getTasksForEvaluator(
             $request->user(),
             $month,
             $year,
             $taskDate,
+            $status,
         );
 
         return view('tasks.evaluator', [
-            'month' => $month,
-            'year' => $year,
-            'tasks' => $tasks,
+            'month'    => $month,
+            'year'     => $year,
+            'tasks'    => $tasks,
             'taskDate' => $taskDate,
+            'status'   => $status,
         ]);
     }
 
     public function upsert(Request $request, EmployeeMonthTask $task): RedirectResponse
     {
         $validated = $request->validate([
-            'score' => ['required', 'integer', 'between:1,10'],
+            'score' => ['required', 'numeric', 'min:1', 'max:10'],
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -51,7 +54,7 @@ class TaskEvaluationController extends Controller
             $this->taskEvaluationService->upsertEvaluation(
                 $request->user(),
                 $task,
-                (int) $validated['score'],
+                (float) $validated['score'],
                 $validated['note'] ?? null
             );
         } catch (RuntimeException $e) {

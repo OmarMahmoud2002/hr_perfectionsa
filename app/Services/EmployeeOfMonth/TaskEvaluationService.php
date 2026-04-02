@@ -11,7 +11,7 @@ use RuntimeException;
 
 class TaskEvaluationService
 {
-    public function getTasksForEvaluator(User $evaluator, int $month, int $year, ?string $taskDate = null): Collection
+    public function getTasksForEvaluator(User $evaluator, int $month, int $year, ?string $taskDate = null, ?string $status = null): Collection
     {
         $this->assertEvaluatorRole($evaluator);
 
@@ -22,6 +22,10 @@ class TaskEvaluationService
             ->with([
                 'evaluation' => fn ($q) => $q
                     ->select(['id', 'task_id', 'evaluator_user_id', 'score', 'note', 'updated_at']),
+                'employees:id,name',
+                'assignments.employee:id,name',
+                'attachments',
+                'links',
             ])
             ->where(function ($query) use ($evaluator) {
                 $query->whereDoesntHave('evaluation')
@@ -33,10 +37,16 @@ class TaskEvaluationService
             $query->whereDate('task_date', $taskDate);
         }
 
-        return $query->get(['id', 'title', 'description', 'task_date', 'period_month', 'period_year']);
+        if ($status === 'evaluated') {
+            $query->whereHas('evaluation', fn ($q) => $q->where('evaluator_user_id', $evaluator->id));
+        } elseif ($status === 'not_evaluated') {
+            $query->whereDoesntHave('evaluation');
+        }
+
+        return $query->get(['id', 'title', 'description', 'task_date', 'task_end_date', 'period_month', 'period_year']);
     }
 
-    public function upsertEvaluation(User $evaluator, EmployeeMonthTask $task, int $score, ?string $note = null): EmployeeMonthTaskEvaluation
+    public function upsertEvaluation(User $evaluator, EmployeeMonthTask $task, float $score, ?string $note = null): EmployeeMonthTaskEvaluation
     {
         $this->assertEvaluatorRole($evaluator);
 

@@ -50,11 +50,22 @@ class EmployeeMonthTask extends Model
     public function employees(): BelongsToMany
     {
         return $this->belongsToMany(Employee::class, 'employee_month_task_assignments', 'task_id', 'employee_id')
+            ->withPivot('status')
             ->withTimestamps();
     }
 
     public function evaluation(): HasOne
     {
         return $this->hasOne(EmployeeMonthTaskEvaluation::class, 'task_id');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(EmployeeMonthTaskAttachment::class, 'task_id');
+    }
+
+    public function links(): HasMany
+    {
+        return $this->hasMany(EmployeeMonthTaskLink::class, 'task_id');
     }
 }

@@ -18,9 +18,9 @@ class EmployeeMonthTaskEvaluation extends Model
     ];
 
     protected $casts = [
-        'task_id' => 'integer',
-        'evaluator_user_id' => 'integer',
-        'score' => 'integer',
+        'task_id'          => 'integer',
+        'evaluator_user_id'=> 'integer',
+        'score'            => 'float',
     ];
 
     public function task(): BelongsTo

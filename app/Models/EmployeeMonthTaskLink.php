@@ -2,34 +2,27 @@
 
 namespace App\Models;
 
-use App\Enums\TaskAssignmentStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class EmployeeMonthTaskAssignment extends Model
+class EmployeeMonthTaskLink extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'task_id',
-        'employee_id',
-        'status',
+        'url',
+        'label',
     ];
 
     protected $casts = [
         'task_id' => 'integer',
-        'employee_id' => 'integer',
-        'status' => TaskAssignmentStatus::class,
     ];
 
     public function task(): BelongsTo
     {
         return $this->belongsTo(EmployeeMonthTask::class, 'task_id');
     }
-
-    public function employee(): BelongsTo
-    {
-        return $this->belongsTo(Employee::class);
-    }
 }
+

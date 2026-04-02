@@ -115,6 +115,8 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     Route::middleware(['role:employee,office_girl'])->group(function () {
         Route::get('/tasks/my', [EmployeeMyTasksController::class, 'index'])
             ->name('tasks.my.index');
+        Route::patch('/tasks/my/{task}/status', [EmployeeMyTasksController::class, 'updateStatus'])
+            ->name('tasks.my.status.update');
 
         Route::get('/daily-performance', [DailyPerformanceEmployeeController::class, 'index'])
             ->name('daily-performance.employee.index');
