@@ -23,6 +23,13 @@ class AttendanceRecord extends Model
         'notes',
         'import_batch_id',
         'manual_status',
+        'source',
+        'type',
+        'latitude',
+        'longitude',
+        'ip_address',
+        'device_info',
+        'photo_path',
     ];
 
     protected $casts = [
@@ -31,6 +38,8 @@ class AttendanceRecord extends Model
         'late_minutes'     => 'integer',
         'overtime_minutes' => 'integer',
         'work_minutes'     => 'integer',
+        'latitude'         => 'decimal:7',
+        'longitude'        => 'decimal:7',
     ];
 
     // ========================

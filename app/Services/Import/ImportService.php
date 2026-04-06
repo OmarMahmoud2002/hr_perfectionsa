@@ -238,6 +238,8 @@ class ImportService
                             'work_minutes'     => $calc['work_minutes'],
                             'notes'            => $calc['notes'],
                             'import_batch_id'  => $batch->id,
+                            'source'           => 'excel',
+                            'type'             => 'office',
                             'created_at'       => now(),
                             'updated_at'       => now(),
                         ];
@@ -319,7 +321,10 @@ class ImportService
     // ===================================================
 
     /**
-     * overwrite-only: حذف كل سجلات الحضور لفترة الرواتب المطلوبة.
+     * overwrite-only: حذف سجلات Excel فقط لفترة الرواتب المطلوبة.
+     *
+     * ملاحظة: لا نحذف السجلات القادمة من النظام (remote/system)
+     * حتى لا نفقد حضور الموظفين عبر الـ GPS.
      */
     private function deleteAttendanceRecordsForPayrollPeriod(int $month, int $year): void
     {
@@ -327,6 +332,16 @@ class ImportService
 
         AttendanceRecord::query()
             ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->where(function ($query) {
+                $query->where('source', 'excel')
+                    ->orWhere(function ($q) {
+                        $q->whereNull('source')
+                            ->where(function ($q2) {
+                                $q2->whereNull('type')
+                                    ->orWhere('type', 'office');
+                            });
+                    });
+            })
             ->delete();
     }
 
@@ -443,10 +458,40 @@ class ImportService
             return;
         }
 
+        $employeeIds = array_values(array_unique(array_map(fn ($row) => (int) $row['employee_id'], $recordsBuffer)));
+        $dates = array_values(array_unique(array_map(fn ($row) => (string) $row['date'], $recordsBuffer)));
+
+        $protectedRemoteKeys = [];
+        if (!empty($employeeIds) && !empty($dates)) {
+            $minDate = min($dates);
+            $maxDate = max($dates);
+
+            $protectedRemoteKeys = AttendanceRecord::query()
+                ->whereIn('employee_id', $employeeIds)
+                ->whereBetween('date', [$minDate, $maxDate])
+                ->where(function ($query) {
+                    $query->where('type', 'remote')
+                        ->orWhere('source', 'system');
+                })
+                ->get(['employee_id', 'date'])
+                // Normalize date key to Y-m-d to match Excel buffer keys exactly.
+                ->mapWithKeys(fn ($record) => [((int) $record->employee_id) . '|' . Carbon::parse($record->date)->toDateString() => true])
+                ->all();
+        }
+
+        $recordsBuffer = array_values(array_filter($recordsBuffer, function (array $row) use ($protectedRemoteKeys) {
+            $key = ((int) $row['employee_id']) . '|' . (string) $row['date'];
+            return !isset($protectedRemoteKeys[$key]);
+        }));
+
+        if (empty($recordsBuffer)) {
+            return;
+        }
+
         AttendanceRecord::upsert(
             $recordsBuffer,
             ['employee_id', 'date'],
-            ['clock_in', 'clock_out', 'is_absent', 'late_minutes', 'overtime_minutes', 'work_minutes', 'notes', 'import_batch_id', 'updated_at']
+            ['clock_in', 'clock_out', 'is_absent', 'late_minutes', 'overtime_minutes', 'work_minutes', 'notes', 'import_batch_id', 'source', 'type', 'updated_at']
         );
 
         $recordsBuffer = [];

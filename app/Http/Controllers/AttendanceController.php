@@ -41,6 +41,9 @@ class AttendanceController extends Controller
     {
         $month = (int) $request->input('month', now()->month);
         $year  = (int) $request->input('year', now()->year);
+        [$periodStartDate, $periodEndDate] = PayrollPeriod::resolve($month, $year);
+        $periodStart = $periodStartDate->toDateString();
+        $periodEnd = $periodEndDate->toDateString();
 
         // الدفعة المقابلة للشهر والسنة
         $batch = ImportBatch::where('month', $month)
@@ -54,8 +57,8 @@ class AttendanceController extends Controller
         if ($batch) {
             $publicHolidays = $this->holidayService->getHolidayDates($batch);
 
-            $employees = Employee::with('user.profile')->whereHas('attendanceRecords', function ($q) use ($batch) {
-                $q->where('import_batch_id', $batch->id);
+            $employees = Employee::with('user.profile')->whereHas('attendanceRecords', function ($q) use ($periodStart, $periodEnd) {
+                $q->whereBetween('date', [$periodStart, $periodEnd]);
             })->orderBy('name')->get();
 
             $employeeStats = $this->absenceService->getBulkMonthlyStats(

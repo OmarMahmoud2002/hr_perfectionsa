@@ -18,6 +18,9 @@ use App\Http\Controllers\TaskEvaluationController;
 use App\Http\Controllers\EmployeeMyTasksController;
 use App\Http\Controllers\DailyPerformanceEmployeeController;
 use App\Http\Controllers\DailyPerformanceReviewController;
+use App\Http\Controllers\LocationController;
+use App\Http\Controllers\RemoteAttendanceController;
+use App\Http\Controllers\EmployeeRemoteAttendancePageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -151,6 +154,14 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
         Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
         Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
         Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+
+        // المواقع المعتمدة
+        Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
+        Route::get('/locations/create', [LocationController::class, 'create'])->name('locations.create');
+        Route::post('/locations', [LocationController::class, 'store'])->name('locations.store');
+        Route::get('/locations/{location}/edit', [LocationController::class, 'edit'])->name('locations.edit');
+        Route::put('/locations/{location}', [LocationController::class, 'update'])->name('locations.update');
+        Route::delete('/locations/{location}', [LocationController::class, 'destroy'])->name('locations.destroy');
     });
 
     Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
@@ -174,6 +185,15 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     // ================================
     // الحضور والانصراف
     // ================================
+    Route::middleware(['role:employee,office_girl'])->group(function () {
+        Route::get('/attendance/remote', [EmployeeRemoteAttendancePageController::class, 'index'])
+            ->name('attendance.remote.page');
+        Route::post('/attendance/check-in', [RemoteAttendanceController::class, 'checkIn'])
+            ->name('attendance.check-in');
+        Route::post('/attendance/check-out', [RemoteAttendanceController::class, 'checkOut'])
+            ->name('attendance.check-out');
+    });
+
     Route::middleware(['role:admin,manager,hr'])->group(function () {
         Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
         Route::get('/attendance/report', [AttendanceController::class, 'report'])->name('attendance.report');

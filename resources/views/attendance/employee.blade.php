@@ -192,6 +192,7 @@
                             };
                             $record    = $day['record'];
                             $isManual  = $record && $record->manual_status;
+                            $isRemoteRecord = $record && $record->type === 'remote';
                         @endphp
                         <tr class="{{ $rowClass }}">
                             {{-- التاريخ --}}
@@ -271,6 +272,15 @@
                                             <span class="badge" style="background:#ede9fe;color:#7c3aed;border:1px solid #ddd6fe;">إجازة أسبوعية</span>
                                             @break
                                     @endswitch
+
+                                    @if($isRemoteRecord)
+                                        <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-sky-200 bg-sky-50 text-sky-700" title="تم تسجيل هذا اليوم ريموت">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                            </svg>
+                                            ريموت
+                                        </span>
+                                    @endif
 
                                     {{-- مؤشر الحالة اليدوية --}}
                                     @if($isManual)

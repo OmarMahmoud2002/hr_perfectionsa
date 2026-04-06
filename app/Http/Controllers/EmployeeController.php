@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\ImportStatus;
 use App\Models\Employee;
 use App\Models\ImportBatch;
+use App\Models\Location;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
 use App\Services\Employee\EmployeeService;
@@ -39,7 +40,11 @@ class EmployeeController extends Controller
      */
     public function create(): View
     {
-        return view('employees.create');
+        $locations = Location::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'latitude', 'longitude', 'radius']);
+
+        return view('employees.create', compact('locations'));
     }
 
     /**
@@ -48,6 +53,11 @@ class EmployeeController extends Controller
     public function store(StoreEmployeeRequest $request): RedirectResponse
     {
         $employee = $this->employeeService->create($request->validated());
+        $locationIds = $request->boolean('is_remote_worker')
+            ? $request->input('location_ids', [])
+            : [];
+
+        $employee->locations()->sync($locationIds);
         $account = $employee->user;
 
         return redirect()
@@ -109,9 +119,15 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): View
     {
-        $employee->loadMissing('user');
+        $employee->loadMissing('user', 'locations');
 
-        return view('employees.edit', compact('employee'));
+        $locations = Location::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'latitude', 'longitude', 'radius']);
+
+        $selectedLocationIds = old('location_ids', $employee->locations->pluck('id')->all());
+
+        return view('employees.edit', compact('employee', 'locations', 'selectedLocationIds'));
     }
 
     /**
@@ -120,6 +136,11 @@ class EmployeeController extends Controller
     public function update(UpdateEmployeeRequest $request, Employee $employee): RedirectResponse
     {
         $employee = $this->employeeService->update($employee, $request->validated());
+        $locationIds = $request->boolean('is_remote_worker')
+            ? $request->input('location_ids', [])
+            : [];
+
+        $employee->locations()->sync($locationIds);
         $account = $employee->user;
 
         return redirect()

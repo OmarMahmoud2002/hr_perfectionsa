@@ -183,6 +183,75 @@
                 </div>
             </div>
 
+            <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                    <div class="h-px flex-1 bg-slate-100"></div>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">نمط الدوام</span>
+                    <div class="h-px flex-1 bg-slate-100"></div>
+                </div>
+
+                @php
+                    $isRemoteWorker = old('is_remote_worker', $employee->is_remote_worker ? '1' : '0') === '1';
+                @endphp
+
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <input type="hidden" name="is_remote_worker" value="0">
+                    <label class="flex items-start gap-3 cursor-pointer" for="is_remote_worker">
+                        <input type="checkbox"
+                               id="is_remote_worker"
+                               name="is_remote_worker"
+                               value="1"
+                               class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                               @checked($isRemoteWorker)>
+                        <span>
+                            <span class="font-semibold text-slate-700 block">دوام ريموت</span>
+                            <span class="text-xs text-slate-500">يمكن لهذا الموظف تسجيل حضور وانصراف ريموت من موقع واحد أو موقعين معتمدين.</span>
+                        </span>
+                    </label>
+                    @error('is_remote_worker')<p class="form-error mt-2">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            <div id="remote-locations-section" class="space-y-3 {{ $isRemoteWorker ? '' : 'hidden' }}">
+                <div class="flex items-center gap-2">
+                    <div class="h-px flex-1 bg-slate-100"></div>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">المواقع</span>
+                    <div class="h-px flex-1 bg-slate-100"></div>
+                </div>
+
+                @if(($locations ?? collect())->isNotEmpty())
+                    @php
+                        $selectedLocationIds = collect($selectedLocationIds ?? old('location_ids', []))->map(fn ($id) => (int) $id)->all();
+                    @endphp
+
+                    <div class="form-group mb-0">
+                        <label for="location_ids" class="form-label">المواقع المسموح بها</label>
+                        <select id="location_ids" name="location_ids[]" multiple size="6"
+                                class="form-input @error('location_ids') border-red-400 @enderror @error('location_ids.*') border-red-400 @enderror">
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}"
+                                        data-lat="{{ $location->latitude }}"
+                                        data-lng="{{ $location->longitude }}"
+                                        data-radius="{{ $location->radius }}"
+                                        data-name="{{ $location->name }}"
+                                        @selected(in_array($location->id, $selectedLocationIds, true))>
+                                    {{ $location->name }} ({{ $location->radius }} متر)
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1.5 text-xs text-slate-400">يمكن اختيار موقع واحد أو موقعين فقط للدوام الريموت.</p>
+                        @error('location_ids')<p class="form-error">{{ $message }}</p>@enderror
+                        @error('location_ids.*')<p class="form-error">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div id="employee-location-map" class="rounded-2xl border border-slate-200 overflow-hidden" style="height: 360px;"></div>
+                @else
+                    <div class="alert-warning">
+                        <p class="text-sm">لا توجد مواقع متاحة حالياً. <a href="{{ route('locations.create') }}" class="underline font-semibold">أضف موقعاً أولاً</a> ثم حدّث الموظف.</p>
+                    </div>
+                @endif
+            </div>
+
             {{-- Buttons --}}
             <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
                 <button type="submit" id="edit-submit" class="btn-gold btn-lg flex-1 justify-center">
@@ -200,3 +269,155 @@
 </div>
 
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var map;
+    var circles = [];
+    var markers = [];
+    var maxSelectedLocations = 2;
+
+    function clearShapes() {
+        circles.forEach(function (circle) { circle.setMap(null); });
+        markers.forEach(function (marker) { marker.setMap(null); });
+        circles = [];
+        markers = [];
+    }
+
+    function getSelectedLocations(selectEl) {
+        return Array.from(selectEl.selectedOptions)
+            .map(function (option) {
+                return {
+                    name: option.dataset.name || option.textContent,
+                    lat: Number(option.dataset.lat),
+                    lng: Number(option.dataset.lng),
+                    radius: Number(option.dataset.radius || 0),
+                };
+            })
+            .filter(function (loc) {
+                return Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && loc.radius > 0;
+            });
+    }
+
+    window.initEmployeeLocationsMap = function () {
+        var mapEl = document.getElementById('employee-location-map');
+        var selectEl = document.getElementById('location_ids');
+        var remoteToggle = document.getElementById('is_remote_worker');
+        var remoteSection = document.getElementById('remote-locations-section');
+        var previousSelection = [];
+
+        if (!mapEl || !selectEl || !window.google || !google.maps) {
+            return;
+        }
+
+        var defaultCenter = { lat: 30.0444, lng: 31.2357 };
+        map = new google.maps.Map(mapEl, {
+            center: defaultCenter,
+            zoom: 11,
+            streetViewControl: false,
+            mapTypeControl: false,
+        });
+
+        function renderSelection() {
+            clearShapes();
+
+            if (selectEl.disabled) {
+                map.setCenter(defaultCenter);
+                map.setZoom(11);
+                return;
+            }
+
+            var selectedLocations = getSelectedLocations(selectEl);
+            if (selectedLocations.length === 0) {
+                map.setCenter(defaultCenter);
+                map.setZoom(11);
+                return;
+            }
+
+            var bounds = new google.maps.LatLngBounds();
+
+            selectedLocations.forEach(function (loc) {
+                var center = { lat: loc.lat, lng: loc.lng };
+
+                var marker = new google.maps.Marker({
+                    map: map,
+                    position: center,
+                    title: loc.name,
+                });
+
+                var circle = new google.maps.Circle({
+                    map: map,
+                    center: center,
+                    radius: loc.radius,
+                    fillColor: '#16a34a',
+                    fillOpacity: 0.16,
+                    strokeColor: '#15803d',
+                    strokeWeight: 2,
+                });
+
+                markers.push(marker);
+                circles.push(circle);
+                bounds.extend(center);
+            });
+
+            map.fitBounds(bounds);
+        }
+
+        function snapshotSelection() {
+            previousSelection = Array.from(selectEl.selectedOptions).map(function (option) {
+                return option.value;
+            });
+        }
+
+        function restoreSelection() {
+            Array.from(selectEl.options).forEach(function (option) {
+                option.selected = previousSelection.indexOf(option.value) !== -1;
+            });
+        }
+
+        function applyRemoteMode() {
+            var isRemote = !!(remoteToggle && remoteToggle.checked);
+
+            if (remoteSection) {
+                remoteSection.classList.toggle('hidden', !isRemote);
+            }
+
+            selectEl.disabled = !isRemote;
+
+            if (!isRemote) {
+                Array.from(selectEl.options).forEach(function (option) {
+                    option.selected = false;
+                });
+                previousSelection = [];
+            }
+
+            renderSelection();
+        }
+
+        selectEl.addEventListener('focus', snapshotSelection);
+        selectEl.addEventListener('mousedown', snapshotSelection);
+        selectEl.addEventListener('change', function () {
+            if (Array.from(selectEl.selectedOptions).length > maxSelectedLocations) {
+                restoreSelection();
+                window.alert('يمكن اختيار موقعين كحد أقصى للموظف الريموت.');
+                return;
+            }
+
+            snapshotSelection();
+            renderSelection();
+        });
+
+        if (remoteToggle) {
+            remoteToggle.addEventListener('change', applyRemoteMode);
+        }
+
+        snapshotSelection();
+        applyRemoteMode();
+    };
+})();
+</script>
+@if(config('services.google_maps.api_key'))
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.api_key') }}&callback=initEmployeeLocationsMap" async defer></script>
+@endif
+@endpush

@@ -20,6 +20,7 @@ class Employee extends Model
         'job_title',
         'basic_salary',
         'is_active',
+        'is_remote_worker',
         'work_start_time',
         'work_end_time',
         'overtime_start_time',
@@ -29,6 +30,7 @@ class Employee extends Model
     protected $casts = [
         'basic_salary'       => 'decimal:2',
         'is_active'          => 'boolean',
+        'is_remote_worker'   => 'boolean',
         'late_grace_minutes' => 'integer',
         'job_title'          => JobTitle::class,
     ];
@@ -75,6 +77,12 @@ class Employee extends Model
     public function monthTasks(): BelongsToMany
     {
         return $this->belongsToMany(EmployeeMonthTask::class, 'employee_month_task_assignments', 'employee_id', 'task_id')
+            ->withTimestamps();
+    }
+
+    public function locations(): BelongsToMany
+    {
+        return $this->belongsToMany(Location::class, 'employee_location')
             ->withTimestamps();
     }
 

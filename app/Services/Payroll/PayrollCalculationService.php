@@ -179,9 +179,13 @@ class PayrollCalculationService
             throw new \Exception("لا توجد بيانات حضور لشهر {$month}/{$year}. قم برفع ملف الحضور أولاً.");
         }
 
-        // جلب الموظفين الذين لديهم بيانات حضور في هذا الشهر
-        $employees = Employee::whereHas('attendanceRecords', function ($q) use ($batch) {
-            $q->where('import_batch_id', $batch->id);
+        [$periodStartDate, $periodEndDate] = PayrollPeriod::resolve($month, $year);
+        $periodStart = $periodStartDate->toDateString();
+        $periodEnd = $periodEndDate->toDateString();
+
+        // جلب الموظفين الذين لديهم بيانات حضور في فترة الشهر (Excel + Remote)
+        $employees = Employee::whereHas('attendanceRecords', function ($q) use ($periodStart, $periodEnd) {
+            $q->whereBetween('date', [$periodStart, $periodEnd]);
         })->get();
 
         if ($employees->isEmpty()) {

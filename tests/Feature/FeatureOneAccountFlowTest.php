@@ -27,6 +27,7 @@ class FeatureOneAccountFlowTest extends TestCase
                 'name' => 'Omar Ali',
                 'job_title' => 'developer',
                 'basic_salary' => 7000,
+                'is_remote_worker' => 0,
             ])
             ->assertRedirect();
 
@@ -63,6 +64,7 @@ class FeatureOneAccountFlowTest extends TestCase
                     'name' => $case['name'],
                     'job_title' => $case['job'],
                     'basic_salary' => 8000,
+                    'is_remote_worker' => 0,
                 ])
                 ->assertRedirect();
 

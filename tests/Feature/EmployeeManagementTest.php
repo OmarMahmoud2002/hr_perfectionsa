@@ -30,6 +30,7 @@ class EmployeeManagementTest extends TestCase
             'name'         => 'موظف تجريبي',
             'job_title'    => 'developer',
             'basic_salary' => 5000,
+            'is_remote_worker' => 0,
         ]);
 
         $response->assertRedirect();
@@ -55,6 +56,7 @@ class EmployeeManagementTest extends TestCase
                 'name'         => 'Should Fail',
                 'job_title'    => 'developer',
                 'basic_salary' => 1000,
+                'is_remote_worker' => 0,
             ])
             ->assertStatus(403);
     }

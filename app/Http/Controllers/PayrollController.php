@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\PayrollReport;
 use App\Services\Payroll\PayrollCalculationService;
+use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -65,8 +66,12 @@ class PayrollController extends Controller
         // الموظفون الذين لديهم بيانات في هذا الشهر
         $employees = collect();
         if ($batch) {
-            $employees = Employee::whereHas('attendanceRecords', function ($q) use ($batch) {
-                $q->where('import_batch_id', $batch->id);
+            [$periodStartDate, $periodEndDate] = PayrollPeriod::resolve($month, $year);
+            $periodStart = $periodStartDate->toDateString();
+            $periodEnd = $periodEndDate->toDateString();
+
+            $employees = Employee::whereHas('attendanceRecords', function ($q) use ($periodStart, $periodEnd) {
+                $q->whereBetween('date', [$periodStart, $periodEnd]);
             })->get();
         }
 
