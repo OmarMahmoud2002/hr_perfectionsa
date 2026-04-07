@@ -32,6 +32,7 @@ class DashboardStatisticsService
                 'recent_batches'     => $this->getRecentBatches(),
                 'top_late_employees' => $this->getTopLateEmployees(),
                 'top_ot_employees'   => $this->getTopOTEmployees(),
+                'top_work_employees' => $this->getTopWorkEmployees(),
             ];
         });
     }
@@ -84,7 +85,11 @@ class DashboardStatisticsService
                 'attendance_rate'   => null,
                 'total_late_hours'  => 0,
                 'total_ot_hours'    => 0,
+                'total_work_hours'  => 0,
+                'avg_work_hours_per_day' => 0,
                 'total_absent_days' => 0,
+                'remote_days'       => 0,
+                'onsite_days'       => 0,
                 'present_days'      => 0,
                 'total_records'     => 0,
                 'batch'             => null,
@@ -101,14 +106,24 @@ class DashboardStatisticsService
         $workingDaysRecords = (clone $records)->whereRaw('DAYOFWEEK(date) != 6')->count();
         $presentDays        = (clone $records)->whereRaw('DAYOFWEEK(date) != 6')->where('is_absent', false)->count();
         $absentDays         = (clone $records)->whereRaw('DAYOFWEEK(date) != 6')->where('is_absent', true)->count();
+        $remoteDays         = (clone $records)
+            ->whereRaw('DAYOFWEEK(date) != 6')
+            ->where('is_absent', false)
+            ->where('type', 'remote')
+            ->count();
+        $onsiteDays         = max($presentDays - $remoteDays, 0);
 
         $totalRecords  = $records->count(); // جميع السجلات (مع الجمعة)
         $totalLate     = (clone $records)->sum('late_minutes');
         $totalOT       = (clone $records)->sum('overtime_minutes');
+        $totalWork     = (clone $records)->sum('work_minutes');
 
         // حساب نسبة الحضور من أيام العمل فقط (بدون الجمعة)
         $attendanceRate = $workingDaysRecords > 0
             ? round(($presentDays / $workingDaysRecords) * 100, 1)
+            : 0;
+        $avgWorkHoursPerDay = $presentDays > 0
+            ? round(($totalWork / $presentDays) / 60, 2)
             : 0;
 
         return [
@@ -116,7 +131,11 @@ class DashboardStatisticsService
             'attendance_rate'   => $attendanceRate,
             'total_late_hours'  => round($totalLate / 60, 1),
             'total_ot_hours'    => round($totalOT / 60, 1),
+            'total_work_hours'  => round($totalWork / 60, 1),
+            'avg_work_hours_per_day' => $avgWorkHoursPerDay,
             'total_absent_days' => $absentDays,
+            'remote_days'       => $remoteDays,
+            'onsite_days'       => $onsiteDays,
             'present_days'      => $presentDays,
             'total_records'     => $totalRecords,
             'batch'             => $batch,
@@ -182,6 +201,35 @@ class DashboardStatisticsService
                     'employee' => $item->employee,
                     'ot_hours' => round($item->total_ot / 60, 1),
                     'ot_minutes' => $item->total_ot,
+                ];
+            });
+    }
+
+    /**
+     * أكثر الموظفين في ساعات العمل خلال الشهر الحالي
+     */
+    private function getTopWorkEmployees(int $limit = 5): \Illuminate\Support\Collection
+    {
+        $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
+        [$periodStart, $periodEnd] = PayrollPeriod::resolve($currentPayrollMonth['month'], $currentPayrollMonth['year']);
+
+        return AttendanceRecord::whereBetween('date', [
+                $periodStart->toDateString(),
+                $periodEnd->toDateString(),
+            ])
+            ->where('is_absent', false)
+            ->where('work_minutes', '>', 0)
+            ->select('employee_id', DB::raw('SUM(work_minutes) as total_work'))
+            ->groupBy('employee_id')
+            ->orderByDesc('total_work')
+            ->limit($limit)
+            ->with('employee.user.profile')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'employee'      => $item->employee,
+                    'work_hours'    => round($item->total_work / 60, 1),
+                    'work_minutes'  => (int) $item->total_work,
                 ];
             });
     }

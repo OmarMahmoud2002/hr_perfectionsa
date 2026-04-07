@@ -236,9 +236,9 @@
 
 </div>
 
-{{-- الصف الثالث: أكثر الموظفين تأخيراً + أعلى أوفرتايم --}}
+{{-- الصف الثالث: أكثر الموظفين تأخيراً + أعلى أوفرتايم + أعلى ساعات عمل --}}
 @if(($hasCurrentData ?? false))
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mb-5">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 mb-5">
 
     {{-- أكثر الموظفين تأخيراً --}}
     <div class="card overflow-hidden">
@@ -257,7 +257,7 @@
             </div>
         </div>
         <div class="divide-y divide-slate-100">
-            @forelse($topLateEmployees ?? [] as $idx => $item)
+            @forelse(collect($topLateEmployees ?? [])->take(5) as $idx => $item)
             @php
                 $lateAvatarUrl = $item['employee']?->user?->profile?->avatar_path
                     ? route('media.avatar', ['path' => $item['employee']->user->profile->avatar_path])
@@ -313,7 +313,7 @@
             </div>
         </div>
         <div class="divide-y divide-slate-100">
-            @forelse($topOTEmployees ?? [] as $idx => $item)
+            @forelse(collect($topOTEmployees ?? [])->take(5) as $idx => $item)
             @php
                 $otAvatarUrl = $item['employee']?->user?->profile?->avatar_path
                     ? route('media.avatar', ['path' => $item['employee']->user->profile->avatar_path])
@@ -352,6 +352,112 @@
         </div>
     </div>
 
+    {{-- أكثر الموظفين في ساعات العمل --}}
+    <div class="card overflow-hidden">
+        <div class="card-header">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                     style="background: rgba(77, 155, 151, 0.2);">
+                    <svg class="w-4 h-4" style="color: #4d9b97;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m3 4V5M3 21h18"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-white leading-tight">أكثر الموظفين في ساعات العمل</h3>
+                    <p class="text-xs text-white/60">{{ now()->locale('ar')->isoFormat('MMMM YYYY') }}</p>
+                </div>
+            </div>
+        </div>
+        @php
+            $maxWorkMinutes = max(1, (int) collect($topWorkEmployees ?? [])->max('work_minutes'));
+        @endphp
+        <div class="divide-y divide-slate-100">
+            @forelse(collect($topWorkEmployees ?? [])->take(5) as $idx => $item)
+            @php
+                $workAvatarUrl = $item['employee']?->user?->profile?->avatar_path
+                    ? route('media.avatar', ['path' => $item['employee']->user->profile->avatar_path])
+                    : null;
+                $workRatio = min(100, round(((int) $item['work_minutes'] / $maxWorkMinutes) * 100, 1));
+            @endphp
+            <div class="px-4 py-3">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                        {{ $idx === 0 ? 'bg-emerald-100 text-emerald-700' : ($idx === 1 ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500') }}">
+                        {{ $idx + 1 }}
+                    </span>
+                    <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-xs font-bold text-slate-700 flex-shrink-0"
+                         style="background:#fff;border:1.5px solid #e2e8f0;">
+                        @if($workAvatarUrl)
+                            <img src="{{ $workAvatarUrl }}" alt="{{ $item['employee']->name }}" class="w-full h-full object-cover">
+                        @else
+                            {{ mb_substr($item['employee']->name, 0, 1) }}
+                        @endif
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-800 truncate">{{ $item['employee']->name }}</p>
+                        <p class="text-xs text-slate-400">{{ $item['employee']->ac_no }}</p>
+                    </div>
+                    <p class="text-sm font-bold text-emerald-700 flex-shrink-0">{{ $item['work_hours'] }} س</p>
+                </div>
+                <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div class="h-full rounded-full js-progress-fill" data-width="{{ $workRatio }}" style="background: linear-gradient(90deg, #4d9b97, #2a6a6a);"></div>
+                </div>
+            </div>
+            @empty
+            <div class="px-4 py-8 text-center">
+                <svg class="w-10 h-10 text-slate-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m3 4V5M3 21h18"/>
+                </svg>
+                <p class="text-sm text-slate-400">لا توجد ساعات عمل كافية للعرض</p>
+            </div>
+            @endforelse
+        </div>
+    </div>
+
+</div>
+
+{{-- الصف الرابع: Visualization لمؤشرات مهمة --}}
+@php
+    $presentCount = (int) ($presentDays ?? 0);
+    $remoteCount = (int) ($remoteDays ?? 0);
+    $onsiteCount = (int) ($onsiteDays ?? 0);
+    $remotePercent = $presentCount > 0 ? round(($remoteCount / $presentCount) * 100, 1) : 0;
+    $onsitePercent = $presentCount > 0 ? round(($onsiteCount / $presentCount) * 100, 1) : 0;
+@endphp
+<div class="grid grid-cols-1 gap-4 sm:gap-5 mb-5">
+    <div class="card p-5 sm:p-6">
+        <h3 class="text-sm font-bold text-slate-700 mb-4">توزيع نمط أيام العمل</h3>
+        <div class="space-y-4">
+            <div>
+                <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                    <span>أيام Onsite</span>
+                    <span>{{ $onsiteCount }} يوم ({{ $onsitePercent }}%)</span>
+                </div>
+                <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div class="h-full rounded-full js-progress-fill" data-width="{{ $onsitePercent }}" style="background: linear-gradient(90deg, #31719d, #4596cf);"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                    <span>أيام Remote</span>
+                    <span>{{ $remoteCount }} يوم ({{ $remotePercent }}%)</span>
+                </div>
+                <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div class="h-full rounded-full js-progress-fill" data-width="{{ $remotePercent }}" style="background: linear-gradient(90deg, #4d9b97, #2a6a6a);"></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <div class="rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
+                    <p class="text-xs text-slate-500">إجمالي ساعات العمل</p>
+                    <p class="text-xl font-black text-slate-800 mt-1">{{ $totalWorkHours ?? 0 }} <span class="text-xs font-semibold text-slate-500">س</span></p>
+                </div>
+                <div class="rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
+                    <p class="text-xs text-slate-500">متوسط الساعات/اليوم</p>
+                    <p class="text-xl font-black text-slate-800 mt-1">{{ $avgWorkHoursPerDay ?? 0 }} <span class="text-xs font-semibold text-slate-500">س</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 @endif
 
@@ -432,3 +538,15 @@
 @endif
 
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    document.querySelectorAll('.js-progress-fill').forEach(function (el) {
+        var width = Number(el.getAttribute('data-width') || 0);
+        var safeWidth = Math.max(0, Math.min(100, width));
+        el.style.width = safeWidth + '%';
+    });
+})();
+</script>
+@endpush

@@ -83,7 +83,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm7-9h.01M12 15h.01M9 15h.01M15 15h.01"/>
             </svg>
-            <span>تسجيل الحضور الريموت</span>
+            <span>تسجيل الحضور والانصراف online</span>
             @if(request()->routeIs('attendance.remote.page'))
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif

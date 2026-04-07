@@ -102,11 +102,17 @@ class DashboardController extends Controller
             'recentBatches'     => $stats['recent_batches'],
             'topLateEmployees'  => $stats['top_late_employees'],
             'topOTEmployees'    => $stats['top_ot_employees'],
+            'topWorkEmployees'  => $stats['top_work_employees'],
             // إحصائيات الشهر الحالي
             'attendanceRate'    => $monthly['attendance_rate'],
             'totalLateHours'    => $monthly['total_late_hours'],
             'totalOTHours'      => $monthly['total_ot_hours'],
+            'totalWorkHours'    => $monthly['total_work_hours'],
+            'avgWorkHoursPerDay'=> $monthly['avg_work_hours_per_day'],
             'totalAbsentDays'   => $monthly['total_absent_days'],
+            'presentDays'       => $monthly['present_days'],
+            'remoteDays'        => $monthly['remote_days'],
+            'onsiteDays'        => $monthly['onsite_days'],
             'hasCurrentData'    => $monthly['has_data'],
             'dashboardMonthLabel' => $dashboardMonthLabel,
         ]);

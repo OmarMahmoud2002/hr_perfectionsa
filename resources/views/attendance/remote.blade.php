@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'تسجيل الحضور الريموت')
-@section('page-title', 'تسجيل الحضور الريموت')
+@section('title', 'تسجيل الحضور والانصراف online')
+@section('page-title', 'تسجيل الحضور والانصراف online')
 @section('page-subtitle', 'تسجيل الحضور والانصراف من المواقع المعتمدة فقط')
 
 @section('content')
