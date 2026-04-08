@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpsertDailyPerformanceReviewRequest;
 use App\Models\DailyPerformanceEntry;
 use App\Models\Employee;
+use App\Models\User;
+use App\Services\Department\DepartmentScopeService;
 use App\Services\DailyPerformance\DailyPerformanceReviewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +17,7 @@ class DailyPerformanceReviewController extends Controller
 {
     public function __construct(
         private readonly DailyPerformanceReviewService $reviewService,
+        private readonly DepartmentScopeService $departmentScopeService,
     ) {}
 
     public function index(Request $request): View
@@ -24,11 +27,14 @@ class DailyPerformanceReviewController extends Controller
             $request->only(['date', 'employee_id', 'status'])
         );
 
-        $employees = Employee::query()
+        $employeesQuery = Employee::query()
             ->active()
-            ->whereHas('user', fn ($q) => $q->where('role', 'employee'))
-            ->orderBy('name')
-            ->get(['id', 'name']);
+            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()))
+            ->orderBy('name');
+
+        $this->departmentScopeService->applyEmployeeScope($employeesQuery, $request->user());
+
+        $employees = $employeesQuery->get(['id', 'name']);
 
         return view('daily-performance.review', [
             'cards' => $dashboard['cards'],

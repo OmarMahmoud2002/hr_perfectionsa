@@ -14,7 +14,10 @@
         ? route('media.avatar', ['path' => $user->profile->avatar_path])
         : null;
 
-    $jobLabel = $user->employee?->job_title?->label() ?? 'غير محدد';
+    $jobLabel = $user->employee?->position_line ?? 'غير محدد';
+    $employmentStartDate = optional($user->employee?->leaveProfile?->employment_start_date)?->format('Y-m-d') ?? 'غير محدد';
+    $departmentName = $user->employee?->department?->name ?? 'غير محدد';
+    $departmentManager = $user->employee?->department?->managerEmployee?->name ?? 'غير محدد';
 @endphp
 
 <nav class="breadcrumb">
@@ -85,6 +88,18 @@
                 <div class="form-group mb-0 md:col-span-2">
                     <label class="form-label">الوظيفة</label>
                     <input type="text" class="form-input bg-slate-100" value="{{ $jobLabel }}" disabled>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label">تاريخ بداية العمل</label>
+                    <input type="text" class="form-input bg-slate-100" value="{{ $employmentStartDate }}" disabled>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label">القسم</label>
+                    <input type="text" class="form-input bg-slate-100" value="{{ $departmentName }}" disabled>
+                </div>
+                <div class="form-group mb-0 md:col-span-2">
+                    <label class="form-label">مدير القسم</label>
+                    <input type="text" class="form-input bg-slate-100" value="{{ $departmentManager }}" disabled>
                 </div>
             </div>
 

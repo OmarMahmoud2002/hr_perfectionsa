@@ -164,7 +164,7 @@
                         </label>
                         <select id="employee_ids" name="employee_ids[]" class="form-input" multiple size="5" required>
                             @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}">{{ $employee->name }} — {{ $employee->ac_no }}</option>
+                                <option value="{{ $employee->id }}">{{ $employee->name }} — {{ $employee->position_line }}</option>
                             @endforeach
                         </select>
                         <p class="form-hint">اضغط <kbd class="px-1.5 py-0.5 text-xs bg-slate-100 rounded border border-slate-300">Ctrl</kbd> لاختيار أكثر من موظف.</p>
@@ -418,7 +418,7 @@
                                 <select name="employee_ids[]" class="form-input" multiple size="4" required>
                                     @foreach($employees as $emp)
                                         <option value="{{ $emp->id }}" {{ $task->employees->contains('id', $emp->id) ? 'selected' : '' }}>
-                                            {{ $emp->name }} - {{ $emp->ac_no }}
+                                            {{ $emp->name }} - {{ $emp->position_line }}
                                         </option>
                                     @endforeach
                                 </select>

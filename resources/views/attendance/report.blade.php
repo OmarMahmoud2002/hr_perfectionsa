@@ -213,7 +213,7 @@
                             </div>
                             <div>
                                 <p class="font-semibold text-slate-800 text-sm">{{ $emp->name }}</p>
-                                <p class="text-xs text-slate-400 font-mono">{{ $emp->ac_no }}</p>
+                                <p class="text-xs text-slate-500">{{ $emp->position_line }}</p>
                             </div>
                         </div>
                     </td>

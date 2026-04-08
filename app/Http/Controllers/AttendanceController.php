@@ -8,6 +8,7 @@ use App\Models\ImportBatch;
 use App\Enums\ImportStatus;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
+use App\Services\Department\DepartmentScopeService;
 use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class AttendanceController extends Controller
     public function __construct(
         private readonly AbsenceDetectionService $absenceService,
         private readonly PublicHolidayService    $holidayService,
+        private readonly DepartmentScopeService  $departmentScopeService,
     ) {}
 
     /**
@@ -57,9 +59,13 @@ class AttendanceController extends Controller
         if ($batch) {
             $publicHolidays = $this->holidayService->getHolidayDates($batch);
 
-            $employees = Employee::with('user.profile')->whereHas('attendanceRecords', function ($q) use ($periodStart, $periodEnd) {
+            $employeesQuery = Employee::with('user.profile')->whereHas('attendanceRecords', function ($q) use ($periodStart, $periodEnd) {
                 $q->whereBetween('date', [$periodStart, $periodEnd]);
-            })->orderBy('name')->get();
+            })->orderBy('name');
+
+            $this->departmentScopeService->applyEmployeeScope($employeesQuery, $request->user());
+
+            $employees = $employeesQuery->get();
 
             $employeeStats = $this->absenceService->getBulkMonthlyStats(
                 $employees,
@@ -89,6 +95,10 @@ class AttendanceController extends Controller
      */
     public function employeeReport(Employee $employee, Request $request): View
     {
+        if (! $this->departmentScopeService->canAccessEmployee($request->user(), $employee)) {
+            abort(403, 'ليس لديك صلاحية للوصول إلى هذا الموظف.');
+        }
+
         $employee->loadMissing('user.profile');
 
         $month = (int) $request->input('month', now()->month);
@@ -129,6 +139,10 @@ class AttendanceController extends Controller
      */
     public function exportEmployee(Employee $employee, Request $request)
     {
+        if (! $this->departmentScopeService->canAccessEmployee($request->user(), $employee)) {
+            abort(403, 'ليس لديك صلاحية للوصول إلى هذا الموظف.');
+        }
+
         $month = (int) $request->input('month', now()->month);
         $year  = (int) $request->input('year', now()->year);
 
@@ -165,6 +179,10 @@ class AttendanceController extends Controller
      */
     public function updateDayStatus(Employee $employee, string $date, Request $request)
     {
+        if (! $this->departmentScopeService->canAccessEmployee($request->user(), $employee)) {
+            abort(403, 'ليس لديك صلاحية لتعديل حالة هذا الموظف.');
+        }
+
         $request->validate([
             'status' => 'required|in:present,absent,weekly_leave,public_holiday,auto',
         ]);

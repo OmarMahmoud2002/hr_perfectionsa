@@ -20,7 +20,7 @@
             'id' => $c->id,
             'name' => $c->name,
             'ac_no' => $c->ac_no,
-            'job_title_label' => $c->job_title?->label(),
+            'position_line' => $c->position_line,
             'avatar' => $c->user?->profile?->avatar_path
                 ? route('media.avatar', ['path' => $c->user->profile->avatar_path])
                 : null,
@@ -90,7 +90,7 @@
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:70ms; animation-fill-mode:both;">
         <div class="card-header flex items-center gap-2">
             <svg class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            <h3>أوائل الشهر الماضي - {{ $previousMonthLabel }}</h3>
+            <h3>أوائل الشهر الماضي (أفضل 4) - {{ $previousMonthLabel }}</h3>
         </div>
         <div class="p-5 flex flex-col gap-3" dir="rtl">
             @php
@@ -119,6 +119,14 @@
                         'label'     => 'المركز الثالث',
                         'text'      => 'text-amber-800',
                     ],
+                    3 => [
+                        'border'    => 'border-cyan-400/70',
+                        'ring'      => 'ring-2 ring-cyan-100',
+                        'gradient'  => 'from-cyan-50 via-sky-50 to-white',
+                        'medal_img' => asset('images/medal-third.png'),
+                        'label'     => 'المركز الرابع',
+                        'text'      => 'text-cyan-800',
+                    ],
                 ];
             @endphp
             @forelse($previousMonthTopThree as $idx => $result)
@@ -144,7 +152,7 @@
                         <p class="text-xs font-bold text-slate-900 mb-0.5">{{ $cfg['label'] }}</p>
                         <p class="font-bold text-slate-800 truncate">{{ $emp?->name ?? '—' }}</p>
                         <p class="text-xs {{ $cfg['text'] }} font-semibold">
-                            {{ $emp?->job_title?->label() ?? 'موظف' }}
+                            {{ $emp?->position_line ?? 'موظف' }}
                         </p>
                         @if($isTitleHolder)
                             <!-- <div class="flex items-center justify-end gap-1 text-amber-600 mt-1"> -->
@@ -165,8 +173,53 @@
                     </div>
                 </div>
             @empty
-                <div class="text-center text-slate-500 py-8">لا توجد نتائج معتمدة للشهر الماضي حتى الآن.</div>
+                <div class="text-center text-slate-500 py-8">
+                    {{ $previousMonthPublished ? 'لا يوجد فائزون مستوفون لحد 90 نقطة للشهر الماضي.' : 'نتائج الشهر الماضي لم تُنشر بعد من الإدارة.' }}
+                </div>
             @endforelse
+        </div>
+    </div>
+
+    <div class="card overflow-hidden animate-slide-up" style="animation-delay:95ms; animation-fill-mode:both;">
+        <div class="card-header flex items-center gap-2">
+            <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.314 0-6 2.239-6 5s2.686 5 6 5 6-2.239 6-5-2.686-5-6-5zm0-5l2 3h-4l2-3z"/>
+            </svg>
+            <h3>مدير الشهر الماضي - {{ $previousMonthLabel }}</h3>
+        </div>
+        <div class="p-5">
+            @if($previousMonthBestManager)
+                @php
+                    $manager = $previousMonthBestManager['manager'];
+                    $managerAvatar = $manager?->user?->profile?->avatar_path
+                        ? route('media.avatar', ['path' => $manager->user->profile->avatar_path])
+                        : null;
+                @endphp
+                <div class="rounded-2xl border border-cyan-200 bg-gradient-to-l from-cyan-50 via-sky-50 to-white p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white text-xl font-black flex-shrink-0"
+                         style="background: linear-gradient(135deg, #31719d, #4d9b97);">
+                        @if($managerAvatar)
+                            <img src="{{ $managerAvatar }}" alt="{{ $manager?->name }}" class="w-full h-full object-cover">
+                        @else
+                            {{ mb_substr((string) ($manager?->name ?? '—'), 0, 1) }}
+                        @endif
+                    </div>
+                    <div class="flex-1 min-w-0 text-right">
+                        <p class="text-xs text-cyan-700 font-semibold mb-1">الفائز بلقب مدير الشهر</p>
+                        <p class="font-black text-slate-800 text-lg truncate">{{ $manager?->name }}</p>
+                        <p class="text-sm text-slate-600">{{ $manager?->position_line ?? 'مدير قسم' }}</p>
+                        <p class="text-xs text-slate-500 mt-1">قسم {{ $previousMonthBestManager['department']->name }}</p>
+                    </div>
+                    <div class="text-right sm:text-left">
+                        <p class="text-xs text-slate-500">متوسط النقاط</p>
+                        <p class="text-lg font-black text-cyan-700">{{ number_format((float) $previousMonthBestManager['avg_final_score'], 2) }}</p>
+                    </div>
+                </div>
+            @else
+                <div class="text-center text-slate-500 py-6">
+                    {{ $previousMonthPublished ? 'لا يوجد مدير مستوفي شرط 3 من 4 لهذا الشهر.' : 'لا توجد نتائج منشورة للشهر الماضي بعد.' }}
+                </div>
+            @endif
         </div>
     </div>
 
@@ -261,8 +314,7 @@
                                 <p class="font-bold text-slate-800 truncate text-sm" x-text="candidate.name"></p>
                                 <p class="text-xs font-semibold mt-0.5 transition-colors duration-200"
                                    :class="selectedEmployeeId === candidate.id ? 'text-secondary-600' : 'text-slate-500'"
-                                   x-text="candidate.job_title_label || 'موظف'"></p>
-                                <p class="text-[11px] text-slate-400 mt-1 font-mono" x-text="candidate.ac_no"></p>
+                                              x-text="candidate.position_line || 'موظف'"></p>
                             </div>
 
                             {{-- Radio circle --}}
@@ -313,7 +365,7 @@
                         <div class="min-w-0">
                             <p class="text-xs text-secondary-600 font-semibold">المرشح المختار</p>
                             <p class="text-sm font-bold text-slate-800 truncate" x-text="selectedCandidate?.name"></p>
-                            <p class="text-xs text-slate-500" x-text="selectedCandidate?.job_title_label || 'موظف'"></p>
+                            <p class="text-xs text-slate-500" x-text="selectedCandidate?.position_line || 'موظف'"></p>
                         </div>
                     </div>
 

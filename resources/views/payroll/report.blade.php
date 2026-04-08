@@ -217,7 +217,7 @@
                                 @else
                                 <p class="font-semibold text-slate-800 text-sm">(موظف محذوف)</p>
                                 @endif
-                                <p class="text-xs text-slate-400 font-mono">{{ $report->employee?->ac_no ?? '—' }}</p>
+                                <p class="text-xs text-slate-500">{{ $report->employee?->position_line ?? '—' }}</p>
                             </div>
                             @if($report->is_locked)
                             <svg class="w-3.5 h-3.5 text-emerald-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,6 +346,18 @@
                             $adjType   = $report->extra_bonus > 0 ? 'bonus' : ($report->extra_deduction > 0 ? 'deduction' : 'bonus');
                             $adjAmount = $report->extra_bonus > 0 ? (float)$report->extra_bonus : ((float)$report->extra_deduction > 0 ? (float)$report->extra_deduction : '');
                         @endphp
+
+                        @if(auth()->user()->isAdminLike())
+                        <form method="POST" action="{{ route('payroll.exclude', $report) }}" class="mb-2"
+                              data-confirm="هل تريد استبعاد الموظف من كشف هذا الشهر؟"
+                              data-confirm-title="تأكيد الاستبعاد"
+                              data-confirm-btn="استبعاد"
+                              data-confirm-type="warning">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="btn-ghost btn-sm !text-red-600 hover:!bg-red-50">استبعاد</button>
+                        </form>
+                        @endif
 
                         @if(auth()->user()->isAdminLike())
                         <div x-data="{ open: false, type: '{{ $adjType }}', amount: '{{ $adjAmount }}' }">

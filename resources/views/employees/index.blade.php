@@ -8,9 +8,12 @@
 
 {{-- Header Row --}}
 <div class="section-header">
+    @php
+        $isWorkforceViewer = auth()->user()->isWorkforceMember();
+    @endphp
     <div>
         <h1 class="section-title">الموظفين</h1>
-        <p class="section-subtitle">{{ $employees->total() }} موظف في النظام</p>
+        <p class="section-subtitle">{{ $employees->total() }} موظف في الدليل</p>
     </div>
     @if(auth()->user()->isAdminLike())
     <a href="{{ route('employees.create') }}" class="btn-primary">
@@ -56,7 +59,7 @@
 
 {{-- Employees Table --}}
 @if($employees->count() > 0)
-@if(auth()->user()->isViewer())
+@if($isWorkforceViewer || auth()->user()->isViewer() || ($forceCards ?? false))
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
     @foreach($employees as $employee)
     @php
@@ -80,14 +83,39 @@
                 <button type="button" @click="open = !open" class="text-right w-full text-base font-bold text-slate-800 hover:text-[#31719d] transition">
                     {{ $employee->name }}
                 </button>
-                <p class="text-xs text-slate-500 mt-1">{{ $employee->job_title?->label() ?? 'غير محدد' }}</p>
+                <p class="text-xs text-slate-500 mt-1">{{ $employee->position_line }}</p>
             </div>
         </div>
 
         <div x-show="open" x-transition class="mt-4 pt-4 border-t border-slate-100 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                    <p class="text-[11px] font-semibold text-slate-500">القسم</p>
+                    <p class="text-sm text-slate-700 mt-1">{{ $employee->department?->name ?: 'غير محدد' }}</p>
+                </div>
+                <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                    <p class="text-[11px] font-semibold text-slate-500">بداية العمل</p>
+                    <p class="text-sm text-slate-700 mt-1">
+                        {{ optional($employee->leaveProfile?->employment_start_date)->format('Y-m-d') ?: 'غير محدد' }}
+                    </p>
+                </div>
+            </div>
+
             <div>
                 <p class="text-xs font-semibold text-slate-500 mb-1">Bio</p>
                 <p class="text-sm text-slate-700 leading-6">{{ $employee->user?->profile?->bio ?: 'لا يوجد نبذة شخصية.' }}</p>
+            </div>
+
+            <div class="rounded-xl border border-slate-100 bg-white px-3 py-2.5 space-y-1.5">
+                <p class="text-xs font-semibold text-slate-500">البيانات التعريفية</p>
+                <p class="text-sm text-slate-700">
+                    <span class="font-medium text-slate-600">المسمى:</span>
+                    {{ $employee->job_title_label ?: 'غير محدد' }}
+                </p>
+                <p class="text-sm text-slate-700">
+                    <span class="font-medium text-slate-600">البريد:</span>
+                    {{ $employee->user?->email ?: 'لا يوجد بريد مرتبط' }}
+                </p>
             </div>
 
             <div class="space-y-2">
@@ -119,7 +147,6 @@
             <thead>
                 <tr>
                     <th>الموظف</th>
-                    <th>رقم البصمة (AC-No)</th>
                     <th>الوظيفة</th>
                     <th>حساب الدخول</th>
                     <th>المرتب الأساسي</th>
@@ -147,16 +174,12 @@
                             </div>
                             <div>
                                 <p class="font-semibold text-slate-800 text-sm">{{ $employee->name }}</p>
+                                <p class="text-xs text-slate-500 mt-0.5">{{ $employee->position_line }}</p>
                             </div>
                         </div>
                     </td>
                     <td>
-                        <span class="font-mono text-sm bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
-                            {{ $employee->ac_no }}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="badge-gray">{{ $employee->job_title?->label() ?? 'غير محدد' }}</span>
+                        <span class="badge-gray">{{ $employee->position_line }}</span>
                     </td>
                     <td>
                         @if($employee->user)

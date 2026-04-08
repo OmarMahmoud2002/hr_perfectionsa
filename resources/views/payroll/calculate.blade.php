@@ -179,7 +179,7 @@
                                         <option value="">— اختر الموظف —</option>
                                         @foreach($employees as $emp)
                                         <option value="{{ $emp->id }}" {{ (old('employee_id', $employeeId) == $emp->id) ? 'selected' : '' }}>
-                                            {{ $emp->name }} ({{ $emp->ac_no }})
+                                            {{ $emp->name }} ({{ $emp->position_line }})
                                         </option>
                                         @endforeach
                                     </select>

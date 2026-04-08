@@ -104,6 +104,8 @@ class VoteSubmissionService
             'voting_closed' => new EmployeeOfMonthVoteException($reason, 'تم إغلاق التصويت لهذا الشهر.'),
             'ineligible_candidate' => new EmployeeOfMonthVoteException($reason, 'الموظف المختار غير مؤهل للتصويت.'),
             'self_vote_forbidden' => new EmployeeOfMonthVoteException($reason, 'لا يمكن التصويت لنفسك.'),
+            'voter_without_department' => new EmployeeOfMonthVoteException($reason, 'لا يمكنك التصويت قبل ربطك بقسم.'),
+            'candidate_outside_department' => new EmployeeOfMonthVoteException($reason, 'يمكنك التصويت لموظفي قسمك فقط.'),
             default => new EmployeeOfMonthVoteException($reason, 'تعذر إتمام التصويت.'),
         };
     }

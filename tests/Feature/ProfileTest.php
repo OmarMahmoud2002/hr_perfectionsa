@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EmployeeOfMonthPublication;
 use App\Models\EmployeeOfMonthResult;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -95,6 +96,12 @@ class ProfileTest extends TestCase
             'formula_version' => 'v3_weighted_points',
             'generated_at' => now(),
         ]);
+        EmployeeOfMonthPublication::create([
+            'month' => 1,
+            'year' => 2026,
+            'published_at' => now(),
+            'published_by_user_id' => $user->id,
+        ]);
         EmployeeOfMonthResult::create([
             'employee_id' => $otherEmployee->id,
             'month' => 1,
@@ -119,6 +126,12 @@ class ProfileTest extends TestCase
             'formula_version' => 'v3_weighted_points',
             'generated_at' => now(),
         ]);
+        EmployeeOfMonthPublication::create([
+            'month' => 2,
+            'year' => 2026,
+            'published_at' => now(),
+            'published_by_user_id' => $user->id,
+        ]);
         EmployeeOfMonthResult::create([
             'employee_id' => $otherEmployee->id,
             'month' => 2,
@@ -142,6 +155,12 @@ class ProfileTest extends TestCase
             ],
             'formula_version' => 'v3_weighted_points',
             'generated_at' => now(),
+        ]);
+        EmployeeOfMonthPublication::create([
+            'month' => 3,
+            'year' => 2026,
+            'published_at' => now(),
+            'published_by_user_id' => $user->id,
         ]);
         EmployeeOfMonthResult::create([
             'employee_id' => $employee->id,

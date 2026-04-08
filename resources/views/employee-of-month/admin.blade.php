@@ -52,6 +52,16 @@
                     </form>
 
                     <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+                        @if($isPublished)
+                            <span class="inline-flex items-center rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-2 border border-emerald-200">
+                                تم نشر النتائج
+                            </span>
+                        @else
+                            <span class="inline-flex items-center rounded-xl bg-amber-100 text-amber-700 text-xs font-bold px-3 py-2 border border-amber-200">
+                                لم يتم نشر النتائج بعد
+                            </span>
+                        @endif
+
                         <a href="{{ route('employee-of-month.admin.export', ['month' => $month, 'year' => $year]) }}" class="btn-outline btn-sm bg-white/95 !h-9 !text-xs">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 8l-3-3m3 3l3-3M5 20h14"/>
@@ -63,7 +73,9 @@
                             @csrf
                             <input type="hidden" name="month" value="{{ $month }}">
                             <input type="hidden" name="year" value="{{ $year }}">
-                            <button type="submit" class="btn-primary btn-sm !h-9 !text-xs">اعتماد النتائج</button>
+                            <button type="submit" class="btn-primary btn-sm !h-9 !text-xs">
+                                {{ $isPublished ? 'إعادة نشر النتائج' : 'اعتماد ونشر النتائج' }}
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -86,10 +98,51 @@
         </div>
     </div>
 
+    <div class="card overflow-hidden animate-slide-up" style="animation-delay:130ms; animation-fill-mode:both;">
+        <div class="card-header flex items-center gap-2">
+            <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.314 0-6 2.239-6 5s2.686 5 6 5 6-2.239 6-5-2.686-5-6-5zm0-5l2 3h-4l2-3z"/>
+            </svg>
+            <h3>مدير الشهر</h3>
+        </div>
+        <div class="p-5">
+            @if($bestManager)
+                @php
+                    $manager = $bestManager['manager'];
+                    $managerAvatar = $manager?->user?->profile?->avatar_path
+                        ? route('media.avatar', ['path' => $manager->user->profile->avatar_path])
+                        : null;
+                @endphp
+                <div class="rounded-2xl border border-cyan-200 bg-gradient-to-l from-cyan-50 via-sky-50 to-white p-4 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white text-xl font-black"
+                         style="background: linear-gradient(135deg, #31719d, #4d9b97);">
+                        @if($managerAvatar)
+                            <img src="{{ $managerAvatar }}" alt="{{ $manager?->name }}" class="w-full h-full object-cover">
+                        @else
+                            {{ mb_substr((string) ($manager?->name ?? '—'), 0, 1) }}
+                        @endif
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-cyan-700 font-semibold mb-1">الفائز بلقب مدير الشهر</p>
+                        <p class="font-black text-slate-800 text-lg truncate">{{ $manager?->name }}</p>
+                        <p class="text-sm text-slate-600">قسم {{ $bestManager['department']->name }}</p>
+                        <p class="text-xs text-slate-500 mt-1">{{ $bestManager['winners_count'] }} من أفضل {{ \App\Services\EmployeeOfMonth\EmployeeOfMonthScoringService::WINNERS_COUNT }} من نفس القسم</p>
+                    </div>
+                    <div class="text-left">
+                        <p class="text-xs text-slate-500">متوسط النقاط</p>
+                        <p class="text-lg font-black text-cyan-700">{{ number_format((float) $bestManager['avg_final_score'], 2) }}</p>
+                    </div>
+                </div>
+            @else
+                <div class="text-center text-slate-500 py-6">لا يوجد مدير مستوفي شرط 3 من 4 لهذا الشهر.</div>
+            @endif
+        </div>
+    </div>
+
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:140ms; animation-fill-mode:both;">
         <div class="card-header flex items-center gap-2">
             <svg class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            <h3>المراكز الثلاثة الأولى</h3>
+            <h3>المراكز الأربعة الأولى</h3>
         </div>
         <div class="p-5 flex flex-col gap-3" dir="rtl">
             @php
@@ -118,6 +171,14 @@
                         'label'    => 'المركز الثالث',
                         'text'     => 'text-amber-800',
                     ],
+                    3 => [
+                        'border'   => 'border-cyan-400/70',
+                        'ring'     => 'ring-2 ring-cyan-100',
+                        'gradient' => 'from-cyan-50 via-sky-50 to-white',
+                        'medal'    => asset('images/medal-third.png'),
+                        'label'    => 'المركز الرابع',
+                        'text'     => 'text-cyan-800',
+                    ],
                 ];
             @endphp
             @forelse($topThreeRanking as $idx => $row)
@@ -131,7 +192,7 @@
 
                 {{-- Horizontal card: medal | info | avatar --}}
                 <div class="rounded-2xl border {{ $cfg['border'] }} {{ $cfg['ring'] }} bg-gradient-to-l {{ $cfg['gradient'] }} px-4 py-3 flex items-center gap-4 shadow-sm"
-                     style="animation: slideUp .4s ease {{ $idx * 80 }}ms both;">
+                     style="animation: slideUp .4s ease 120ms both;">
 
                     {{-- Medal on the left, bigger --}}
                     <img src="{{ $cfg['medal'] }}" alt="medal"
@@ -142,7 +203,7 @@
                         <p class="text-xs font-bold text-slate-900 mb-0.5">{{ $cfg['label'] }}</p>
                         <p class="font-bold text-slate-800 truncate">{{ $emp->name }}</p>
                         <p class="text-xs {{ $cfg['text'] }} font-semibold">
-                            {{ $emp->job_title?->label() ?? 'موظف' }}
+                            {{ $emp->position_line ?? 'موظف' }}
                         </p>
                         <p class="text-sm font-black {{ $cfg['text'] }} mt-0.5">
                             {{ number_format($row['final_score'], 1) }}
@@ -161,7 +222,7 @@
                     </div>
                 </div>
             @empty
-                <div class="text-center text-slate-500 py-8">لا يوجد موظف تخطي 85 نقطه حتي الان</div>
+                <div class="text-center text-slate-500 py-8">لا يوجد موظف تخطى 90 نقطة حتى الآن</div>
             @endforelse
         </div>
     </div>
@@ -212,7 +273,7 @@
                                     </div>
                                     <div>
                                         <p class="font-semibold text-slate-800 text-sm">{{ $emp->name }}</p>
-                                        <p class="text-xs text-slate-400">{{ $emp->ac_no }}</p>
+                                        <p class="text-xs text-slate-500">{{ $emp->position_line }}</p>
                                     </div>
                                 </div>
                             </td>
@@ -258,7 +319,7 @@
                                 <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                                 <td>
                                     <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
-                                    <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
+                                    <p class="text-xs text-slate-500">{{ $row['employee']->position_line }}</p>
                                 </td>
                                 <td class="text-center"><span class="badge-blue">{{ $formatMinutes((int) $row['work_minutes']) }}</span></td>
                                 <td class="text-center text-xs font-semibold text-slate-700">{{ number_format($workHoursPoints, 2) }} / {{ (int) $pointCaps['work_hours'] }}</td>
@@ -300,7 +361,7 @@
                                 <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                                 <td>
                                     <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
-                                    <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
+                                    <p class="text-xs text-slate-500">{{ $row['employee']->position_line }}</p>
                                 </td>
                                 <td class="text-center"><span class="badge-success">{{ (int) $row['late_minutes'] }} دقيقة</span></td>
                                 <td class="text-center text-xs font-semibold text-slate-700">{{ number_format($punctualityPoints, 2) }} / {{ (int) $pointCaps['punctuality'] }}</td>
@@ -384,7 +445,7 @@
                         <td class="font-semibold text-slate-500">{{ $idx + 1 }}</td>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
-                            <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
+                            <p class="text-xs text-slate-500">{{ $row['employee']->position_line }}</p>
                         </td>
                         <td class="text-center text-xs">{{ $assigned }}</td>
                         <td class="text-center text-xs">{{ $evaluated }}</td>
@@ -452,7 +513,7 @@
                                 </div>
                                 <div>
                                     <p class="font-semibold text-slate-800 text-sm">{{ $emp->name }}</p>
-                                    <p class="text-xs text-slate-400">{{ $emp->ac_no }}</p>
+                                    <p class="text-xs text-slate-500">{{ $emp->position_line }}</p>
                                 </div>
                             </div>
                         </td>
@@ -508,7 +569,7 @@
                     <tr x-show="{{ $idx < 5 ? 'true' : 'showAllExplainRows' }}" x-transition.opacity.duration.200ms>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $row['employee']->name }}</p>
-                            <p class="text-xs text-slate-400">{{ $row['employee']->ac_no }}</p>
+                            <p class="text-xs text-slate-500">{{ $row['employee']->position_line }}</p>
                         </td>
                         <td class="text-center"><span class="badge-success">{{ number_format($row['final_score'], 2) }}</span></td>
                         <td class="text-center text-xs">{{ number_format($row['task_score'], 1) }}</td>
@@ -556,7 +617,7 @@
                         <td>{{ $idx + 1 }}</td>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $row->employee?->name }}</p>
-                            <p class="text-xs text-slate-400">{{ $row->employee?->ac_no }}</p>
+                            <p class="text-xs text-slate-500">{{ $row->employee?->position_line }}</p>
                         </td>
                         <td class="text-center"><span class="badge-success">{{ number_format((float) $row->final_score, 2) }}</span></td>
                         <!-- <td class="text-center text-xs">{{ $row->formula_version }}</td> -->
@@ -586,7 +647,7 @@
                         <td class="text-sm text-slate-600">{{ \Carbon\Carbon::create($winner->year, $winner->month, 1)->locale('ar')->isoFormat('MMMM YYYY') }}</td>
                         <td>
                             <p class="font-semibold text-slate-800 text-sm">{{ $winner->employee?->name }}</p>
-                            <p class="text-xs text-slate-400">{{ $winner->employee?->ac_no }}</p>
+                            <p class="text-xs text-slate-500">{{ $winner->employee?->position_line }}</p>
                         </td>
                         <td class="text-center"><span class="badge-success">{{ number_format((float) $winner->final_score, 2) }}</span></td>
                         <!-- <td class="text-center text-xs">{{ $winner->formula_version }}</td> -->

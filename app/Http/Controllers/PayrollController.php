@@ -25,6 +25,7 @@ class PayrollController extends Controller
     {
         // الشهور التي يوجد لها كشوف مرتبات
         $payrollMonths = PayrollReport::selectRaw('month, year, COUNT(*) as employee_count, SUM(net_salary + extra_bonus - extra_deduction) as total_net')
+            ->where('is_excluded', false)
             ->groupBy('month', 'year')
             ->orderByDesc('year')
             ->orderByDesc('month')
@@ -129,7 +130,7 @@ class PayrollController extends Controller
      */
     public function report(int $month, int $year, Request $request): View
     {
-        $reports = $this->payrollService->getMonthlyPayroll($month, $year);
+        $reports = $this->payrollService->getMonthlyPayroll($month, $year, false);
 
         // تصفية لموظف واحد إذا طُلب ذلك
         $singleEmployee = null;
@@ -218,7 +219,7 @@ class PayrollController extends Controller
      */
     public function export(int $month, int $year)
     {
-        $reports = $this->payrollService->getMonthlyPayroll($month, $year);
+        $reports = $this->payrollService->getMonthlyPayroll($month, $year, false);
 
         if ($reports->isEmpty()) {
             return back()->with('error', 'لا توجد بيانات لتصديرها.');
@@ -253,5 +254,18 @@ class PayrollController extends Controller
         $monthLabel = \Carbon\Carbon::create($year, $month, 1)->locale('ar')->isoFormat('MMMM YYYY');
 
         return back()->with('success', "تم حذف كشف رواتب شهر {$monthLabel} بنجاح.");
+    }
+
+    public function toggleExclusion(PayrollReport $report): RedirectResponse
+    {
+        $report->update([
+            'is_excluded' => ! (bool) $report->is_excluded,
+        ]);
+
+        if ((bool) $report->is_excluded) {
+            return back()->with('success', 'تم استبعاد الموظف من كشف الرواتب الحالي.');
+        }
+
+        return back()->with('success', 'تم إرجاع الموظف إلى كشف الرواتب الحالي.');
     }
 }

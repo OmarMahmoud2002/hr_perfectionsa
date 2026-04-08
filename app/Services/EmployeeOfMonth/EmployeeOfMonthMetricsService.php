@@ -6,6 +6,7 @@ use App\Models\AttendanceRecord;
 use App\Models\Employee;
 use App\Models\EmployeeMonthAdminScore;
 use App\Models\EmployeeMonthVote;
+use App\Models\User;
 use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,8 @@ class EmployeeOfMonthMetricsService
     {
         return Employee::query()
             ->where('is_active', true)
-            ->whereHas('user', fn ($q) => $q->where('role', 'employee'))
+            ->where('is_department_manager', false)
+            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()))
             ->with('user')
             ->orderBy('name')
             ->get();
@@ -44,14 +46,14 @@ class EmployeeOfMonthMetricsService
             ->join('users as u', 'u.id', '=', 'v.voter_user_id')
             ->where('v.vote_month', $month)
             ->where('v.vote_year', $year)
-            ->where('u.role', 'employee')
+            ->whereIn('u.role', User::employeeOfMonthVoterRoles())
             ->count();
 
         $votersCount = (int) DB::table('employee_month_votes as v')
             ->join('users as u', 'u.id', '=', 'v.voter_user_id')
             ->where('v.vote_month', $month)
             ->where('v.vote_year', $year)
-            ->where('u.role', 'employee')
+            ->whereIn('u.role', User::employeeOfMonthVoterRoles())
             ->distinct('v.voter_user_id')
             ->count('v.voter_user_id');
 

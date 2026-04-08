@@ -17,11 +17,12 @@ class DailyPerformanceFeatureTest extends TestCase
     public function test_employee_can_create_daily_performance_entry_with_attachments(): void
     {
         Storage::fake('public');
+        $today = now()->toDateString();
 
         [$employeeUser, $employee] = $this->createEmployeeUser('Emp Daily 1', 'AC-DP-1');
 
         $response = $this->actingAs($employeeUser)->post(route('daily-performance.employee.upsert'), [
-            'work_date' => '2026-03-29',
+            'work_date' => $today,
             'project_name' => 'Attendance Reports',
             'work_description' => 'Implemented daily performance report widgets.',
             'attachments' => [
@@ -34,13 +35,13 @@ class DailyPerformanceFeatureTest extends TestCase
 
         $this->assertDatabaseHas('daily_performance_entries', [
             'employee_id' => $employee->id,
-            'work_date' => '2026-03-29',
+            'work_date' => $today,
             'project_name' => 'Attendance Reports',
         ]);
 
         $entry = DailyPerformanceEntry::query()
             ->where('employee_id', $employee->id)
-            ->whereDate('work_date', '2026-03-29')
+            ->whereDate('work_date', $today)
             ->firstOrFail();
 
         $this->assertDatabaseCount('daily_performance_attachments', 2);
@@ -52,16 +53,17 @@ class DailyPerformanceFeatureTest extends TestCase
 
     public function test_employee_upsert_updates_same_day_entry_instead_of_creating_duplicate(): void
     {
+        $today = now()->toDateString();
         [$employeeUser, $employee] = $this->createEmployeeUser('Emp Daily 2', 'AC-DP-2');
 
         $this->actingAs($employeeUser)->post(route('daily-performance.employee.upsert'), [
-            'work_date' => '2026-03-29',
+            'work_date' => $today,
             'project_name' => 'Project Alpha',
             'work_description' => 'Initial update.',
         ])->assertRedirect();
 
         $this->actingAs($employeeUser)->post(route('daily-performance.employee.upsert'), [
-            'work_date' => '2026-03-29',
+            'work_date' => $today,
             'project_name' => 'Project Alpha Updated',
             'work_description' => 'Updated work summary.',
         ])->assertRedirect();
@@ -69,7 +71,7 @@ class DailyPerformanceFeatureTest extends TestCase
         $this->assertDatabaseCount('daily_performance_entries', 1);
         $this->assertDatabaseHas('daily_performance_entries', [
             'employee_id' => $employee->id,
-            'work_date' => '2026-03-29',
+            'work_date' => $today,
             'project_name' => 'Project Alpha Updated',
             'work_description' => 'Updated work summary.',
         ]);

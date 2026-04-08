@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ImportStatus;
+use App\Enums\TaskAssignmentStatus;
+use App\Models\DailyPerformanceReview;
+use App\Models\EmployeeMonthTaskAssignment;
 use App\Models\ImportBatch;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
+use App\Services\Department\DepartmentScopeService;
 use App\Services\Dashboard\DashboardStatisticsService;
 use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
@@ -18,13 +22,14 @@ class DashboardController extends Controller
         private readonly DashboardStatisticsService $statsService,
         private readonly AbsenceDetectionService $absenceService,
         private readonly PublicHolidayService $holidayService,
+        private readonly DepartmentScopeService $departmentScopeService,
     ) {}
 
     public function index(Request $request)
     {
         $user = $request->user()->loadMissing('employee');
 
-        if ($user->isEmployee()) {
+        if ($user->isWorkforceMember()) {
             $monthData = PayrollPeriod::monthForDate(now());
             $defaultMonth = (int) $monthData['month'];
             $defaultYear = (int) $monthData['year'];
@@ -86,9 +91,48 @@ class DashboardController extends Controller
             ]);
         }
 
-        $stats = $this->statsService->getStats();
+        $stats = $this->statsService->getStats($user);
 
         $monthly = $stats['current_month_stats'];
+        $departmentManagerSummary = null;
+
+        if ($user->isDepartmentManager()) {
+            $departmentId = $user->employee?->department_id;
+            $employeeIds = $this->departmentScopeService->visibleEmployeeIdsQuery($user)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $period = PayrollPeriod::monthForDate(now());
+            $month = (int) $period['month'];
+            $year = (int) $period['year'];
+
+            $taskAssignments = EmployeeMonthTaskAssignment::query()
+                ->whereIn('employee_id', $employeeIds)
+                ->whereHas('task', fn ($q) => $q->where('period_month', $month)->where('period_year', $year));
+
+            $totalTasks = (clone $taskAssignments)->count();
+            $doneTasks = (clone $taskAssignments)->where('status', TaskAssignmentStatus::Done->value)->count();
+            $inProgressTasks = (clone $taskAssignments)->where('status', TaskAssignmentStatus::InProgress->value)->count();
+
+            $avgDailyRating = (float) DailyPerformanceReview::query()
+                ->whereHas('entry', fn ($q) => $q
+                    ->whereIn('employee_id', $employeeIds)
+                    ->whereYear('work_date', $year)
+                    ->whereMonth('work_date', $month)
+                )
+                ->avg('rating');
+
+            $departmentManagerSummary = [
+                'department_id' => $departmentId,
+                'team_size' => count($employeeIds),
+                'total_tasks' => $totalTasks,
+                'done_tasks' => $doneTasks,
+                'in_progress_tasks' => $inProgressTasks,
+                'avg_daily_rating' => round($avgDailyRating, 2),
+            ];
+        }
+
         $currentPayrollMonth = PayrollPeriod::monthForDate(now());
         $dashboardMonthLabel = Carbon::create(
             $currentPayrollMonth['year'],
@@ -115,6 +159,7 @@ class DashboardController extends Controller
             'onsiteDays'        => $monthly['onsite_days'],
             'hasCurrentData'    => $monthly['has_data'],
             'dashboardMonthLabel' => $dashboardMonthLabel,
+            'departmentManagerSummary' => $departmentManagerSummary,
         ]);
     }
 }

@@ -2,8 +2,11 @@
 
 namespace App\Services\Employee;
 
+use App\Enums\JobTitle as LegacyJobTitle;
 use App\Models\Employee;
+use App\Models\JobTitle;
 use App\Models\User;
+use App\Services\Department\DepartmentScopeService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -11,14 +14,19 @@ class EmployeeService
 {
     public function __construct(
         private readonly EmployeeAccountService $accountService,
+        private readonly DepartmentScopeService $departmentScopeService,
     ) {}
 
     /**
      * جلب قائمة الموظفين مع بحث وفلترة وتقسيم صفحات
      */
-    public function getEmployees(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function getEmployees(array $filters = [], int $perPage = 15, ?User $actor = null, bool $applyVisibilityScope = true): LengthAwarePaginator
     {
-        $query = Employee::query()->with('user.profile');
+        $query = Employee::query()->with(['user.profile', 'department:id,name', 'jobTitleRef:id,name_ar', 'leaveProfile:employee_id,employment_start_date']);
+
+        if ($actor !== null && $applyVisibilityScope) {
+            $this->departmentScopeService->applyEmployeeScope($query, $actor);
+        }
 
         // البحث بالاسم أو الرقم
         if (!empty($filters['search'])) {
@@ -46,10 +54,16 @@ class EmployeeService
      */
     public function create(array $data): Employee
     {
+        $jobTitle = $this->resolveJobTitleFromPayload($data);
+
+        $legacyJobTitle = $this->resolveLegacyJobTitleKey($jobTitle);
+
         $employee = Employee::create([
             'ac_no'               => $data['ac_no'],
             'name'                => $data['name'],
-            'job_title'           => $data['job_title'] ?? null,
+            'job_title'           => $legacyJobTitle,
+            'job_title_id'        => $jobTitle?->id,
+            'department_id'       => $data['department_id'] ?? null,
             'basic_salary'        => $data['basic_salary'] ?? 0,
             'is_active'           => true,
             'is_remote_worker'    => (bool) ($data['is_remote_worker'] ?? false),
@@ -69,10 +83,16 @@ class EmployeeService
      */
     public function update(Employee $employee, array $data): Employee
     {
+        $jobTitle = $this->resolveJobTitleFromPayload($data);
+
+        $legacyJobTitle = $this->resolveLegacyJobTitleKey($jobTitle);
+
         $employee->update([
             'ac_no'               => $data['ac_no'],
             'name'                => $data['name'],
-            'job_title'           => $data['job_title'] ?? null,
+            'job_title'           => $legacyJobTitle,
+            'job_title_id'        => $jobTitle?->id,
+            'department_id'       => $data['department_id'] ?? null,
             'basic_salary'        => $data['basic_salary'] ?? 0,
             'is_remote_worker'    => (bool) ($data['is_remote_worker'] ?? false),
             'work_start_time'     => $data['work_start_time'] ?? null,
@@ -148,5 +168,27 @@ class EmployeeService
     public function getForSelect(): Collection
     {
         return Employee::active()->orderBy('name')->get(['id', 'ac_no', 'name']);
+    }
+
+    private function resolveLegacyJobTitleKey(?JobTitle $jobTitle): ?string
+    {
+        if (! $jobTitle || ! is_string($jobTitle->key) || $jobTitle->key === '') {
+            return null;
+        }
+
+        return LegacyJobTitle::tryFrom($jobTitle->key)?->value;
+    }
+
+    private function resolveJobTitleFromPayload(array $data): ?JobTitle
+    {
+        if (! empty($data['job_title_id'])) {
+            return JobTitle::query()->find((int) $data['job_title_id']);
+        }
+
+        if (! empty($data['job_title'])) {
+            return JobTitle::query()->where('key', (string) $data['job_title'])->first();
+        }
+
+        return null;
     }
 }

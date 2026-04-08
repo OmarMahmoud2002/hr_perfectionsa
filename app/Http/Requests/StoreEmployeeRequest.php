@@ -2,10 +2,8 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\JobTitle;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 
 class StoreEmployeeRequest extends FormRequest
 {
@@ -19,7 +17,9 @@ class StoreEmployeeRequest extends FormRequest
         return [
             'ac_no'               => ['required', 'string', 'max:50', 'unique:employees,ac_no'],
             'name'                => ['required', 'string', 'max:255'],
-            'job_title'           => ['required', new Enum(JobTitle::class)],
+            'job_title_id'        => ['nullable', 'integer', 'exists:job_titles,id', 'required_without:job_title'],
+            'job_title'           => ['nullable', 'string', 'max:50', 'exists:job_titles,key', 'required_without:job_title_id'],
+            'department_id'       => ['nullable', 'integer', 'exists:departments,id'],
             'basic_salary'        => ['required', 'numeric', 'min:0', 'max:999999.99'],
             'is_remote_worker'    => ['required', 'boolean'],
             'work_start_time'     => ['nullable', 'regex:/^\d{2}:\d{2}$/'],
@@ -50,7 +50,11 @@ class StoreEmployeeRequest extends FormRequest
             'ac_no.max'                  => 'رقم الموظف لا يتجاوز 50 حرفاً.',
             'name.required'              => 'اسم الموظف مطلوب.',
             'name.max'                   => 'اسم الموظف لا يتجاوز 255 حرفاً.',
+            'job_title_id.required'      => 'الوظيفة مطلوبة.',
+            'job_title_id.exists'        => 'الوظيفة المختارة غير صالحة.',
             'job_title.required'         => 'الوظيفة مطلوبة.',
+            'job_title.exists'           => 'الوظيفة المختارة غير صالحة.',
+            'department_id.exists'       => 'القسم المختار غير صالح.',
             'basic_salary.required'      => 'المرتب الأساسي مطلوب.',
             'basic_salary.numeric'       => 'المرتب الأساسي يجب أن يكون رقماً.',
             'basic_salary.min'           => 'المرتب الأساسي لا يمكن أن يكون سالباً.',
@@ -75,7 +79,9 @@ class StoreEmployeeRequest extends FormRequest
         return [
             'ac_no'               => 'رقم الموظف',
             'name'                => 'اسم الموظف',
+            'job_title_id'        => 'الوظيفة',
             'job_title'           => 'الوظيفة',
+            'department_id'       => 'القسم',
             'basic_salary'        => 'المرتب الأساسي',
             'is_remote_worker'    => 'نمط الدوام ريموت',
             'work_start_time'     => 'وقت الحضور',

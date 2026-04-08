@@ -2,7 +2,7 @@
 
 @section('title', 'تفاصيل: ' . $employee->name)
 @section('page-title', $employee->name)
-@section('page-subtitle', 'AC-No: ' . $employee->ac_no)
+@section('page-subtitle', $employee->position_line)
 
 @section('content')
 
@@ -39,11 +39,9 @@
                     @endif
                 </div>
                 <h2 class="font-bold text-xl text-slate-800">{{ $employee->name }}</h2>
-                <p class="text-sm text-slate-500 mt-0.5">
-                    <span class="font-mono bg-slate-100 px-2 py-0.5 rounded text-xs">{{ $employee->ac_no }}</span>
-                </p>
+                <p class="text-sm text-slate-500 mt-0.5">{{ $employee->position_line }}</p>
                 <div class="mt-2">
-                    <span class="badge-gray">{{ $employee->job_title?->label() ?? 'غير محدد' }}</span>
+                    <span class="badge-gray">{{ $employee->position_line }}</span>
                     @if($employee->is_active && !$employee->trashed())
                         <span class="badge-success">نشط</span>
                     @else

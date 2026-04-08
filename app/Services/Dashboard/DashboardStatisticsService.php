@@ -6,6 +6,8 @@ use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\AttendanceRecord;
 use App\Models\PayrollReport;
+use App\Models\User;
+use App\Services\Department\DepartmentScopeService;
 use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -13,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardStatisticsService
 {
+    public function __construct(
+        private readonly DepartmentScopeService $departmentScopeService,
+    ) {}
+
     /**
      * مدة الـ Cache بالثواني (5 دقائق)
      */
@@ -21,18 +27,22 @@ class DashboardStatisticsService
     /**
      * جلب جميع إحصائيات لوحة التحكم
      */
-    public function getStats(): array
+    public function getStats(?User $actor = null): array
     {
-        return Cache::remember('dashboard_stats', self::CACHE_TTL, function () {
+        $cacheKey = $actor
+            ? "dashboard_stats_user_{$actor->id}_{$actor->role}"
+            : 'dashboard_stats';
+
+        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($actor) {
             return [
-                'total_employees'    => $this->getTotalEmployees(),
-                'active_employees'   => $this->getActiveEmployees(),
+                'total_employees'    => $this->getTotalEmployees($actor),
+                'active_employees'   => $this->getActiveEmployees($actor),
                 'last_batch'         => $this->getLastBatch(),
-                'current_month_stats'=> $this->getCurrentMonthStats(),
+                'current_month_stats'=> $this->getCurrentMonthStats($actor),
                 'recent_batches'     => $this->getRecentBatches(),
-                'top_late_employees' => $this->getTopLateEmployees(),
-                'top_ot_employees'   => $this->getTopOTEmployees(),
-                'top_work_employees' => $this->getTopWorkEmployees(),
+                'top_late_employees' => $this->getTopLateEmployees(actor: $actor),
+                'top_ot_employees'   => $this->getTopOTEmployees(actor: $actor),
+                'top_work_employees' => $this->getTopWorkEmployees(actor: $actor),
             ];
         });
     }
@@ -49,14 +59,26 @@ class DashboardStatisticsService
     // Private Methods
     // ========================
 
-    private function getTotalEmployees(): int
+    private function getTotalEmployees(?User $actor = null): int
     {
-        return Employee::count();
+        $query = Employee::query();
+
+        if ($actor !== null) {
+            $this->departmentScopeService->applyEmployeeScope($query, $actor);
+        }
+
+        return $query->count();
     }
 
-    private function getActiveEmployees(): int
+    private function getActiveEmployees(?User $actor = null): int
     {
-        return Employee::active()->count();
+        $query = Employee::active();
+
+        if ($actor !== null) {
+            $this->departmentScopeService->applyEmployeeScope($query, $actor);
+        }
+
+        return $query->count();
     }
 
     private function getLastBatch(): ?ImportBatch
@@ -66,7 +88,7 @@ class DashboardStatisticsService
             ->first();
     }
 
-    private function getCurrentMonthStats(): array
+    private function getCurrentMonthStats(?User $actor = null): array
     {
         $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
         $currentMonth = $currentPayrollMonth['month'];
@@ -100,6 +122,29 @@ class DashboardStatisticsService
             $periodStart->toDateString(),
             $periodEnd->toDateString(),
         ]);
+
+        if ($actor !== null) {
+            $employeeIds = $this->scopedEmployeeIds($actor);
+
+            if (empty($employeeIds)) {
+                return [
+                    'has_data'          => false,
+                    'attendance_rate'   => null,
+                    'total_late_hours'  => 0,
+                    'total_ot_hours'    => 0,
+                    'total_work_hours'  => 0,
+                    'avg_work_hours_per_day' => 0,
+                    'total_absent_days' => 0,
+                    'remote_days'       => 0,
+                    'onsite_days'       => 0,
+                    'present_days'      => 0,
+                    'total_records'     => 0,
+                    'batch'             => $batch,
+                ];
+            }
+
+            $records->whereIn('employee_id', $employeeIds);
+        }
 
         // استبعاد أيام الجمعة (DAYOFWEEK = 6 في MySQL) من حساب نسبة الحضور
         // نحسب فقط من أيام العمل (5 أيام في الأسبوع)
@@ -152,12 +197,12 @@ class DashboardStatisticsService
     /**
      * أكثر 5 موظفين تأخيراً في الشهر الحالي
      */
-    private function getTopLateEmployees(int $limit = 5): \Illuminate\Support\Collection
+    private function getTopLateEmployees(int $limit = 5, ?User $actor = null): \Illuminate\Support\Collection
     {
         $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
         [$periodStart, $periodEnd] = PayrollPeriod::resolve($currentPayrollMonth['month'], $currentPayrollMonth['year']);
 
-        return AttendanceRecord::whereBetween('date', [
+        $query = AttendanceRecord::whereBetween('date', [
                 $periodStart->toDateString(),
                 $periodEnd->toDateString(),
             ])
@@ -165,8 +210,18 @@ class DashboardStatisticsService
             ->select('employee_id', DB::raw('SUM(late_minutes) as total_late'))
             ->groupBy('employee_id')
             ->orderByDesc('total_late')
-            ->limit($limit)
-            ->with('employee.user.profile')
+            ->limit($limit);
+
+        if ($actor !== null) {
+            $employeeIds = $this->scopedEmployeeIds($actor);
+            if (empty($employeeIds)) {
+                return collect();
+            }
+
+            $query->whereIn('employee_id', $employeeIds);
+        }
+
+        return $query->with('employee.user.profile')
             ->get()
             ->map(function ($item) {
                 return [
@@ -180,12 +235,12 @@ class DashboardStatisticsService
     /**
      * أكثر 5 موظفين أوفرتايم في الشهر الحالي
      */
-    private function getTopOTEmployees(int $limit = 5): \Illuminate\Support\Collection
+    private function getTopOTEmployees(int $limit = 5, ?User $actor = null): \Illuminate\Support\Collection
     {
         $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
         [$periodStart, $periodEnd] = PayrollPeriod::resolve($currentPayrollMonth['month'], $currentPayrollMonth['year']);
 
-        return AttendanceRecord::whereBetween('date', [
+        $query = AttendanceRecord::whereBetween('date', [
                 $periodStart->toDateString(),
                 $periodEnd->toDateString(),
             ])
@@ -193,8 +248,18 @@ class DashboardStatisticsService
             ->select('employee_id', DB::raw('SUM(overtime_minutes) as total_ot'))
             ->groupBy('employee_id')
             ->orderByDesc('total_ot')
-            ->limit($limit)
-            ->with('employee.user.profile')
+            ->limit($limit);
+
+        if ($actor !== null) {
+            $employeeIds = $this->scopedEmployeeIds($actor);
+            if (empty($employeeIds)) {
+                return collect();
+            }
+
+            $query->whereIn('employee_id', $employeeIds);
+        }
+
+        return $query->with('employee.user.profile')
             ->get()
             ->map(function ($item) {
                 return [
@@ -208,12 +273,12 @@ class DashboardStatisticsService
     /**
      * أكثر الموظفين في ساعات العمل خلال الشهر الحالي
      */
-    private function getTopWorkEmployees(int $limit = 5): \Illuminate\Support\Collection
+    private function getTopWorkEmployees(int $limit = 5, ?User $actor = null): \Illuminate\Support\Collection
     {
         $currentPayrollMonth = PayrollPeriod::monthForDate(Carbon::now());
         [$periodStart, $periodEnd] = PayrollPeriod::resolve($currentPayrollMonth['month'], $currentPayrollMonth['year']);
 
-        return AttendanceRecord::whereBetween('date', [
+        $query = AttendanceRecord::whereBetween('date', [
                 $periodStart->toDateString(),
                 $periodEnd->toDateString(),
             ])
@@ -222,8 +287,18 @@ class DashboardStatisticsService
             ->select('employee_id', DB::raw('SUM(work_minutes) as total_work'))
             ->groupBy('employee_id')
             ->orderByDesc('total_work')
-            ->limit($limit)
-            ->with('employee.user.profile')
+            ->limit($limit);
+
+        if ($actor !== null) {
+            $employeeIds = $this->scopedEmployeeIds($actor);
+            if (empty($employeeIds)) {
+                return collect();
+            }
+
+            $query->whereIn('employee_id', $employeeIds);
+        }
+
+        return $query->with('employee.user.profile')
             ->get()
             ->map(function ($item) {
                 return [
@@ -232,5 +307,14 @@ class DashboardStatisticsService
                     'work_minutes'  => (int) $item->total_work,
                 ];
             });
+    }
+
+    private function scopedEmployeeIds(User $actor): array
+    {
+        return $this->departmentScopeService
+            ->visibleEmployeeIdsQuery($actor)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 }

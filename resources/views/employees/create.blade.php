@@ -75,23 +75,43 @@
                 @enderror
             </div>
 
-            {{-- الوظيفة --}}
+            {{-- الوظيفة والقسم --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="form-group">
-                <label for="job_title" class="form-label">
+                <label for="job_title_id" class="form-label">
                     الوظيفة
                     <span class="text-red-500">*</span>
                 </label>
-                <select id="job_title" name="job_title" class="form-input @error('job_title') border-red-400 focus:ring-red-300 @enderror">
+                <select id="job_title_id" name="job_title_id" class="form-input @error('job_title_id') border-red-400 focus:ring-red-300 @enderror">
                     <option value="">اختر الوظيفة</option>
-                    @foreach(\App\Enums\JobTitle::cases() as $job)
-                        <option value="{{ $job->value }}" {{ old('job_title') === $job->value ? 'selected' : '' }}>
-                            {{ $job->label() }}
+                    @foreach(($jobTitles ?? collect()) as $job)
+                        <option value="{{ $job->id }}" {{ (string) old('job_title_id') === (string) $job->id ? 'selected' : '' }}>
+                            {{ $job->name_ar }}
                         </option>
                     @endforeach
                 </select>
-                @error('job_title')
+                <div class="mt-1.5 text-xs text-slate-500">
+                    لإضافة وظيفة جديدة: <a href="{{ route('job-titles.index') }}" class="font-semibold text-[#31719d] hover:underline">إدارة الوظائف</a>
+                </div>
+                @error('job_title_id')
                     <p class="form-error">{{ $message }}</p>
                 @enderror
+            </div>
+
+            <div class="form-group">
+                <label for="department_id" class="form-label">القسم</label>
+                <select id="department_id" name="department_id" class="form-input @error('department_id') border-red-400 focus:ring-red-300 @enderror">
+                    <option value="">بدون قسم</option>
+                    @foreach(($departments ?? collect()) as $department)
+                        <option value="{{ $department->id }}" {{ (string) old('department_id') === (string) $department->id ? 'selected' : '' }}>
+                            {{ $department->name }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('department_id')
+                    <p class="form-error">{{ $message }}</p>
+                @enderror
+            </div>
             </div>
 
             {{-- Divider --}}

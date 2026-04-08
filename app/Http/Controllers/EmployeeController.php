@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ImportStatus;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\ImportBatch;
+use App\Models\JobTitle;
 use App\Models\Location;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
@@ -30,9 +32,18 @@ class EmployeeController extends Controller
     public function index(Request $request): View
     {
         $filters = $request->only(['search', 'status']);
-        $employees = $this->employeeService->getEmployees($filters, perPage: 15);
+        $actor = $request->user();
+        $showAllEmployees = $actor?->isDepartmentManager() && $request->boolean('all_employees');
+        $forceCards = $request->boolean('cards');
 
-        return view('employees.index', compact('employees', 'filters'));
+        $employees = $this->employeeService->getEmployees(
+            $filters,
+            perPage: 15,
+            actor: $actor,
+            applyVisibilityScope: ! $showAllEmployees,
+        );
+
+        return view('employees.index', compact('employees', 'filters', 'forceCards', 'showAllEmployees'));
     }
 
     /**
@@ -44,7 +55,17 @@ class EmployeeController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'latitude', 'longitude', 'radius']);
 
-        return view('employees.create', compact('locations'));
+        $departments = Department::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $jobTitles = JobTitle::query()
+            ->where('is_active', true)
+            ->orderBy('name_ar')
+            ->get(['id', 'name_ar', 'key', 'system_role_mapping']);
+
+        return view('employees.create', compact('locations', 'departments', 'jobTitles'));
     }
 
     /**
@@ -75,7 +96,7 @@ class EmployeeController extends Controller
             abort(403, 'ليس لديك صلاحية للوصول إلى هذه الصفحة.');
         }
 
-        $employee->loadMissing('user.profile');
+        $employee->loadMissing('user.profile', 'department', 'jobTitleRef');
 
         $month = (int) $request->input('month', now()->month);
         $year  = (int) $request->input('year', now()->year);
@@ -119,15 +140,25 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): View
     {
-        $employee->loadMissing('user', 'locations');
+        $employee->loadMissing('user', 'locations', 'department', 'jobTitleRef');
 
         $locations = Location::query()
             ->orderBy('name')
             ->get(['id', 'name', 'latitude', 'longitude', 'radius']);
 
+        $departments = Department::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $jobTitles = JobTitle::query()
+            ->where('is_active', true)
+            ->orderBy('name_ar')
+            ->get(['id', 'name_ar', 'key', 'system_role_mapping']);
+
         $selectedLocationIds = old('location_ids', $employee->locations->pluck('id')->all());
 
-        return view('employees.edit', compact('employee', 'locations', 'selectedLocationIds'));
+        return view('employees.edit', compact('employee', 'locations', 'selectedLocationIds', 'departments', 'jobTitles'));
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Services\EmployeeOfMonth;
 
+use App\Models\EmployeeOfMonthPublication;
 use App\Models\EmployeeOfMonthResult;
 use Illuminate\Support\Facades\DB;
 
@@ -11,13 +12,13 @@ class EmployeeOfMonthFinalizationService
         private readonly EmployeeOfMonthScoringService $scoringService,
     ) {}
 
-    public function finalizeMonth(int $month, int $year): array
+    public function finalizeMonth(int $month, int $year, ?int $publishedByUserId = null): array
     {
         $scoring = $this->scoringService->calculateForMonth($month, $year);
         $rows = $scoring['scored_rows'];
         $generatedAt = now();
 
-        DB::transaction(function () use ($rows, $scoring, $month, $year, $generatedAt) {
+        DB::transaction(function () use ($rows, $scoring, $month, $year, $generatedAt, $publishedByUserId) {
             $payload = $rows->map(function (array $row) use ($scoring, $month, $year, $generatedAt) {
                 return [
                     'employee_id' => $row['employee_id'],
@@ -40,6 +41,17 @@ class EmployeeOfMonthFinalizationService
                 $payload,
                 ['employee_id', 'month', 'year'],
                 ['final_score', 'breakdown', 'formula_version', 'generated_at', 'updated_at']
+            );
+
+            EmployeeOfMonthPublication::query()->updateOrCreate(
+                [
+                    'month' => $month,
+                    'year' => $year,
+                ],
+                [
+                    'published_at' => $generatedAt,
+                    'published_by_user_id' => $publishedByUserId,
+                ]
             );
         });
 

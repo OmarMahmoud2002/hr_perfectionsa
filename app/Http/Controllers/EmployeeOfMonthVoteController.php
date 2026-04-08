@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreEmployeeMonthVoteRequest;
 use App\Models\Employee;
+use App\Models\EmployeeOfMonthPublication;
 use App\Models\EmployeeOfMonthResult;
+use App\Models\User;
+use App\Services\EmployeeOfMonth\BestManagerOfMonthService;
 use App\Services\EmployeeOfMonth\EmployeeOfMonthScoringService;
 use App\Services\EmployeeOfMonth\EmployeeOfMonthVoteException;
 use App\Services\EmployeeOfMonth\VoteEligibilityService;
@@ -19,6 +22,7 @@ class EmployeeOfMonthVoteController extends Controller
     public function __construct(
         private readonly VoteEligibilityService $eligibilityService,
         private readonly VoteSubmissionService $submissionService,
+        private readonly BestManagerOfMonthService $bestManagerService,
     ) {}
 
     public function page(): View
@@ -27,9 +31,20 @@ class EmployeeOfMonthVoteController extends Controller
 
         $candidatesQuery = Employee::query()
             ->where('is_active', true)
-            ->whereHas('user', fn ($q) => $q->where('role', 'employee'))
-            ->with('user.profile')
+            ->where('is_department_manager', false)
+            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()))
+            ->with(['user.profile', 'department', 'jobTitleRef'])
             ->orderBy('name');
+
+        if ($user->isDepartmentManager()) {
+            $departmentId = $user->employee?->department_id;
+
+            if ($departmentId === null) {
+                $candidatesQuery->whereRaw('1 = 0');
+            } else {
+                $candidatesQuery->where('department_id', $departmentId);
+            }
+        }
 
         if ($user->employee_id !== null) {
             $candidatesQuery->whereKeyNot((int) $user->employee_id);
@@ -41,27 +56,39 @@ class EmployeeOfMonthVoteController extends Controller
         $currentMonthDate = Carbon::create((int) $status['year'], (int) $status['month'], 1);
         $previousMonthDate = $currentMonthDate->copy()->subMonthNoOverflow();
 
-        $previousMonthTopThree = EmployeeOfMonthResult::query()
-            ->with('employee.user.profile')
+        $previousMonthPublished = EmployeeOfMonthPublication::query()
             ->where('month', (int) $previousMonthDate->month)
             ->where('year', (int) $previousMonthDate->year)
-            ->where('final_score', '>=', EmployeeOfMonthScoringService::MIN_RANKING_SCORE)
-            ->get()
-            ->sort(function (EmployeeOfMonthResult $a, EmployeeOfMonthResult $b) {
-                $finalCompare = ((float) $b->final_score) <=> ((float) $a->final_score);
-                if ($finalCompare !== 0) {
-                    return $finalCompare;
-                }
+            ->exists();
 
-                $taskA = (float) data_get($a->breakdown, 'task_points', data_get($a->breakdown, 'task_score', 0));
-                $taskB = (float) data_get($b->breakdown, 'task_points', data_get($b->breakdown, 'task_score', 0));
+        $previousMonthTopThree = collect();
 
-                return $taskB <=> $taskA;
-            })
-            ->take(3)
-            ->values();
+        if ($previousMonthPublished) {
+            $previousMonthTopThree = EmployeeOfMonthResult::query()
+                ->with(['employee.user.profile', 'employee.department', 'employee.jobTitleRef'])
+                ->where('month', (int) $previousMonthDate->month)
+                ->where('year', (int) $previousMonthDate->year)
+                ->where('final_score', '>=', EmployeeOfMonthScoringService::MIN_RANKING_SCORE)
+                ->get()
+                ->sort(function (EmployeeOfMonthResult $a, EmployeeOfMonthResult $b) {
+                    $finalCompare = ((float) $b->final_score) <=> ((float) $a->final_score);
+                    if ($finalCompare !== 0) {
+                        return $finalCompare;
+                    }
+
+                    $taskA = (float) data_get($a->breakdown, 'task_points', data_get($a->breakdown, 'task_score', 0));
+                    $taskB = (float) data_get($b->breakdown, 'task_points', data_get($b->breakdown, 'task_score', 0));
+
+                    return $taskB <=> $taskA;
+                })
+                ->take(EmployeeOfMonthScoringService::WINNERS_COUNT)
+                ->values();
+        }
 
         $titleHolderEmployeeId = $previousMonthTopThree->first()?->employee_id;
+        $previousMonthBestManager = $previousMonthPublished
+            ? $this->bestManagerService->resolveForMonth((int) $previousMonthDate->month, (int) $previousMonthDate->year)
+            : null;
 
         return view('employee-of-month.vote', [
             'candidates' => $candidates,
@@ -69,6 +96,8 @@ class EmployeeOfMonthVoteController extends Controller
             'previousMonthLabel' => $previousMonthDate->locale('ar')->isoFormat('MMMM YYYY'),
             'previousMonthTopThree' => $previousMonthTopThree,
             'titleHolderEmployeeId' => $titleHolderEmployeeId,
+            'previousMonthPublished' => $previousMonthPublished,
+            'previousMonthBestManager' => $previousMonthBestManager,
         ]);
     }
 

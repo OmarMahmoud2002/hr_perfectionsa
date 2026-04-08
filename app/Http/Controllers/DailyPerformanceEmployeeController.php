@@ -104,7 +104,8 @@ class DailyPerformanceEmployeeController extends Controller
 
         $role = (string) $request->user()->role;
         $isReviewer = in_array($role, ['admin', 'manager', 'hr', 'user'], true);
-        $isOwnerEmployee = $role === 'employee' && (int) $request->user()->employee_id === (int) $attachment->entry->employee_id;
+        $isOwnerEmployee = in_array($role, ['employee', 'office_girl'], true)
+            && (int) $request->user()->employee_id === (int) $attachment->entry->employee_id;
 
         if (! $isReviewer && ! $isOwnerEmployee) {
             abort(403, 'ليس لديك صلاحية للوصول إلى هذا الملف.');

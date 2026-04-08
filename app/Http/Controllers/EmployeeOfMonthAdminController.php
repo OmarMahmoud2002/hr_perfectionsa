@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpsertEmployeeMonthAdminScoreRequest;
 use App\Models\EmployeeMonthAdminScore;
+use App\Models\EmployeeOfMonthPublication;
 use App\Models\EmployeeOfMonthResult;
 use App\Exports\EmployeeOfMonthRankingExport;
+use App\Services\EmployeeOfMonth\BestManagerOfMonthService;
 use App\Services\EmployeeOfMonth\EmployeeOfMonthFinalizationService;
 use App\Services\EmployeeOfMonth\EmployeeOfMonthMetricsService;
 use App\Services\EmployeeOfMonth\EmployeeOfMonthScoringService;
@@ -20,6 +22,7 @@ class EmployeeOfMonthAdminController extends Controller
         private readonly EmployeeOfMonthMetricsService $metricsService,
         private readonly EmployeeOfMonthScoringService $scoringService,
         private readonly EmployeeOfMonthFinalizationService $finalizationService,
+        private readonly BestManagerOfMonthService $bestManagerService,
     ) {}
 
     public function index(Request $request): View
@@ -36,7 +39,7 @@ class EmployeeOfMonthAdminController extends Controller
 
         $topThreeRanking = $scoredRows
             ->filter(fn (array $row) => $row['final_score'] >= EmployeeOfMonthScoringService::MIN_RANKING_SCORE)
-            ->take(3)
+            ->take(EmployeeOfMonthScoringService::WINNERS_COUNT)
             ->values();
         $firstPlaceRow = $topThreeRanking->first();
         $firstPlaceEmployeeId = is_array($firstPlaceRow) ? (int) $firstPlaceRow['employee_id'] : null;
@@ -107,6 +110,13 @@ class EmployeeOfMonthAdminController extends Controller
             ->orderByDesc('final_score')
             ->get();
 
+        $isPublished = EmployeeOfMonthPublication::query()
+            ->where('month', $month)
+            ->where('year', $year)
+            ->exists();
+
+        $bestManager = $this->bestManagerService->resolveForMonth($month, $year);
+
         return view('employee-of-month.admin', [
             'month' => $month,
             'year' => $year,
@@ -125,6 +135,8 @@ class EmployeeOfMonthAdminController extends Controller
             'pointsByEmployee' => $pointsByEmployee,
             'historyTopWinners' => $historyTopWinners,
             'historyForSelectedMonth' => $historyForSelectedMonth,
+            'isPublished' => $isPublished,
+            'bestManager' => $bestManager,
         ]);
     }
 
@@ -160,14 +172,18 @@ class EmployeeOfMonthAdminController extends Controller
             'year' => ['required', 'integer', 'between:2000,2100'],
         ]);
 
-        $result = $this->finalizationService->finalizeMonth((int) $validated['month'], (int) $validated['year']);
+        $result = $this->finalizationService->finalizeMonth(
+            (int) $validated['month'],
+            (int) $validated['year'],
+            (int) $request->user()->id
+        );
 
         return redirect()
             ->route('employee-of-month.admin.index', [
                 'month' => (int) $validated['month'],
                 'year' => (int) $validated['year'],
             ])
-            ->with('success', 'تم اعتماد النتائج وحفظ ' . $result['rows_count'] . ' سجل في History.');
+                ->with('success', 'تم اعتماد ونشر النتائج وحفظ ' . $result['rows_count'] . ' سجل في History.');
     }
 
     public function exportRanking(Request $request)

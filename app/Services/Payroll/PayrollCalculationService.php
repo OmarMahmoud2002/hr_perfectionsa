@@ -125,6 +125,12 @@ class PayrollCalculationService
                 $netSalary = 0;
             }
 
+            $existingReport = PayrollReport::query()
+                ->where('employee_id', $employee->id)
+                ->where('month', $month)
+                ->where('year', $year)
+                ->first();
+
             // حفظ أو تحديث كشف الراتب
             $report = PayrollReport::updateOrCreate(
                 [
@@ -145,9 +151,12 @@ class PayrollCalculationService
                     'overtime_bonus'         => $overtimeBonus,
                     'attendance_bonus'       => $attendanceBonus,
                     'net_salary'             => $netSalary,
-                    'extra_bonus'            => 0,
-                    'extra_deduction'        => 0,
-                    'adjustment_note'        => null,
+                    // الاحتفاظ بالتسوية الإضافية الحالية عند إعادة الحساب.
+                    'extra_bonus'            => (float) ($existingReport?->extra_bonus ?? 0),
+                    'extra_deduction'        => (float) ($existingReport?->extra_deduction ?? 0),
+                    'adjustment_note'        => $existingReport?->adjustment_note,
+                    // عند إعادة الحساب يتم إعادة الموظف إلى الكشف تلقائيا.
+                    'is_excluded'            => false,
                     // لا نعيد ضبط is_locked إذا كان محفوظاً — فقط نحدّثه إذا لم يكن مؤمناً
                 ]
             );
@@ -194,6 +203,12 @@ class PayrollCalculationService
 
         return DB::transaction(function () use ($employees, $month, $year, $batch) {
             $reports = collect();
+
+            // عند إعادة الحساب يتم إعادة كل المستبعدين تلقائيا للكشف.
+            PayrollReport::query()
+                ->where('month', $month)
+                ->where('year', $year)
+                ->update(['is_excluded' => false]);
 
             foreach ($employees as $employee) {
                 // تجاهل الرواتب المؤمّنة
@@ -248,13 +263,18 @@ class PayrollCalculationService
      *
      * @return Collection<PayrollReport>
      */
-    public function getMonthlyPayroll(int $month, int $year): Collection
+    public function getMonthlyPayroll(int $month, int $year, bool $includeExcluded = false): Collection
     {
-        return PayrollReport::with('employee.user.profile')
+        $query = PayrollReport::with('employee.user.profile')
             ->where('month', $month)
             ->where('year', $year)
-            ->orderBy('employee_id')
-            ->get();
+            ->orderBy('employee_id');
+
+        if (! $includeExcluded) {
+            $query->where('is_excluded', false);
+        }
+
+        return $query->get();
     }
 
     /**

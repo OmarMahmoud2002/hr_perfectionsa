@@ -10,8 +10,6 @@ use Carbon\Carbon;
 
 class VoteEligibilityService
 {
-    private const VOTER_ROLES = ['employee', 'admin', 'manager', 'hr'];
-
     public function canUserVote(User $user, int $month, int $year, ?Carbon $now = null): array
     {
         $now ??= now();
@@ -61,6 +59,24 @@ class VoteEligibilityService
             ];
         }
 
+        if ($voter->isDepartmentManager()) {
+            $voterDepartmentId = $voter->employee?->department_id;
+
+            if ($voterDepartmentId === null) {
+                return [
+                    'allowed' => false,
+                    'reason' => 'voter_without_department',
+                ];
+            }
+
+            if ((int) $candidate->department_id !== (int) $voterDepartmentId) {
+                return [
+                    'allowed' => false,
+                    'reason' => 'candidate_outside_department',
+                ];
+            }
+        }
+
         return [
             'allowed' => true,
             'reason' => 'ok',
@@ -69,7 +85,7 @@ class VoteEligibilityService
 
     public function isEligibleVoter(User $user): bool
     {
-        return in_array($user->role, self::VOTER_ROLES, true);
+        return in_array($user->role, User::employeeOfMonthVoterRoles(), true);
     }
 
     public function isEligibleCandidate(Employee $employee): bool
@@ -78,9 +94,14 @@ class VoteEligibilityService
             return false;
         }
 
+        if ($employee->is_department_manager) {
+            return false;
+        }
+
         $employee->loadMissing('user');
 
-        return $employee->user !== null && $employee->user->isEmployee();
+        return $employee->user !== null
+            && in_array($employee->user->role, User::workforceRoles(), true);
     }
 
     public function isVotingWindowOpen(int $month, int $year, ?Carbon $at = null): bool

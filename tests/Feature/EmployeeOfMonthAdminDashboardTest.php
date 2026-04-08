@@ -47,7 +47,7 @@ class EmployeeOfMonthAdminDashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('نتائج التصويت');
-        $response->assertSee('المراكز الثلاثة الأولى');
+        $response->assertSee('المراكز الأربعة الأولى');
         $response->assertSee('نقاط التصويت');
         $response->assertSee('Explain Score');
         $response->assertSee('الترتيب النهائي حسب المعادلة');

@@ -2,7 +2,6 @@
 
 namespace App\Services\Employee;
 
-use App\Enums\JobTitle;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\UserProfile;
@@ -42,8 +41,29 @@ class EmployeeAccountService
 
     private function resolveRole(Employee $employee): string
     {
-        if ($employee->job_title instanceof JobTitle) {
-            return $employee->job_title->systemRole();
+        if ($employee->is_department_manager) {
+            return 'department_manager';
+        }
+
+        $employee->loadMissing('jobTitleRef');
+
+        $mapped = $employee->jobTitleRef?->system_role_mapping;
+        if (is_string($mapped) && $mapped !== '') {
+            return $mapped;
+        }
+
+        if ($employee->relationLoaded('jobTitleRef')) {
+            $legacyKey = $employee->jobTitleRef?->key;
+            if (is_string($legacyKey) && $legacyKey !== '') {
+                return match ($legacyKey) {
+                    'admin' => 'admin',
+                    'manager' => 'manager',
+                    'hr' => 'hr',
+                    'evaluator' => 'user',
+                    'office_girl' => 'office_girl',
+                    default => 'employee',
+                };
+            }
         }
 
         return 'employee';

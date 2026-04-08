@@ -38,14 +38,14 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-slate-800">{{ $employee->name }}</h2>
-                    <p class="text-xs text-slate-500">AC-No: {{ $employee->ac_no }}</p>
+                    <p class="text-xs text-slate-500">{{ $employee->position_line }}</p>
                 </div>
             </div>
 
             @if($employee->user)
-            <div class="mt-3 pt-3 border-t border-slate-200/70">
+                <div class="mt-3 pt-3 border-t border-slate-200/70">
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="badge-gray">{{ $employee->job_title?->label() ?? 'غير محدد' }}</span>
+                    <span class="badge-gray">{{ $employee->position_line }}</span>
                     <span class="text-slate-500">الحساب:</span>
                     <span class="font-mono text-slate-700">{{ $employee->user->email }}</span>
                     <span class="{{ $employee->user->must_change_password ? 'badge-warning' : 'badge-success' }}">
@@ -96,24 +96,44 @@
                 @enderror
             </div>
 
-            {{-- الوظيفة --}}
+            {{-- الوظيفة والقسم --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="form-group">
-                <label for="job_title" class="form-label">
+                <label for="job_title_id" class="form-label">
                     الوظيفة
                     <span class="text-red-500">*</span>
                 </label>
-                <select id="job_title" name="job_title" class="form-input @error('job_title') border-red-400 focus:ring-red-300 @enderror">
+                <select id="job_title_id" name="job_title_id" class="form-input @error('job_title_id') border-red-400 focus:ring-red-300 @enderror">
                     <option value="">اختر الوظيفة</option>
-                    @foreach(\App\Enums\JobTitle::cases() as $job)
-                        <option value="{{ $job->value }}"
-                            {{ old('job_title', $employee->job_title?->value) === $job->value ? 'selected' : '' }}>
-                            {{ $job->label() }}
+                    @foreach(($jobTitles ?? collect()) as $job)
+                        <option value="{{ $job->id }}"
+                            {{ (string) old('job_title_id', $employee->job_title_id) === (string) $job->id ? 'selected' : '' }}>
+                            {{ $job->name_ar }}
                         </option>
                     @endforeach
                 </select>
-                @error('job_title')
+                <div class="mt-1.5 text-xs text-slate-500">
+                    لإضافة وظيفة جديدة: <a href="{{ route('job-titles.index') }}" class="font-semibold text-[#31719d] hover:underline">إدارة الوظائف</a>
+                </div>
+                @error('job_title_id')
                     <p class="form-error">{{ $message }}</p>
                 @enderror
+            </div>
+
+            <div class="form-group">
+                <label for="department_id" class="form-label">القسم</label>
+                <select id="department_id" name="department_id" class="form-input @error('department_id') border-red-400 focus:ring-red-300 @enderror">
+                    <option value="">بدون قسم</option>
+                    @foreach(($departments ?? collect()) as $department)
+                        <option value="{{ $department->id }}" {{ (string) old('department_id', $employee->department_id) === (string) $department->id ? 'selected' : '' }}>
+                            {{ $department->name }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('department_id')
+                    <p class="form-error">{{ $message }}</p>
+                @enderror
+            </div>
             </div>
 
             <hr class="border-slate-100">

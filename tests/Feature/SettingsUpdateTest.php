@@ -27,6 +27,8 @@ class SettingsUpdateTest extends TestCase
             'late_grace_minutes'       => 20,
             'working_days_per_month'   => 26,
             'working_hours_per_day'    => 8,
+            'default_required_work_days_before_leave' => 120,
+            'default_annual_leave_days' => 21,
         ];
 
         $response = $this->actingAs($admin)
@@ -47,6 +49,7 @@ class SettingsUpdateTest extends TestCase
     public function test_validation_prevents_invalid_settings(): void
     {
         $admin = $this->makeAdmin();
+        $initialSettingsCount = Setting::count();
 
         $response = $this->actingAs($admin)
             ->from(route('settings.index'))
@@ -64,6 +67,6 @@ class SettingsUpdateTest extends TestCase
 
         $response->assertRedirect(route('settings.index'));
         $response->assertSessionHasErrors();
-        $this->assertDatabaseCount('settings', 0);
+        $this->assertDatabaseCount('settings', $initialSettingsCount);
     }
 }

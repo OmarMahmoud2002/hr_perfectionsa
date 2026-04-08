@@ -7,6 +7,8 @@ use App\Models\Employee;
 use App\Models\EmployeeMonthTask;
 use App\Models\EmployeeMonthTaskAttachment;
 use App\Models\EmployeeMonthTaskLink;
+use App\Models\User;
+use App\Services\Department\DepartmentScopeService;
 use App\Services\EmployeeOfMonth\TaskManagementService;
 use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +24,7 @@ class TaskAdminController extends Controller
 {
     public function __construct(
         private readonly TaskManagementService $taskManagementService,
+        private readonly DepartmentScopeService $departmentScopeService,
     ) {}
 
     public function index(Request $request): View
@@ -42,6 +45,12 @@ class TaskAdminController extends Controller
             ->withCount('assignments')
             ->orderByDesc('id');
 
+        if ($request->user()?->isDepartmentManager()) {
+            $tasksQuery->whereHas('employees', function ($query) use ($request): void {
+                $this->departmentScopeService->applyEmployeeScope($query, $request->user());
+            });
+        }
+
         if (! empty($taskDate)) {
             $tasksQuery->whereDate('task_date', $taskDate);
         }
@@ -54,9 +63,12 @@ class TaskAdminController extends Controller
 
         $employees = Employee::query()
             ->where('is_active', true)
-            ->whereHas('user', fn ($query) => $query->where('role', 'employee'))
-            ->orderBy('name')
-            ->get(['id', 'name', 'ac_no']);
+            ->whereHas('user', fn ($query) => $query->whereIn('role', User::workforceRoles()))
+            ->orderBy('name');
+
+        $this->departmentScopeService->applyEmployeeScope($employees, $request->user());
+
+        $employees = $employees->get(['id', 'name', 'ac_no']);
 
         $totalTasks = $tasks->count();
         $evaluatedTasks = $tasks->filter(fn ($task) => $task->evaluation !== null)->count();
@@ -97,7 +109,7 @@ class TaskAdminController extends Controller
             'links.*'        => ['nullable', 'url', 'max:2000'],
         ]);
 
-        $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids']);
+        $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids'], $request->user());
 
         $task = $this->taskManagementService->createTask(
             $validated,
@@ -166,7 +178,7 @@ class TaskAdminController extends Controller
             'new_links.*'             => ['nullable', 'url', 'max:2000'],
         ]);
 
-        $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids']);
+        $employeeIds = $this->ensureEligibleEmployeeIds($validated['employee_ids'], $request->user());
 
         $this->taskManagementService->updateTask($task, $validated, $employeeIds);
 
@@ -284,7 +296,7 @@ class TaskAdminController extends Controller
         );
     }
 
-    private function ensureEligibleEmployeeIds(array $employeeIds): array
+    private function ensureEligibleEmployeeIds(array $employeeIds, User $actor): array
     {
         $requestedIds = collect($employeeIds)
             ->map(fn ($id) => (int) $id)
@@ -294,15 +306,19 @@ class TaskAdminController extends Controller
 
         $eligibleIds = Employee::query()
             ->where('is_active', true)
-            ->whereHas('user', fn ($query) => $query->where('role', 'employee'))
-            ->whereIn('id', $requestedIds->all())
+            ->whereHas('user', fn ($query) => $query->whereIn('role', User::workforceRoles()))
+            ->whereIn('id', $requestedIds->all());
+
+        $this->departmentScopeService->applyEmployeeScope($eligibleIds, $actor);
+
+        $eligibleIds = $eligibleIds
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values();
 
         if ($eligibleIds->count() !== $requestedIds->count()) {
             throw ValidationException::withMessages([
-                'employee_ids' => 'يجب إسناد المهمة لموظفين فقط (role = employee).',
+                'employee_ids' => 'يجب إسناد المهمة لموظفين فعالين فقط ضمن الأدوار التشغيلية.',
             ]);
         }
 

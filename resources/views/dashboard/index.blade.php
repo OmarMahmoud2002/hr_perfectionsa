@@ -6,6 +6,45 @@
 
 @section('content')
 
+@if(auth()->user()->isDepartmentManager() && isset($departmentManagerSummary) && $departmentManagerSummary)
+<div class="mb-5 rounded-3xl border border-white/30 overflow-hidden relative">
+    <div class="absolute inset-0" style="background: radial-gradient(circle at 80% 20%, rgba(231,197,57,.2), transparent 42%), radial-gradient(circle at 10% 80%, rgba(77,155,151,.24), transparent 45%), linear-gradient(135deg, #2f6f9a 0%, #2f7b76 100%);"></div>
+    <div class="relative p-5 sm:p-6 text-white">
+        <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-white/70 mb-2">Department Manager Dashboard</p>
+                <h2 class="text-2xl sm:text-3xl font-black leading-tight">لوحة مختصرة لفريقك</h2>
+                <p class="text-sm text-white/80 mt-2">مؤشرات الحضور والمهام وتقييم الأداء اليومي لأعضاء قسمك فقط</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2 sm:gap-3 w-full lg:w-auto lg:min-w-[320px]">
+                <div class="rounded-2xl bg-white/15 border border-white/20 p-3 text-center">
+                    <p class="text-xs text-white/70">عدد أعضاء القسم</p>
+                    <p class="text-xl font-black mt-1">{{ $departmentManagerSummary['team_size'] }}</p>
+                </div>
+                <div class="rounded-2xl bg-white/15 border border-white/20 p-3 text-center">
+                    <p class="text-xs text-white/70">متوسط التقييم اليومي</p>
+                    <p class="text-xl font-black mt-1">{{ number_format((float) $departmentManagerSummary['avg_daily_rating'], 2) }}</p>
+                </div>
+                <div class="rounded-2xl bg-white/15 border border-white/20 p-3 text-center">
+                    <p class="text-xs text-white/70">مهام منجزة</p>
+                    <p class="text-xl font-black mt-1">{{ $departmentManagerSummary['done_tasks'] }}/{{ $departmentManagerSummary['total_tasks'] }}</p>
+                </div>
+                <div class="rounded-2xl bg-white/15 border border-white/20 p-3 text-center">
+                    <p class="text-xs text-white/70">مهام قيد التنفيذ</p>
+                    <p class="text-xl font-black mt-1">{{ $departmentManagerSummary['in_progress_tasks'] }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+            <a href="{{ route('tasks.admin.index') }}" class="px-4 py-3 rounded-xl bg-white/15 border border-white/20 hover:bg-white/25 text-sm font-semibold text-center transition">مهام القسم</a>
+            <a href="{{ route('daily-performance.review.index') }}" class="px-4 py-3 rounded-xl bg-white/15 border border-white/20 hover:bg-white/25 text-sm font-semibold text-center transition">تقييم الأداء اليومي</a>
+            <a href="{{ route('employees.index') }}" class="px-4 py-3 rounded-xl bg-white/15 border border-white/20 hover:bg-white/25 text-sm font-semibold text-center transition">أعضاء القسم</a>
+        </div>
+    </div>
+</div>
+@endif
+
 {{-- بطاقات الإحصاء الرئيسية --}}
 <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5 mb-5">
 
@@ -278,7 +317,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-slate-800 truncate">{{ $item['employee']->name }}</p>
-                    <p class="text-xs text-slate-400">{{ $item['employee']->ac_no }}</p>
+                    <p class="text-xs text-slate-500">{{ $item['employee']->position_line }}</p>
                 </div>
                 <div class="text-left flex-shrink-0">
                     <p class="text-sm font-bold" style="color: #ca9a0a;">{{ $item['late_hours'] }} س</p>
@@ -334,7 +373,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-slate-800 truncate">{{ $item['employee']->name }}</p>
-                    <p class="text-xs text-slate-400">{{ $item['employee']->ac_no }}</p>
+                    <p class="text-xs text-slate-500">{{ $item['employee']->position_line }}</p>
                 </div>
                 <div class="text-left flex-shrink-0">
                     <p class="text-sm font-bold" style="color: #4596cf;">{{ $item['ot_hours'] }} س</p>
@@ -395,7 +434,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-slate-800 truncate">{{ $item['employee']->name }}</p>
-                        <p class="text-xs text-slate-400">{{ $item['employee']->ac_no }}</p>
+                        <p class="text-xs text-slate-500">{{ $item['employee']->position_line }}</p>
                     </div>
                     <p class="text-sm font-bold text-emerald-700 flex-shrink-0">{{ $item['work_hours'] }} س</p>
                 </div>

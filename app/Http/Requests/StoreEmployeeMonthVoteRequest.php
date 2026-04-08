@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreEmployeeMonthVoteRequest extends FormRequest
@@ -14,7 +15,7 @@ class StoreEmployeeMonthVoteRequest extends FormRequest
             return false;
         }
 
-        return in_array($user->role, ['employee', 'admin', 'manager', 'hr'], true);
+        return in_array($user->role, User::employeeOfMonthVoterRoles(), true);
     }
 
     public function rules(): array

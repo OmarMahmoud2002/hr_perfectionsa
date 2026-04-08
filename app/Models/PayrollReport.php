@@ -31,6 +31,7 @@ class PayrollReport extends Model
         'net_salary',
         'net_salary_final',
         'is_locked',
+        'is_excluded',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class PayrollReport extends Model
         'net_salary'             => 'decimal:2',
         'net_salary_final'       => 'decimal:2',
         'is_locked'              => 'boolean',
+        'is_excluded'            => 'boolean',
     ];
 
     // ========================

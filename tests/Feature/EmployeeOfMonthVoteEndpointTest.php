@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EmployeeOfMonthPublication;
 use App\Models\EmployeeOfMonthResult;
 use App\Models\EmployeeMonthVote;
 use App\Models\User;
@@ -57,7 +58,7 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
         $response->assertDontSee($voterEmployee->ac_no);
     }
 
-    public function test_vote_page_shows_previous_month_top_three_and_title_holder_for_employees(): void
+    public function test_vote_page_shows_previous_month_top_winners_after_publication_for_employees(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
 
@@ -81,7 +82,7 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
             'employee_id' => $winnerTwo->id,
             'month' => 2,
             'year' => 2026,
-            'final_score' => 89.50,
+            'final_score' => 91.50,
             'breakdown' => ['task_points' => 32],
             'formula_version' => 'v3_weighted_points',
             'generated_at' => now(),
@@ -91,10 +92,17 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
             'employee_id' => $winnerThree->id,
             'month' => 2,
             'year' => 2026,
-            'final_score' => 88.20,
+            'final_score' => 90.20,
             'breakdown' => ['task_points' => 30],
             'formula_version' => 'v3_weighted_points',
             'generated_at' => now(),
+        ]);
+
+        EmployeeOfMonthPublication::query()->create([
+            'month' => 2,
+            'year' => 2026,
+            'published_at' => now(),
+            'published_by_user_id' => $viewerUser->id,
         ]);
 
         $response = $this->actingAs($viewerUser)->get(route('employee-of-month.vote.page'));
@@ -105,7 +113,6 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
         $response->assertSee($winnerOne->name);
         $response->assertSee($winnerTwo->name);
         $response->assertSee($winnerThree->name);
-        $response->assertSee('حامل اللقب الحالي');
     }
 
     public function test_employee_can_submit_vote_and_receive_payload(): void
@@ -187,7 +194,7 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_access_vote_status_but_is_marked_ineligible(): void
+    public function test_admin_can_access_vote_status_and_is_eligible(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
 
@@ -200,8 +207,8 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
             ->getJson(route('employee-of-month.vote.status'))
             ->assertOk()
             ->assertJson([
-                'can_vote' => false,
-                'reason' => 'ineligible_voter',
+                'can_vote' => true,
+                'reason' => 'ok',
             ]);
     }
 

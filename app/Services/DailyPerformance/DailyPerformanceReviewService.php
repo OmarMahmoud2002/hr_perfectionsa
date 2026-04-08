@@ -6,6 +6,7 @@ use App\Models\DailyPerformanceEntry;
 use App\Models\DailyPerformanceReview;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Department\DepartmentScopeService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,11 @@ use RuntimeException;
 
 class DailyPerformanceReviewService
 {
-    private const ALLOWED_REVIEWER_ROLES = ['admin', 'manager', 'hr', 'user'];
+    private const ALLOWED_REVIEWER_ROLES = ['admin', 'manager', 'hr', 'user', 'department_manager'];
+
+    public function __construct(
+        private readonly DepartmentScopeService $departmentScopeService,
+    ) {}
 
     /**
      * @return array{cards: Collection<int, Employee>, filters: array<string, mixed>, stats: array<string, int|float>}
@@ -30,7 +35,7 @@ class DailyPerformanceReviewService
 
         $employeesQuery = Employee::query()
             ->active()
-            ->whereHas('user', fn ($q) => $q->where('role', 'employee'))
+            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()))
             ->withExists([
                 'dailyPerformanceEntries as has_daily_entry' => fn ($q) => $q->whereDate('work_date', $selectedDate),
             ])
@@ -47,6 +52,8 @@ class DailyPerformanceReviewService
             ->orderByDesc('has_daily_entry')
             ->orderBy('name');
 
+        $this->departmentScopeService->applyEmployeeScope($employeesQuery, $reviewer);
+
         if ($employeeId !== null) {
             $employeesQuery->whereKey($employeeId);
         }
@@ -61,7 +68,7 @@ class DailyPerformanceReviewService
 
         $cards = $employeesQuery->get();
 
-        $stats = $this->getReviewStats($selectedDate, $employeeId);
+        $stats = $this->getReviewStats($selectedDate, $employeeId, $reviewer);
 
         return [
             'cards' => $cards,
@@ -126,11 +133,15 @@ class DailyPerformanceReviewService
     /**
      * @return array{total_employees: int, submitted_count: int, not_submitted_count: int, submission_rate: float}
      */
-    private function getReviewStats(string $date, ?int $employeeId = null): array
+    private function getReviewStats(string $date, ?int $employeeId = null, ?User $reviewer = null): array
     {
         $baseEmployees = Employee::query()
             ->active()
-            ->whereHas('user', fn ($q) => $q->where('role', 'employee'));
+            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()));
+
+        if ($reviewer !== null) {
+            $this->departmentScopeService->applyEmployeeScope($baseEmployees, $reviewer);
+        }
 
         if ($employeeId !== null) {
             $baseEmployees->whereKey($employeeId);

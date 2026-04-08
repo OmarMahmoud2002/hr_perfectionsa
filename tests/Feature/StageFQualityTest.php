@@ -36,7 +36,7 @@ class StageFQualityTest extends TestCase
         $this->actingAs($admin)->get(route('tasks.my.index'))->assertForbidden();
 
         $this->actingAs($evaluator)->get(route('tasks.evaluator.index'))->assertOk();
-        $this->actingAs($evaluator)->get(route('employees.index'))->assertOk();
+        $this->actingAs($evaluator)->get(route('employees.index'))->assertForbidden();
         $this->actingAs($evaluator)->get(route('account.my'))->assertOk();
         $this->actingAs($evaluator)->get(route('tasks.admin.index'))->assertForbidden();
         $this->actingAs($evaluator)->get(route('employee-of-month.admin.index'))->assertForbidden();
@@ -47,7 +47,7 @@ class StageFQualityTest extends TestCase
         $this->actingAs($employeeUser)->get(route('tasks.admin.index'))->assertForbidden();
     }
 
-    public function test_evaluator_page_does_not_expose_assigned_employee_data(): void
+    public function test_evaluator_page_shows_assigned_employee_data_for_filtering_and_clarity(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',
@@ -92,7 +92,7 @@ class StageFQualityTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Privacy Task');
-        $response->assertDontSee('Sensitive Employee Name');
+        $response->assertSee('Sensitive Employee Name');
     }
 
     public function test_scoring_weighted_points_and_task_tie_breaker(): void

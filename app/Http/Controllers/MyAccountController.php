@@ -25,7 +25,11 @@ class MyAccountController extends Controller
 
     public function show(Request $request): View
     {
-        $user = $request->user()->loadMissing('profile', 'employee');
+        $user = $request->user()->loadMissing(
+            'profile',
+            'employee.leaveProfile',
+            'employee.department.managerEmployee.user',
+        );
 
         $monthData = PayrollPeriod::monthForDate(now());
         $defaultMonth = (int) $monthData['month'];
@@ -83,6 +87,12 @@ class MyAccountController extends Controller
 
             $monthlyWinners = EmployeeOfMonthResult::query()
                 ->select(['employee_id', 'month', 'year', 'final_score', 'breakdown', 'generated_at'])
+                ->whereExists(function ($query) {
+                    $query->selectRaw('1')
+                        ->from('employee_of_month_publications')
+                        ->whereColumn('employee_of_month_publications.month', 'employee_of_month_results.month')
+                        ->whereColumn('employee_of_month_publications.year', 'employee_of_month_results.year');
+                })
                 ->orderByDesc('year')
                 ->orderByDesc('month')
                 ->get()

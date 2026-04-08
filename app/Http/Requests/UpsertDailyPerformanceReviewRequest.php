@@ -10,7 +10,7 @@ class UpsertDailyPerformanceReviewRequest extends FormRequest
     {
         $role = $this->user()?->role;
 
-        return in_array($role, ['admin', 'manager', 'hr', 'user'], true);
+        return in_array($role, ['admin', 'manager', 'hr', 'user', 'department_manager'], true);
     }
 
     public function rules(): array

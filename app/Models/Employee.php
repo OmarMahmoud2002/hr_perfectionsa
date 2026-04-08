@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use App\Enums\JobTitle;
+use App\Enums\JobTitle as LegacyJobTitle;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -18,6 +19,9 @@ class Employee extends Model
         'ac_no',
         'name',
         'job_title',
+        'job_title_id',
+        'department_id',
+        'is_department_manager',
         'basic_salary',
         'is_active',
         'is_remote_worker',
@@ -31,8 +35,9 @@ class Employee extends Model
         'basic_salary'       => 'decimal:2',
         'is_active'          => 'boolean',
         'is_remote_worker'   => 'boolean',
+        'is_department_manager' => 'boolean',
         'late_grace_minutes' => 'integer',
-        'job_title'          => JobTitle::class,
+        'job_title'          => LegacyJobTitle::class,
     ];
 
     // ========================
@@ -91,6 +96,36 @@ class Employee extends Model
         return $this->hasMany(DailyPerformanceEntry::class, 'employee_id');
     }
 
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id');
+    }
+
+    public function managedDepartment(): HasOne
+    {
+        return $this->hasOne(Department::class, 'manager_employee_id');
+    }
+
+    public function jobTitleRef(): BelongsTo
+    {
+        return $this->belongsTo(JobTitle::class, 'job_title_id');
+    }
+
+    public function leaveProfile(): HasOne
+    {
+        return $this->hasOne(EmployeeLeaveProfile::class, 'employee_id');
+    }
+
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class, 'employee_id');
+    }
+
+    public function leaveBalances(): HasMany
+    {
+        return $this->hasMany(LeaveBalance::class, 'employee_id');
+    }
+
     // ========================
     // Scopes
     // ========================
@@ -120,7 +155,38 @@ class Employee extends Model
 
     public function getJobTitleLabelAttribute(): ?string
     {
-        return $this->job_title?->label();
+        if ($this->job_title instanceof \App\Enums\JobTitle) {
+            return $this->job_title->label();
+        }
+
+        if ($this->relationLoaded('jobTitleRef')) {
+            return $this->jobTitleRef?->name_ar;
+        }
+
+        if ($this->job_title_id !== null) {
+            return $this->jobTitleRef()->value('name_ar');
+        }
+
+        return null;
+    }
+
+    public function getPositionLineAttribute(): string
+    {
+        $departmentName = $this->relationLoaded('department')
+            ? $this->department?->name
+            : ($this->department_id ? $this->department()->value('name') : null);
+
+        if ($this->is_department_manager && $departmentName) {
+            return 'مدير قسم '.$departmentName;
+        }
+
+        $jobLabel = $this->job_title_label ?? 'غير محدد';
+
+        if ($departmentName) {
+            return $jobLabel.' ('.$departmentName.')';
+        }
+
+        return $jobLabel;
     }
 
     /**
@@ -131,6 +197,18 @@ class Employee extends Model
         $role = $this->user?->role;
         if (in_array($role, ['admin', 'manager', 'hr'], true)) {
             return true;
+        }
+
+        if ($role === 'department_manager') {
+            return false;
+        }
+
+        if ($this->relationLoaded('jobTitleRef')) {
+            $mappedRole = $this->jobTitleRef?->system_role_mapping;
+
+            if (in_array($mappedRole, ['manager', 'hr'], true)) {
+                return true;
+            }
         }
 
         $jobTitle = $this->job_title?->value;

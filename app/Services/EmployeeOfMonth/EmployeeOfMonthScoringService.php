@@ -7,8 +7,11 @@ use Illuminate\Support\Collection;
 
 class EmployeeOfMonthScoringService
 {
-    /** Minimum final score required to appear in the top-3 ranking. */
-    public const MIN_RANKING_SCORE = 85.0;
+    /** Minimum final score required to appear in the winners ranking. */
+    public const MIN_RANKING_SCORE = 90.0;
+
+    /** Winners count shown and considered by business logic. */
+    public const WINNERS_COUNT = 4;
 
     private const TASKS_MAX_POINTS = 40.0;
     private const VOTE_MAX_POINTS = 25.0;

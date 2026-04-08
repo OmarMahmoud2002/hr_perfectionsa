@@ -41,7 +41,7 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-base text-slate-800">{{ $employee->name }}</h2>
-                    <span class="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{{ $employee->ac_no }}</span>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ $employee->position_line }}</p>
                 </div>
             </div>
 

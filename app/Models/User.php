@@ -15,6 +15,12 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    public const ADMIN_LIKE_ROLES = ['admin', 'manager', 'hr'];
+
+    public const WORKFORCE_ROLES = ['employee', 'office_girl'];
+
+    public const EMPLOYEE_OF_MONTH_VOTER_ROLES = ['employee', 'admin', 'manager', 'hr', 'department_manager'];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -63,12 +69,22 @@ class User extends Authenticatable
 
     public function isAdminLike(): bool
     {
-        return in_array($this->role, ['admin', 'manager', 'hr'], true);
+        return in_array($this->role, self::ADMIN_LIKE_ROLES, true);
     }
 
     public function isEmployee(): bool
     {
         return $this->role === 'employee';
+    }
+
+    public function isWorkforceMember(): bool
+    {
+        return in_array($this->role, self::WORKFORCE_ROLES, true);
+    }
+
+    public function isDepartmentManager(): bool
+    {
+        return $this->role === 'department_manager';
     }
 
     public function isEvaluatorUser(): bool
@@ -80,6 +96,16 @@ class User extends Authenticatable
     {
         // Backward-compatible alias for legacy checks.
         return in_array($this->role, ['viewer', 'employee', 'user'], true);
+    }
+
+    public static function workforceRoles(): array
+    {
+        return self::WORKFORCE_ROLES;
+    }
+
+    public static function employeeOfMonthVoterRoles(): array
+    {
+        return self::EMPLOYEE_OF_MONTH_VOTER_ROLES;
     }
 
     public function employee(): BelongsTo
@@ -120,5 +146,10 @@ class User extends Authenticatable
     public function dailyPerformanceReviewsGiven(): HasMany
     {
         return $this->hasMany(DailyPerformanceReview::class, 'reviewer_user_id');
+    }
+
+    public function leaveApprovalsGiven(): HasMany
+    {
+        return $this->hasMany(LeaveRequestApproval::class, 'actor_user_id');
     }
 }
