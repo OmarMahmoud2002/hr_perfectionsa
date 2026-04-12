@@ -29,10 +29,12 @@ class DailyPerformanceReviewController extends Controller
 
         $employeesQuery = Employee::query()
             ->active()
-            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()))
+            ->whereHas('user', fn ($q) => $q->where('role', 'employee'))
             ->orderBy('name');
 
-        $this->departmentScopeService->applyEmployeeScope($employeesQuery, $request->user());
+        if (! $request->user()->isEvaluatorUser()) {
+            $this->departmentScopeService->applyEmployeeScope($employeesQuery, $request->user());
+        }
 
         $employees = $employeesQuery->get(['id', 'name']);
 

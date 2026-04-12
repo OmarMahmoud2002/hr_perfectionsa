@@ -101,7 +101,7 @@ class VoteEligibilityService
         $employee->loadMissing('user');
 
         return $employee->user !== null
-            && in_array($employee->user->role, User::workforceRoles(), true);
+            && in_array($employee->user->role, User::employeeOfMonthCandidateRoles(), true);
     }
 
     public function isVotingWindowOpen(int $month, int $year, ?Carbon $at = null): bool

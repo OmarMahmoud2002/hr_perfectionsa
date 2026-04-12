@@ -24,7 +24,7 @@ class EmployeeService
     {
         $query = Employee::query()->with(['user.profile', 'department:id,name', 'jobTitleRef:id,name_ar', 'leaveProfile:employee_id,employment_start_date']);
 
-        if ($actor !== null && $applyVisibilityScope) {
+        if ($actor !== null && $applyVisibilityScope && ! $actor->isEvaluatorUser()) {
             $this->departmentScopeService->applyEmployeeScope($query, $actor);
         }
 
@@ -67,6 +67,7 @@ class EmployeeService
             'basic_salary'        => $data['basic_salary'] ?? 0,
             'is_active'           => true,
             'is_remote_worker'    => (bool) ($data['is_remote_worker'] ?? false),
+            'allow_remote_from_anywhere' => (bool) ($data['allow_remote_from_anywhere'] ?? false),
             'work_start_time'     => $data['work_start_time'] ?? null,
             'work_end_time'       => $data['work_end_time'] ?? null,
             'overtime_start_time' => $data['overtime_start_time'] ?? null,
@@ -74,6 +75,13 @@ class EmployeeService
         ]);
 
         $this->accountService->provisionForEmployee($employee);
+
+        if (! empty($data['employment_start_date'])) {
+            $employee->leaveProfile()->updateOrCreate(
+                ['employee_id' => (int) $employee->id],
+                ['employment_start_date' => $data['employment_start_date']]
+            );
+        }
 
         return $employee->fresh();
     }
@@ -95,11 +103,19 @@ class EmployeeService
             'department_id'       => $data['department_id'] ?? null,
             'basic_salary'        => $data['basic_salary'] ?? 0,
             'is_remote_worker'    => (bool) ($data['is_remote_worker'] ?? false),
+            'allow_remote_from_anywhere' => (bool) ($data['allow_remote_from_anywhere'] ?? false),
             'work_start_time'     => $data['work_start_time'] ?? null,
             'work_end_time'       => $data['work_end_time'] ?? null,
             'overtime_start_time' => $data['overtime_start_time'] ?? null,
             'late_grace_minutes'  => isset($data['late_grace_minutes']) && $data['late_grace_minutes'] !== '' ? (int) $data['late_grace_minutes'] : null,
         ]);
+
+        if (array_key_exists('employment_start_date', $data)) {
+            $employee->leaveProfile()->updateOrCreate(
+                ['employee_id' => (int) $employee->id],
+                ['employment_start_date' => $data['employment_start_date'] ?: null]
+            );
+        }
 
         $this->accountService->provisionForEmployee($employee);
 

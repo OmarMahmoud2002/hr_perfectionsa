@@ -29,6 +29,7 @@ use App\Models\DailyPerformanceEntry;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeMonthTask;
+use App\Models\LeaveRequest;
 
 /*
 |--------------------------------------------------------------------------
@@ -134,7 +135,7 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     });
 
     // Employee tasks page
-    Route::middleware(['role:employee,office_girl'])->group(function () {
+    Route::middleware(['role:employee'])->group(function () {
         Route::get('/tasks/my', [EmployeeMyTasksController::class, 'index'])
             ->name('tasks.my.index');
         Route::patch('/tasks/my/{task}/status', [EmployeeMyTasksController::class, 'updateStatus'])
@@ -148,16 +149,22 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
             ->name('daily-performance.employee.attachment.destroy');
     });
 
-    Route::middleware(['role:employee,office_girl,department_manager'])->group(function () {
+    Route::middleware(['role:employee,office_girl,department_manager,hr,admin,manager'])->group(function () {
         Route::get('/leave/requests', [LeaveRequestController::class, 'index'])
             ->name('leave.requests.index');
         Route::post('/leave/requests', [LeaveRequestController::class, 'store'])
             ->name('leave.requests.store');
     });
 
-    Route::middleware(['role:admin,manager,hr,department_manager'])->group(function () {
+    Route::middleware(['role:hr,admin,manager,department_manager', 'can:viewAny,'.LeaveRequest::class])->group(function () {
         Route::get('/leave/approvals', [LeaveApprovalController::class, 'index'])
             ->name('leave.approvals.index');
+        Route::post('/leave/approvals/{leaveRequest}/decide', [LeaveApprovalController::class, 'decide'])
+            ->middleware('can:approve,leaveRequest')
+            ->name('leave.approvals.decide');
+    });
+
+    Route::middleware(['role:hr,admin,manager'])->group(function () {
         Route::get('/leave/approvals/employee-settings', [LeaveApprovalController::class, 'employeeSettings'])
             ->name('leave.approvals.employee-settings');
         Route::post('/leave/approvals/employee-settings/bulk-update', [LeaveApprovalController::class, 'bulkUpdateEmployeeSettings'])
@@ -166,8 +173,6 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
             ->name('leave.approvals.employee-settings.update');
         Route::post('/leave/approvals/employee-settings/apply-defaults', [LeaveApprovalController::class, 'applyDefaultEmployeeSettings'])
             ->name('leave.approvals.employee-settings.apply-defaults');
-        Route::post('/leave/approvals/{leaveRequest}/decide', [LeaveApprovalController::class, 'decide'])
-            ->name('leave.approvals.decide');
     });
 
     // Daily performance review page
@@ -182,8 +187,9 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     // ================================
     // الموظفين (Admin فقط للإضافة/التعديل)
     // ================================
-    Route::middleware(['role:admin,manager,hr,department_manager,employee,office_girl', 'can:viewAny,'.Employee::class])->group(function () {
+    Route::middleware(['role:admin,manager,hr,department_manager,employee,office_girl,user', 'can:viewAny,'.Employee::class])->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+        Route::get('/employees/all-cards', [EmployeeController::class, 'allCards'])->name('employees.all-cards');
     });
 
     Route::middleware(['role:admin,manager,hr,department_manager', 'can:viewAny,'.Employee::class])->group(function () {
@@ -270,7 +276,7 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     // ================================
     // الحضور والانصراف
     // ================================
-    Route::middleware(['role:employee,office_girl'])->group(function () {
+    Route::middleware(['role:employee,office_girl,department_manager,hr,admin,manager'])->group(function () {
         Route::get('/attendance/remote', [EmployeeRemoteAttendancePageController::class, 'index'])
             ->name('attendance.remote.page');
         Route::post('/attendance/check-in', [RemoteAttendanceController::class, 'checkIn'])

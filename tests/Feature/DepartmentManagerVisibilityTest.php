@@ -45,6 +45,74 @@ class DepartmentManagerVisibilityTest extends TestCase
         $this->assertNotNull($managerEmployee);
     }
 
+    public function test_department_manager_cannot_expand_employee_scope_using_all_employees_query_param(): void
+    {
+        [$managerUser, , $departmentA] = $this->createDepartmentManager('Dept Manager Scope', 'DM-S', 'Scope A', 'SA');
+
+        [, $employeeInA] = $this->createEmployeeUser('Scoped Employee A', 'SA-1', $departmentA->id);
+
+        $departmentB = Department::query()->create([
+            'name' => 'Scope B',
+            'code' => 'SB',
+            'is_active' => true,
+        ]);
+
+        [, $employeeInB] = $this->createEmployeeUser('Scoped Employee B', 'SB-1', $departmentB->id);
+
+        $this->actingAs($managerUser)
+            ->get(route('employees.index', ['all_employees' => 1]))
+            ->assertOk()
+            ->assertSee($employeeInA->name)
+            ->assertDontSee($employeeInB->name);
+    }
+
+    public function test_employee_cannot_expand_scope_using_all_employees_query_param(): void
+    {
+        $department = Department::query()->create([
+            'name' => 'Employees Scope',
+            'code' => 'ES',
+            'is_active' => true,
+        ]);
+
+        [$employeeUser, $employee] = $this->createEmployeeUser('Scoped Self', 'ES-1', $department->id);
+        [, $otherEmployee] = $this->createEmployeeUser('Scoped Other', 'ES-2', $department->id);
+
+        $this->actingAs($employeeUser)
+            ->get(route('employees.index', ['all_employees' => 1]))
+            ->assertOk()
+            ->assertSee($employee->name)
+            ->assertDontSee($otherEmployee->name);
+    }
+
+    public function test_admin_can_still_view_all_employees_even_with_all_employees_query_param(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'must_change_password' => false,
+        ]);
+
+        $departmentA = Department::query()->create([
+            'name' => 'Admin Scope A',
+            'code' => 'ASA',
+            'is_active' => true,
+        ]);
+
+        $departmentB = Department::query()->create([
+            'name' => 'Admin Scope B',
+            'code' => 'ASB',
+            'is_active' => true,
+        ]);
+
+        [, $employeeInA] = $this->createEmployeeUser('Admin Employee A', 'AA-1', $departmentA->id);
+        [, $employeeInB] = $this->createEmployeeUser('Admin Employee B', 'AB-1', $departmentB->id);
+
+        $this->actingAs($admin)
+            ->get(route('employees.index', ['all_employees' => 1]))
+            ->assertOk()
+            ->assertSee($employeeInA->name)
+            ->assertSee($employeeInB->name);
+    }
+
     public function test_department_manager_daily_performance_review_is_scoped_and_blocks_other_department_upsert(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 4, 10, 10, 0, 0, config('app.timezone')));

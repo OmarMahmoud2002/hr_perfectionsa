@@ -27,8 +27,7 @@ class SettingController extends Controller
             'late_grace_minutes'     => ['required', 'integer', 'min:0', 'max:120'],
             'working_days_per_month' => ['required', 'integer', 'min:1', 'max:31'],
             'working_hours_per_day'  => ['required', 'numeric', 'min:1', 'max:24'],
-            'default_required_work_days_before_leave' => ['required', 'integer', 'min:0', 'max:3650'],
-            'default_annual_leave_days' => ['required', 'integer', 'min:0', 'max:365'],
+            'allow_remote_without_location' => ['nullable', 'boolean'],
         ], [
             'work_start_time.required'        => 'وقت بدء العمل مطلوب.',
             'work_start_time.regex'           => 'صيغة وقت بدء العمل غير صحيحة.',
@@ -40,13 +39,21 @@ class SettingController extends Controller
             'late_grace_minutes.integer'      => 'فترة السماح يجب أن تكون عدداً صحيحاً.',
             'working_days_per_month.required' => 'عدد أيام العمل في الشهر مطلوب.',
             'working_hours_per_day.required'  => 'عدد ساعات العمل في اليوم مطلوب.',
-            'default_required_work_days_before_leave.required' => 'عدد أيام الخدمة المطلوب قبل الإجازة مطلوب.',
-            'default_required_work_days_before_leave.integer' => 'عدد أيام الخدمة المطلوب قبل الإجازة يجب أن يكون عدداً صحيحاً.',
-            'default_annual_leave_days.required' => 'الرصيد السنوي الافتراضي للإجازة مطلوب.',
-            'default_annual_leave_days.integer' => 'الرصيد السنوي الافتراضي يجب أن يكون عدداً صحيحاً.',
         ]);
 
-        $this->settingService->save($validated, 'attendance');
+        $settingsPayload = [
+            'work_start_time' => $validated['work_start_time'],
+            'work_end_time' => $validated['work_end_time'],
+            'overtime_start_time' => $validated['overtime_start_time'],
+            'late_grace_minutes' => $validated['late_grace_minutes'],
+            'working_days_per_month' => $validated['working_days_per_month'],
+            'working_hours_per_day' => $validated['working_hours_per_day'],
+            'allow_remote_without_location' => isset($validated['allow_remote_without_location'])
+                ? (string) (int) ((bool) $validated['allow_remote_without_location'])
+                : '0',
+        ];
+
+        $this->settingService->save($settingsPayload, 'attendance');
 
         return back()->with('success', 'تم حفظ الإعدادات بنجاح.');
     }

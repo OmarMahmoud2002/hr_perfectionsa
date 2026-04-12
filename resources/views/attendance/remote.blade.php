@@ -2,16 +2,23 @@
 
 @section('title', 'تسجيل الحضور والانصراف online')
 @section('page-title', 'تسجيل الحضور والانصراف online')
-@section('page-subtitle', 'تسجيل الحضور والانصراف من المواقع المعتمدة فقط')
+@section('page-subtitle', 'تسجيل الحضور والانصراف online')
 
 @section('content')
 @php
     $clockIn = $todayRecord?->clock_in ? substr($todayRecord->clock_in, 0, 5) : null;
     $clockOut = $todayRecord?->clock_out ? substr($todayRecord->clock_out, 0, 5) : null;
+    $allowedLocations = collect($allowedLocations ?? []);
+    $allowRemoteWithoutLocation = (bool) ($allowRemoteWithoutLocation ?? false);
+
+    $todayDate = now()->toDateString();
+    $scheduledRemoteDaysThisMonth = collect($scheduledRemoteDaysThisMonth ?? []);
+    $isTodayScheduledRemote = $scheduledRemoteDaysThisMonth->contains($todayDate);
 
     $canUseRemoteAttendance = $employee
         && $employee->is_remote_worker
-        && $employee->locations->isNotEmpty();
+        && ($allowRemoteWithoutLocation || $allowedLocations->isNotEmpty())
+        && $isTodayScheduledRemote;
 
     $action = null;
     $buttonText = null;
@@ -26,7 +33,7 @@
 @endphp
 
 <div class="max-w-3xl mx-auto space-y-5">
-    <div class="card p-5">
+    <div class="card card-interactive p-5">
         <h3 class="text-sm font-bold text-slate-700 mb-4">حالة اليوم</h3>
 
         @if(!$employee)
@@ -35,11 +42,15 @@
             </div>
         @elseif(!$employee->is_remote_worker)
             <div class="alert-warning">
-                <p>نمط دوامك غير مفعّل كـ ريموت حالياً، لذلك لا يمكنك التسجيل من هذه الصفحة.</p>
+                <p>غير مسموح لك بالحضور الأونلاين. برجاء الرجوع للإدارة.</p>
             </div>
-        @elseif($employee->locations->isEmpty())
+        @elseif(!$allowRemoteWithoutLocation && $allowedLocations->isEmpty())
             <div class="alert-warning">
                 <p>لم يتم تحديد أي موقع ريموت لك حتى الآن. برجاء التواصل مع الإدارة.</p>
+            </div>
+        @elseif(!$isTodayScheduledRemote)
+            <div class="alert-warning">
+                <p>اليوم غير مجدول لك كدوام ريموت، لذلك لا يمكن تسجيل الحضور الأونلاين اليوم.</p>
             </div>
         @else
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -73,11 +84,19 @@
         @endif
     </div>
 
-    @if($employee && $employee->locations->isNotEmpty())
-        <div class="card p-5">
+    @if($employee && $allowRemoteWithoutLocation)
+        <div class="card card-interactive p-5">
+            <h3 class="text-sm font-bold text-slate-700 mb-3">إعداد الموقع</h3>
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <p class="font-semibold text-emerald-700">مفعل: بدون عنوان</p>
+                <p class="text-xs text-emerald-700 mt-1">يمكنك التسجيل من أي مكان دون التقيد بالمواقع المعتمدة.</p>
+            </div>
+        </div>
+    @elseif($employee && $allowedLocations->isNotEmpty())
+        <div class="card card-interactive p-5">
             <h3 class="text-sm font-bold text-slate-700 mb-3">المواقع المسموح بها لك</h3>
             <div class="space-y-2">
-                @foreach($employee->locations as $location)
+                @foreach($allowedLocations as $location)
                     <div class="rounded-xl border border-slate-200 p-3">
                         <p class="font-semibold text-slate-700">{{ $location->name }}</p>
                         <p class="text-xs text-slate-500 mt-1">نطاق السماح: {{ (int) $location->radius }} متر</p>
@@ -87,8 +106,31 @@
         </div>
     @endif
 
+    @if(($scheduledRemoteDaysThisMonth ?? collect())->filter()->isNotEmpty())
+        <div class="card card-interactive p-5">
+            <h3 class="text-sm font-bold text-slate-700 mb-3">أيام الريموت المجدولة لهذا الشهر</h3>
+            <div class="flex flex-wrap gap-2">
+                @foreach($scheduledRemoteDaysThisMonth->filter() as $day)
+                    <span class="px-2.5 py-1 rounded-full border text-xs {{ $day === $todayDate ? 'border-sky-300 bg-sky-100 text-slate-900' : 'border-slate-200 text-slate-700 bg-slate-50' }}">
+                        {{ $day }}
+                    </span>
+                @endforeach
+            </div>
+        </div>
+    @elseif($employee)
+        <div class="empty-state border border-amber-200 bg-amber-50 animate-fade-in">
+            <div class="empty-state-icon !mb-3" style="background: linear-gradient(135deg, rgba(245,158,11,.2), rgba(217,119,6,.15));">
+                <svg class="w-9 h-9 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 8v4m0 4h.01M3.33 18h17.34c1.54 0 2.5-1.67 1.73-3L13.73 3c-.77-1.33-2.69-1.33-3.46 0L1.6 15c-.77 1.33.19 3 1.73 3z"/>
+                </svg>
+            </div>
+            <h3 class="text-sm font-bold text-amber-800 mb-2">لا توجد أيام ريموت مجدولة هذا الشهر</h3>
+            <p class="text-xs text-amber-700">لن يظهر زر التسجيل إلا في الأيام المجدولة لك كدوام ريموت.</p>
+        </div>
+    @endif
+
     @if(($remoteRecordsThisMonth ?? collect())->isNotEmpty())
-        <div class="card p-5">
+        <div class="card card-interactive p-5">
             <h3 class="text-sm font-bold text-slate-700 mb-3">الأيام المسجلة ريموت خلال هذا الشهر</h3>
             <div class="overflow-x-auto">
                 <table class="data-table">

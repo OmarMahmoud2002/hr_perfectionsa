@@ -88,9 +88,11 @@
     </div>
 
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:70ms; animation-fill-mode:both;">
-        <div class="card-header flex items-center gap-2">
-            <svg class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            <h3>أوائل الشهر الماضي (أفضل 4) - {{ $previousMonthLabel }}</h3>
+        <div class="card-header">
+            <h3 class="card-header-title">أوائل الشهر الماضي (أفضل 4) - {{ $previousMonthLabel }}</h3>
+            <span class="card-header-icon" aria-hidden="true">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </span>
         </div>
         <div class="p-5 flex flex-col gap-3" dir="rtl">
             @php
@@ -140,8 +142,8 @@
                 @endphp
 
                 {{-- Horizontal card: medal | info | avatar --}}
-                <div class="rounded-2xl border {{ $cfg['border'] }} {{ $cfg['ring'] }} bg-gradient-to-l {{ $cfg['gradient'] }} px-4 py-3 flex items-center gap-4 shadow-sm"
-                     style="animation: slideUp .4s ease {{ $idx * 80 }}ms both;">
+                 <div class="rounded-2xl border {{ $cfg['border'] }} {{ $cfg['ring'] }} bg-gradient-to-l {{ $cfg['gradient'] }} px-4 py-3 flex items-center gap-4 shadow-sm js-ranked-winner"
+                     data-animation-delay="{{ $idx * 80 }}">
 
                     {{-- Medal on the left, bigger --}}
                     <img src="{{ $cfg['medal_img'] }}" alt="medal"
@@ -181,11 +183,13 @@
     </div>
 
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:95ms; animation-fill-mode:both;">
-        <div class="card-header flex items-center gap-2">
-            <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.314 0-6 2.239-6 5s2.686 5 6 5 6-2.239 6-5-2.686-5-6-5zm0-5l2 3h-4l2-3z"/>
-            </svg>
-            <h3>مدير الشهر الماضي - {{ $previousMonthLabel }}</h3>
+        <div class="card-header">
+            <h3 class="card-header-title">مدير الشهر الماضي - {{ $previousMonthLabel }}</h3>
+            <span class="card-header-icon" aria-hidden="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-3.314 0-6 2.239-6 5s2.686 5 6 5 6-2.239 6-5-2.686-5-6-5zm0-5l2 3h-4l2-3z"/>
+                </svg>
+            </span>
         </div>
         <div class="p-5">
             @if($previousMonthBestManager)
@@ -425,6 +429,14 @@
 
 @push('scripts')
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-animation-delay]').forEach(function (el) {
+        const delay = Number(el.dataset.animationDelay || 0);
+        el.style.animationDelay = `${delay}ms`;
+        el.style.animationFillMode = 'both';
+    });
+});
+
 function employeeMonthVotePage(config) {
     return {
         status: config.initialStatus,
@@ -648,6 +660,7 @@ function employeeMonthVotePage(config) {
     }
 }
 </script>
+@endpush
 
 @push('styles')
 <style>

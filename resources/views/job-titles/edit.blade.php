@@ -7,7 +7,7 @@
 @section('content')
 <div class="max-w-4xl mx-auto">
     <div class="card p-6">
-        <form action="{{ route('job-titles.update', $jobTitle) }}" method="POST" class="space-y-5">
+        <form action="{{ route('job-titles.update', $jobTitle) }}" method="POST" class="space-y-5" id="job-title-form">
             @csrf
             @method('PUT')
             @include('job-titles._form', ['jobTitle' => $jobTitle, 'employees' => $employees])
@@ -20,3 +20,5 @@
     </div>
 </div>
 @endsection
+
+@include('partials.reassignment-confirmation-script', ['formId' => 'job-title-form', 'mode' => 'job_title'])

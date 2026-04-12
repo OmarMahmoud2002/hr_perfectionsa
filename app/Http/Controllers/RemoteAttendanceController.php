@@ -24,6 +24,9 @@ class RemoteAttendanceController extends Controller
 
     public function checkIn(Request $request): JsonResponse
     {
+        $employee = $request->user()?->employee;
+        $allowRemoteWithoutLocation = $this->allowRemoteWithoutLocation($employee);
+
         $data = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
@@ -35,7 +38,6 @@ class RemoteAttendanceController extends Controller
             'client_timezone_offset_minutes' => ['nullable', 'integer', 'between:-840,840'],
         ]);
 
-        $employee = $request->user()?->employee;
         if (!$employee) {
             return response()->json(['message' => 'لم يتم العثور على ملف الموظف.'], 404);
         }
@@ -45,18 +47,22 @@ class RemoteAttendanceController extends Controller
         }
 
         $locations = $employee->locations()->get();
-        if ($locations->isEmpty()) {
+        if (!$allowRemoteWithoutLocation && $locations->isEmpty()) {
             return response()->json(['message' => 'لا توجد مواقع مسموح بها لهذا الموظف.'], 422);
         }
 
         $latitude = (float) $data['latitude'];
         $longitude = (float) $data['longitude'];
 
-        if (!$this->insideAnyLocation($latitude, $longitude, $locations)) {
+        if (!$allowRemoteWithoutLocation && !$this->insideAnyLocation($latitude, $longitude, $locations)) {
             return response()->json(['message' => 'أنت خارج نطاق المواقع المسموح بها.'], 422);
         }
 
         [$localDate, $localTime, $clientTimezoneMeta] = $this->resolveClientLocalDateTime($data);
+
+        if (! $this->isAllowedRemoteWorkDate($employee, $localDate)) {
+            return response()->json(['message' => 'هذا اليوم غير مجدول كدوام ريموت لك.'], 422);
+        }
 
         $existing = AttendanceRecord::query()
             ->where('employee_id', $employee->id)
@@ -95,6 +101,9 @@ class RemoteAttendanceController extends Controller
 
     public function checkOut(Request $request): JsonResponse
     {
+        $employee = $request->user()?->employee;
+        $allowRemoteWithoutLocation = $this->allowRemoteWithoutLocation($employee);
+
         $data = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
@@ -105,7 +114,6 @@ class RemoteAttendanceController extends Controller
             'client_timezone_offset_minutes' => ['nullable', 'integer', 'between:-840,840'],
         ]);
 
-        $employee = $request->user()?->employee;
         if (!$employee) {
             return response()->json(['message' => 'لم يتم العثور على ملف الموظف.'], 404);
         }
@@ -115,18 +123,22 @@ class RemoteAttendanceController extends Controller
         }
 
         $locations = $employee->locations()->get();
-        if ($locations->isEmpty()) {
+        if (!$allowRemoteWithoutLocation && $locations->isEmpty()) {
             return response()->json(['message' => 'لا توجد مواقع مسموح بها لهذا الموظف.'], 422);
         }
 
         $latitude = (float) $data['latitude'];
         $longitude = (float) $data['longitude'];
 
-        if (!$this->insideAnyLocation($latitude, $longitude, $locations)) {
+        if (!$allowRemoteWithoutLocation && !$this->insideAnyLocation($latitude, $longitude, $locations)) {
             return response()->json(['message' => 'أنت خارج نطاق المواقع المسموح بها.'], 422);
         }
 
         [$localDate, $localTime, $clientTimezoneMeta] = $this->resolveClientLocalDateTime($data);
+
+        if (! $this->isAllowedRemoteWorkDate($employee, $localDate)) {
+            return response()->json(['message' => 'هذا اليوم غير مجدول كدوام ريموت لك.'], 422);
+        }
 
         $record = AttendanceRecord::query()
             ->where('employee_id', $employee->id)
@@ -231,6 +243,13 @@ class RemoteAttendanceController extends Controller
         return 0;
     }
 
+    private function isAllowedRemoteWorkDate($employee, string $localDate): bool
+    {
+        return $employee->remoteWorkDays()
+            ->whereDate('work_date', $localDate)
+            ->exists();
+    }
+
     private function calculateMetricsForRemoteRecord(
         string $acNo,
         string $name,
@@ -274,6 +293,17 @@ class RemoteAttendanceController extends Controller
             'overtime_start_time' => $allSettings['overtime_start_time'] ?? '17:30',
             'late_grace_minutes' => (int) ($allSettings['late_grace_minutes'] ?? 30),
         ];
+    }
+
+    private function allowRemoteWithoutLocation($employee): bool
+    {
+        if ($employee && (bool) ($employee->allow_remote_from_anywhere ?? false)) {
+            return true;
+        }
+
+        $value = Setting::getValue('allow_remote_without_location', '0');
+
+        return in_array(strtolower((string) $value), ['1', 'true', 'yes', 'on'], true);
     }
 
     private function resolvePublicHolidaysForDate(Carbon $date): array

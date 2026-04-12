@@ -26,7 +26,7 @@ class LeaveApprovalService
         $decidedAt ??= now();
         $decision = strtolower(trim($decision));
 
-        if (! in_array($decision, ['approved', 'partially_approved', 'rejected'], true)) {
+        if (! in_array($decision, ['approved', 'rejected'], true)) {
             throw new LeaveRequestException('invalid_decision', 'قرار الاعتماد غير صالح.');
         }
 
@@ -37,38 +37,21 @@ class LeaveApprovalService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($request->finalized_at !== null || in_array($request->status, ['approved', 'partially_approved', 'rejected'], true)) {
+            $request->loadMissing('employee.user');
+
+            if ($request->finalized_at !== null || in_array($request->status, ['approved', 'rejected'], true)) {
                 throw new LeaveRequestException('request_already_finalized', 'تم إنهاء هذا الطلب مسبقا.');
             }
 
             $actorSide = $this->resolveActorSide($request, $actor);
 
-            if ($actorSide === 'manager' && $decision === 'partially_approved') {
-                throw new LeaveRequestException('partial_approval_hr_only', 'الموافقة الجزئية متاحة للـ HR فقط.');
+            if ($decision === 'approved') {
+                $approvedDays = (int) $request->requested_days;
+            } else {
+                $approvedDays = null;
             }
 
             if ($actorSide === 'hr') {
-                if ($decision === 'partially_approved') {
-                    $normalizedApprovedDates = $this->normalizeApprovedDates($approvedDates, $request);
-
-                    if (! empty($normalizedApprovedDates)) {
-                        $approvedDays = count($normalizedApprovedDates);
-                        $note = $this->appendApprovedDatesToNote($note, $normalizedApprovedDates);
-                    }
-
-                    if ($approvedDays === null || $approvedDays <= 0) {
-                        throw new LeaveRequestException('invalid_approved_days', 'عدد الأيام الجزئية غير صالح.');
-                    }
-
-                    if ($approvedDays >= (int) $request->requested_days) {
-                        throw new LeaveRequestException('partial_days_must_be_less_than_requested', 'الموافقة الجزئية يجب أن تكون أقل من الأيام المطلوبة.');
-                    }
-                } elseif ($decision === 'approved') {
-                    $approvedDays = (int) $request->requested_days;
-                } else {
-                    $approvedDays = null;
-                }
-
                 $request->hr_status = $decision;
                 $request->hr_approved_days = $approvedDays;
             } else {
@@ -78,9 +61,9 @@ class LeaveApprovalService
             LeaveRequestApproval::query()->create([
                 'leave_request_id' => (int) $request->id,
                 'actor_user_id' => (int) $actor->id,
-                'actor_role' => $actorSide === 'hr' ? 'hr' : 'department_manager',
+                'actor_role' => $actorSide,
                 'decision' => $decision,
-                'approved_days' => $actorSide === 'hr' ? $approvedDays : null,
+                'approved_days' => $approvedDays,
                 'note' => $note,
                 'decided_at' => $decidedAt,
             ]);
@@ -95,27 +78,32 @@ class LeaveApprovalService
 
     private function resolveActorSide(LeaveRequest $request, User $actor): string
     {
-        if (in_array($actor->role, ['hr', 'admin', 'manager'], true)) {
+        $requesterRole = (string) ($request->employee?->user?->role ?? '');
+        $isHrLikeRequester = in_array($requesterRole, ['hr', 'admin'], true);
+
+        if (in_array($actor->role, ['hr', 'admin'], true) && ! $isHrLikeRequester && $request->hr_status === 'pending') {
             return 'hr';
         }
 
-        if ($actor->role !== 'department_manager') {
-            throw new LeaveRequestException('unauthorized_actor', 'لا تملك صلاحية لاتخاذ قرار على هذا الطلب.');
+        if ($actor->role === 'department_manager') {
+            if ((int) ($actor->employee_id ?? 0) === (int) ($request->manager_employee_id ?? 0) && $request->manager_status === 'pending') {
+                return 'manager';
+            }
         }
 
-        if ($request->manager_status === 'not_required' || $request->manager_employee_id === null) {
-            throw new LeaveRequestException('manager_decision_not_required', 'هذا الطلب لا يحتاج قرار مدير قسم.');
+        if ($actor->role === 'manager' && $isHrLikeRequester && $request->manager_status === 'pending') {
+            return 'manager';
         }
 
-        if ((int) ($actor->employee_id ?? 0) !== (int) $request->manager_employee_id) {
-            throw new LeaveRequestException('not_request_department_manager', 'لا يمكنك اتخاذ قرار على طلب ليس تابعا لقسمك.');
-        }
-
-        return 'manager';
+        throw new LeaveRequestException('unauthorized_actor', 'لا تملك صلاحية لاتخاذ قرار على هذا الطلب.');
     }
 
     private function finalizeIfPossible(LeaveRequest $request, Carbon $decidedAt): void
     {
+        if ($request->finalized_at !== null || in_array($request->status, ['approved', 'rejected'], true)) {
+            return;
+        }
+
         if ($request->hr_status === 'rejected' || $request->manager_status === 'rejected') {
             $request->status = 'rejected';
             $request->finalized_at = $decidedAt;
@@ -123,64 +111,29 @@ class LeaveApprovalService
             return;
         }
 
+        $hrRequired = $request->hr_status !== 'not_required';
         $managerRequired = $request->manager_status !== 'not_required';
 
-        if ($managerRequired && $request->manager_status !== 'approved') {
+        if (($hrRequired && $request->hr_status !== 'approved') || ($managerRequired && $request->manager_status !== 'approved')) {
             return;
         }
 
-        if (! in_array($request->hr_status, ['approved', 'partially_approved'], true)) {
-            return;
-        }
-
-        $finalApprovedDays = (int) ($request->hr_approved_days ?? 0);
+        $finalApprovedDays = (int) ($request->hr_approved_days ?? $request->requested_days ?? 0);
 
         if ($finalApprovedDays <= 0) {
             throw new LeaveRequestException('invalid_final_approved_days', 'تعذر احتساب عدد الأيام المعتمدة نهائيا.');
         }
 
+        if ($request->final_approved_days !== null && (int) $request->final_approved_days > 0) {
+            return;
+        }
+
         $request->final_approved_days = $finalApprovedDays;
-        $request->status = $finalApprovedDays < (int) $request->requested_days ? 'partially_approved' : 'approved';
+        $request->status = 'approved';
         $request->finalized_at = $decidedAt;
 
         $this->balanceService->consumeDaysForDate($request->employee, $request->start_date->copy(), $finalApprovedDays);
     }
 
-    private function normalizeApprovedDates(?array $approvedDates, LeaveRequest $request): array
-    {
-        if (! is_array($approvedDates)) {
-            return [];
-        }
-
-        $start = $request->start_date?->format('Y-m-d');
-        $end = $request->end_date?->format('Y-m-d');
-
-        return collect($approvedDates)
-            ->filter(fn ($date) => is_string($date) && $date !== '')
-            ->map(function (string $date): string {
-                return Carbon::parse($date)->format('Y-m-d');
-            })
-            ->filter(function (string $date) use ($start, $end): bool {
-                if ($start === null || $end === null) {
-                    return true;
-                }
-
-                return $date >= $start && $date <= $end;
-            })
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-    }
-
-    private function appendApprovedDatesToNote(?string $note, array $approvedDates): string
-    {
-        $datesLine = 'تواريخ الاعتماد الجزئي: '.implode('، ', $approvedDates);
-
-        if ($note === null || trim($note) === '') {
-            return $datesLine;
-        }
-
-        return trim($note)."\n".$datesLine;
-    }
+    
 }

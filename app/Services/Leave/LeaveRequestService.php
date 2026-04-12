@@ -58,16 +58,24 @@ class LeaveRequestService
             throw new LeaveRequestException('insufficient_leave_balance', 'عدد الأيام المطلوبة أكبر من الرصيد المتبقي.');
         }
 
-        $employee->loadMissing('department.managerEmployee');
+        $employee->loadMissing('department.managerEmployee', 'user');
+
+        $requesterRole = (string) ($employee->user?->role ?? '');
+        $isHrLikeRequester = in_array($requesterRole, ['hr', 'admin'], true);
 
         $managerEmployeeId = $employee->department?->manager_employee_id;
 
-        // If the manager of the department is the same employee, HR-only flow is used.
+        // Department head requests are handled as HR-only requests.
         if ($managerEmployeeId !== null && (int) $managerEmployeeId === (int) $employee->id) {
             $managerEmployeeId = null;
         }
 
-        return DB::transaction(function () use ($employee, $start, $end, $requestedDays, $reason, $submittedAt, $managerEmployeeId) {
+        $hrStatus = $isHrLikeRequester ? 'not_required' : 'pending';
+        $managerStatus = $isHrLikeRequester
+            ? 'pending'
+            : ($managerEmployeeId === null ? 'not_required' : 'pending');
+
+        return DB::transaction(function () use ($employee, $start, $end, $requestedDays, $reason, $submittedAt, $managerEmployeeId, $hrStatus, $managerStatus) {
             return LeaveRequest::query()->create([
                 'employee_id' => (int) $employee->id,
                 'department_id' => $employee->department_id,
@@ -77,8 +85,8 @@ class LeaveRequestService
                 'requested_days' => $requestedDays,
                 'reason' => $reason,
                 'status' => 'pending',
-                'hr_status' => 'pending',
-                'manager_status' => $managerEmployeeId === null ? 'not_required' : 'pending',
+                'hr_status' => $hrStatus,
+                'manager_status' => $managerStatus,
                 'submitted_at' => $submittedAt,
             ]);
         });

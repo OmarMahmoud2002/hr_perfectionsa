@@ -63,12 +63,13 @@ class TaskAdminController extends Controller
 
         $employees = Employee::query()
             ->where('is_active', true)
-            ->whereHas('user', fn ($query) => $query->whereIn('role', User::workforceRoles()))
+            ->whereHas('user', fn ($query) => $query->where('role', 'employee'))
+            ->with('jobTitleRef:id,name_ar')
             ->orderBy('name');
 
         $this->departmentScopeService->applyEmployeeScope($employees, $request->user());
 
-        $employees = $employees->get(['id', 'name', 'ac_no']);
+        $employees = $employees->get(['id', 'name', 'ac_no', 'job_title_id', 'job_title']);
 
         $totalTasks = $tasks->count();
         $evaluatedTasks = $tasks->filter(fn ($task) => $task->evaluation !== null)->count();
@@ -306,7 +307,7 @@ class TaskAdminController extends Controller
 
         $eligibleIds = Employee::query()
             ->where('is_active', true)
-            ->whereHas('user', fn ($query) => $query->whereIn('role', User::workforceRoles()))
+            ->whereHas('user', fn ($query) => $query->where('role', 'employee'))
             ->whereIn('id', $requestedIds->all());
 
         $this->departmentScopeService->applyEmployeeScope($eligibleIds, $actor);

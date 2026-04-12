@@ -22,6 +22,7 @@ class UpdateDepartmentRequest extends FormRequest
             'employee_ids' => ['nullable', 'array'],
             'employee_ids.*' => ['integer', 'exists:employees,id'],
             'is_active' => ['nullable', 'boolean'],
+            'confirm_reassignment' => ['nullable', 'boolean'],
         ];
     }
 }

@@ -14,7 +14,8 @@ class StoreLeaveRequestRequest extends FormRequest
             return false;
         }
 
-        return in_array($user->role, ['employee', 'office_girl', 'department_manager'], true);
+        return in_array($user->role, ['employee', 'office_girl', 'department_manager', 'hr', 'admin', 'manager'], true)
+            && $user->employee_id !== null;
     }
 
     public function rules(): array

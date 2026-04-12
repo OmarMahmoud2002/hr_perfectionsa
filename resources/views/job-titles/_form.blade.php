@@ -13,6 +13,8 @@
     ];
 @endphp
 
+<input type="hidden" name="confirm_reassignment" value="0" data-confirm-reassignment-flag>
+
 <div class="space-y-5">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="form-group">
@@ -36,13 +38,24 @@
     <div class="form-group">
         <label class="form-label">الموظفون داخل هذه الوظيفة (اختياري)</label>
         <input type="hidden" name="manage_employee_assignments" value="1">
-        <select name="employee_ids[]" multiple size="8" class="form-input @error('employee_ids') border-red-400 @enderror @error('employee_ids.*') border-red-400 @enderror">
+        <div class="rounded-xl border border-slate-200 p-2 max-h-72 overflow-y-auto space-y-1.5 @error('employee_ids') border-red-400 @enderror @error('employee_ids.*') border-red-400 @enderror">
             @foreach($employees as $employee)
-                <option value="{{ $employee->id }}" @selected(in_array((int) $employee->id, $selectedEmployeeIds, true))>
-                    {{ $employee->name }}
-                </option>
+                <label class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 cursor-pointer hover:bg-slate-50 transition">
+                    <input type="checkbox"
+                           name="employee_ids[]"
+                           value="{{ $employee->id }}"
+                           data-employee-name="{{ $employee->name }}"
+                           data-current-job-title-id="{{ $employee->job_title_id }}"
+                           data-current-job-title-name="{{ $employee->jobTitleRef?->name_ar ?? '' }}"
+                           class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-300"
+                           @checked(in_array((int) $employee->id, $selectedEmployeeIds, true))>
+                    <span class="flex-1 text-sm text-slate-700">
+                        <span class="font-semibold text-slate-800">{{ $employee->name }}</span>
+                        <span class="text-slate-500"> — {{ $employee->position_line ?: 'غير محدد' }}</span>
+                    </span>
+                </label>
             @endforeach
-        </select>
+        </div>
         <p class="text-xs text-slate-400 mt-1">يمكن اختيار أكثر من موظف. إذا ألغيت الاختيار ثم حفظت، سيتم فك الربط.</p>
         @error('employee_ids')<p class="form-error">{{ $message }}</p>@enderror
         @error('employee_ids.*')<p class="form-error">{{ $message }}</p>@enderror

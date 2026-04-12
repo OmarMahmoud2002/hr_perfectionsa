@@ -30,6 +30,7 @@ class SettingService
         'late_grace_minutes'       => '30',
         'working_days_per_month'   => '26',
         'working_hours_per_day'    => '8',
+        'allow_remote_without_location' => '0',
         'default_required_work_days_before_leave' => '120',
         'default_annual_leave_days' => '21',
     ];

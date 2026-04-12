@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AttendanceRecord;
+use App\Models\Setting;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -11,7 +12,13 @@ class EmployeeRemoteAttendancePageController extends Controller
 {
     public function index(Request $request): View
     {
-        $employee = $request->user()?->employee?->loadMissing('locations');
+        $employee = $request->user()?->employee?->loadMissing('locations', 'remoteWorkDays');
+        $allowedLocations = collect();
+        $allowRemoteWithoutLocation = $this->allowRemoteWithoutLocation($employee);
+
+        if ($employee) {
+            $allowedLocations = $employee->locations;
+        }
 
         $todayRecord = null;
         if ($employee) {
@@ -22,10 +29,16 @@ class EmployeeRemoteAttendancePageController extends Controller
         }
 
         $remoteRecordsThisMonth = collect();
+        $scheduledRemoteDaysThisMonth = collect();
         if ($employee) {
             $startOfMonth = Carbon::now()->startOfMonth()->toDateString();
             $endOfMonth = Carbon::now()->endOfMonth()->toDateString();
-            $allowedLocations = $employee->locations;
+
+            $scheduledRemoteDaysThisMonth = $employee->remoteWorkDays()
+                ->whereBetween('work_date', [$startOfMonth, $endOfMonth])
+                ->orderBy('work_date')
+                ->pluck('work_date')
+                ->map(fn ($date) => Carbon::parse($date)->toDateString());
 
             $remoteRecordsThisMonth = AttendanceRecord::query()
                 ->where('employee_id', $employee->id)
@@ -34,11 +47,12 @@ class EmployeeRemoteAttendancePageController extends Controller
                 ->where('type', 'remote')
                 ->orderBy('date')
                 ->get(['date', 'clock_in', 'clock_out', 'latitude', 'longitude'])
-                ->map(function (AttendanceRecord $record) use ($allowedLocations) {
+                ->map(function (AttendanceRecord $record) use ($allowedLocations, $allowRemoteWithoutLocation) {
                     $locationName = $this->resolveMatchedLocationName(
                         $record->latitude !== null ? (float) $record->latitude : null,
                         $record->longitude !== null ? (float) $record->longitude : null,
-                        $allowedLocations
+                        $allowedLocations,
+                        $allowRemoteWithoutLocation
                     );
 
                     return [
@@ -54,13 +68,20 @@ class EmployeeRemoteAttendancePageController extends Controller
 
         return view('attendance.remote', [
             'employee' => $employee,
+            'allowedLocations' => $allowedLocations,
             'todayRecord' => $todayRecord,
             'remoteRecordsThisMonth' => $remoteRecordsThisMonth,
+            'scheduledRemoteDaysThisMonth' => $scheduledRemoteDaysThisMonth,
+            'allowRemoteWithoutLocation' => $allowRemoteWithoutLocation,
         ]);
     }
 
-    private function resolveMatchedLocationName(?float $lat, ?float $lng, $locations): string
+    private function resolveMatchedLocationName(?float $lat, ?float $lng, $locations, bool $allowRemoteWithoutLocation): string
     {
+        if ($allowRemoteWithoutLocation) {
+            return 'بدون عنوان';
+        }
+
         if ($lat === null || $lng === null || $locations->isEmpty()) {
             return 'غير محدد';
         }
@@ -91,5 +112,16 @@ class EmployeeRemoteAttendancePageController extends Controller
             + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
 
         return 2 * $earthRadius * asin(min(1, sqrt($a)));
+    }
+
+    private function allowRemoteWithoutLocation($employee): bool
+    {
+        if ($employee && (bool) ($employee->allow_remote_from_anywhere ?? false)) {
+            return true;
+        }
+
+        $value = Setting::getValue('allow_remote_without_location', '0');
+
+        return in_array(strtolower((string) $value), ['1', 'true', 'yes', 'on'], true);
     }
 }

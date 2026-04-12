@@ -14,42 +14,43 @@
                 <div>
                     <p class="text-xs uppercase tracking-[0.2em] text-white/70 mb-2">Employee Leave Settings</p>
                     <h2 class="text-2xl sm:text-3xl font-black">لوحة إعدادات الموظفين</h2>
-                    <p class="text-sm text-white/85 mt-2">تعديل أهلية طلب الإجازة والرصد السنوي لكل موظف من الصف مباشرة.</p>
+                    <p class="text-sm text-white/85 mt-2">تطبيق سياسة موحدة لأيام الأهلية والرصيد السنوي على جميع الموظفين.</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('leave.approvals.index') }}" class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold bg-white text-[#2f6f9a] border border-white hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition duration-200">العودة لقرارات الإجازات</a>
+                    <a href="{{ route('leave.approvals.index') }}" class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold bg-[#123f5f] text-white border border-[#123f5f] hover:bg-[#0f3550] hover:border-[#0f3550] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition duration-200">العودة لقرارات الإجازات</a>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card p-4">
-        <form method="GET" class="flex flex-wrap items-end gap-2.5">
-            <div class="min-w-[220px] flex-1">
-                <label class="form-label">بحث</label>
-                <input type="text" name="search" value="{{ $search }}" class="form-input" placeholder="اسم الموظف أو رقمه">
+    <div class="card p-3.5 sm:p-4">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-2 items-end">
+            <div class="xl:col-span-5">
+                <label class="form-label !mb-1 text-xs">بحث</label>
+                <input type="text" name="search" value="{{ $search }}" class="form-input !h-9 !min-h-0 !py-1.5 !text-xs" placeholder="اسم الموظف أو رقمه">
             </div>
-            <div class="w-full sm:w-[220px]">
-                <label class="form-label">القسم</label>
-                <select name="department_id" class="form-input">
+            <div class="xl:col-span-3">
+                <label class="form-label !mb-1 text-xs">القسم</label>
+                <select name="department_id" class="form-input !h-9 !min-h-0 !py-1.5 !text-xs">
                     <option value="0">كل الأقسام</option>
                     @foreach($departments as $department)
                         <option value="{{ $department->id }}" {{ (int) $departmentId === (int) $department->id ? 'selected' : '' }}>{{ $department->name }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="w-full sm:w-[120px]">
-                <label class="form-label">السنة</label>
-                <input type="number" min="2020" max="2100" name="year" value="{{ $year }}" class="form-input">
+            <div class="xl:col-span-2">
+                <label class="form-label !mb-1 text-xs">السنة</label>
+                <input type="number" min="2020" max="2100" name="year" value="{{ $year }}" class="form-input !h-9 !min-h-0 !py-1.5 !text-xs">
             </div>
-            <div class="flex gap-2">
-                <button type="submit" class="btn-primary btn-sm">تطبيق الفلتر</button>
-                <a href="{{ route('leave.approvals.employee-settings') }}" class="btn-ghost btn-sm">إعادة ضبط</a>
+            <div class="xl:col-span-2 flex gap-2 xl:justify-end flex-nowrap">
+                <button type="submit" class="btn-primary btn-sm whitespace-nowrap !px-2.5">تطبيق</button>
+                <a href="{{ route('leave.approvals.employee-settings') }}" class="btn-ghost btn-sm whitespace-nowrap !px-2.5">إعادة ضبط</a>
             </div>
         </form>
 
         <div class="mt-4 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-600">
-            القيم الافتراضية الحالية: أيام الخدمة قبل الإجازة <strong>{{ $defaultRequiredDays }}</strong> يوم - رصيد سنوي <strong>{{ $defaultAnnualQuota }}</strong> يوم.
+            الافتراضيات الحالية (من نفس الصفحة): أيام الخدمة قبل الإجازة <strong>{{ $defaultRequiredDays }}</strong> يوم - رصيد سنوي <strong>{{ $defaultAnnualQuota }}</strong> يوم.
+            <p class="mt-1 text-[11px] text-slate-400">ملاحظة: خصم الإجازات يُسجَّل على سنة دورة الاستحقاق المرتبطة بتاريخ بداية الإجازة، وقد تختلف عن سنة الفلتر.</p>
         </div>
     </div>
 
@@ -59,7 +60,21 @@
 
         <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h3 class="font-bold text-slate-800">جدول إعدادات الموظفين</h3>
-            <button type="submit" class="btn-primary btn-sm">حفظ كل التعديلات</button>
+            <button type="submit" class="btn-primary btn-sm">تطبيق على كل الموظفين</button>
+        </div>
+
+        <div class="p-4 border-b border-slate-100 bg-slate-50/70">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">أيام قبل طلب الإجازة (موحّد)</label>
+                    <input type="number" min="0" max="3650" name="global_required_work_days_before_leave" value="{{ old('global_required_work_days_before_leave', $defaultRequiredDays) }}" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">إجمالي الرصيد السنوي (موحّد)</label>
+                    <input type="number" min="0" max="365" name="global_annual_leave_quota" value="{{ old('global_annual_leave_quota', $defaultAnnualQuota) }}" class="form-input">
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">سيتم تطبيق القيمتين على جميع الموظفين، ولا يمكن تعديل القيم من الجدول الفردي.</p>
         </div>
 
         <div class="overflow-x-auto">
@@ -82,11 +97,13 @@
                             $snapshot = $employee->eligibility_snapshot ?? [];
                             $daysRemainingToEligibility = (int) ($snapshot['days_remaining_to_eligibility'] ?? 0);
                             $eligible = (bool) ($snapshot['status'] ?? false);
-                            $annualQuota = (int) ($snapshot['annual_quota_days'] ?? 0);
                             $usedDays = (int) ($snapshot['used_days'] ?? 0);
                             $remainingDays = (int) ($snapshot['remaining_days'] ?? 0);
+                            $cycleYear = (int) ($snapshot['cycle_year'] ?? 0);
+                            $requiredWorkDays = (int) ($snapshot['required_work_days'] ?? $defaultRequiredDays);
+                            $annualQuotaDays = (int) ($snapshot['annual_quota_days'] ?? $defaultAnnualQuota);
+                            $cycleEnd = (string) ($snapshot['cycle_end'] ?? '');
                             $profile = $employee->leaveProfile;
-                            $rowInput = old('rows.'.$loop->index, []);
                         @endphp
                         <tr>
                             <td>
@@ -94,13 +111,12 @@
                                     <p class="font-semibold text-slate-800">{{ $employee->name }}</p>
                                     <p class="text-xs text-slate-500">{{ $employee->position_line }}</p>
                                 </div>
-                                <input type="hidden" name="rows[{{ $loop->index }}][employee_id]" value="{{ $employee->id }}">
                             </td>
                             <td>
-                                <input type="date" name="rows[{{ $loop->index }}][employment_start_date]" value="{{ $rowInput['employment_start_date'] ?? optional($profile?->employment_start_date)->format('Y-m-d') }}" class="form-input !min-w-[170px]">
+                                <span class="font-semibold text-slate-700">{{ optional($profile?->employment_start_date)->format('Y-m-d') ?: 'غير محدد' }}</span>
                             </td>
                             <td>
-                                <input type="number" min="0" max="3650" name="rows[{{ $loop->index }}][required_work_days_before_leave]" value="{{ array_key_exists('required_work_days_before_leave', $rowInput) ? $rowInput['required_work_days_before_leave'] : $profile?->required_work_days_before_leave }}" class="form-input !w-28">
+                                <span class="font-semibold text-slate-700">{{ $requiredWorkDays }}</span>
                             </td>
                             <td>
                                 <span class="font-bold {{ $daysRemainingToEligibility > 0 ? 'text-amber-600' : 'text-emerald-700' }}">{{ $daysRemainingToEligibility }}</span>
@@ -113,10 +129,18 @@
                                 @endif
                             </td>
                             <td>
-                                <input type="number" min="0" max="365" name="rows[{{ $loop->index }}][annual_leave_quota]" value="{{ array_key_exists('annual_leave_quota', $rowInput) ? $rowInput['annual_leave_quota'] : ($profile?->annual_leave_quota ?? $annualQuota) }}" class="form-input !w-24">
+                                <span class="font-semibold text-slate-700">{{ $annualQuotaDays }}</span>
                             </td>
                             <td><span class="font-semibold text-slate-700">{{ $usedDays }}</span></td>
-                            <td><span class="font-semibold text-emerald-700">{{ $remainingDays }}</span></td>
+                            <td>
+                                <span class="font-semibold text-emerald-700">{{ $remainingDays }}</span>
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    رصيد سنة {{ $cycleYear > 0 ? $cycleYear : $year }}
+                                    @if($cycleEnd !== '')
+                                        - ينتهي {{ $cycleEnd }}
+                                    @endif
+                                </p>
+                            </td>
                         </tr>
                     @empty
                         <tr>

@@ -24,6 +24,7 @@ class UpdateJobTitleRequest extends FormRequest
             'manage_employee_assignments' => ['nullable', 'boolean'],
             'employee_ids' => ['nullable', 'array'],
             'employee_ids.*' => ['integer', 'exists:employees,id'],
+            'confirm_reassignment' => ['nullable', 'boolean'],
         ];
     }
 }

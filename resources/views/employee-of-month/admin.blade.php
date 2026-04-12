@@ -99,11 +99,13 @@
     </div>
 
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:130ms; animation-fill-mode:both;">
-        <div class="card-header flex items-center gap-2">
-            <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.314 0-6 2.239-6 5s2.686 5 6 5 6-2.239 6-5-2.686-5-6-5zm0-5l2 3h-4l2-3z"/>
-            </svg>
-            <h3>مدير الشهر</h3>
+        <div class="card-header">
+            <h3 class="card-header-title">مدير الشهر</h3>
+            <span class="card-header-icon" aria-hidden="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-3.314 0-6 2.239-6 5s2.686 5 6 5 6-2.239 6-5-2.686-5-6-5zm0-5l2 3h-4l2-3z"/>
+                </svg>
+            </span>
         </div>
         <div class="p-5">
             @if($bestManager)
@@ -140,9 +142,11 @@
     </div>
 
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:140ms; animation-fill-mode:both;">
-        <div class="card-header flex items-center gap-2">
-            <svg class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            <h3>المراكز الأربعة الأولى</h3>
+        <div class="card-header">
+            <h3 class="card-header-title">المراكز الأربعة الأولى</h3>
+            <span class="card-header-icon" aria-hidden="true">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </span>
         </div>
         <div class="p-5 flex flex-col gap-3" dir="rtl">
             @php

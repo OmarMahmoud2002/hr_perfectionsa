@@ -5,16 +5,12 @@
 @section('page-subtitle', 'عرض وإدارة بيانات الموظفين')
 
 @section('content')
-
-{{-- Header Row --}}
 <div class="section-header">
-    @php
-        $isWorkforceViewer = auth()->user()->isWorkforceMember();
-    @endphp
     <div>
         <h1 class="section-title">الموظفين</h1>
         <p class="section-subtitle">{{ $employees->total() }} موظف في الدليل</p>
     </div>
+
     @if(auth()->user()->isAdminLike())
     <a href="{{ route('employees.create') }}" class="btn-primary">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -25,11 +21,10 @@
     @endif
 </div>
 
-{{-- Search & Filter --}}
 <div class="card mb-5">
     <div class="card-body">
-        <form action="{{ route('employees.index') }}" method="GET" class="flex flex-wrap items-center gap-2">
-            <div class="relative w-full sm:w-60">
+        <form action="{{ route('employees.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+            <div class="relative w-full md:col-span-7 lg:col-span-8">
                 <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -38,109 +33,30 @@
                 <input type="text" name="search" value="{{ $filters['search'] ?? '' }}"
                        oninput="clearTimeout(this._searchTimer); this._searchTimer = setTimeout(() => this.form.submit(), 400);"
                        placeholder="ابحث بالاسم أو رقم الموظف..."
-                       class="form-input pr-10 !px-4 !w-full">
+                       class="form-input pr-10 !px-3.5 !h-9 !text-sm !w-full">
             </div>
-            <select name="status" onchange="this.form.submit()" class="form-input !w-auto !min-w-0 !px-4">
-                <option value="">جميع الحالات</option>
-                <option value="active" {{ ($filters['status'] ?? '') === 'active' ? 'selected' : '' }}>نشط فقط</option>
-                <option value="inactive" {{ ($filters['status'] ?? '') === 'inactive' ? 'selected' : '' }}>معطّل فقط</option>
-            </select>
-            @if(!empty($filters['search']) || !empty($filters['status']))
-            <a href="{{ route('employees.index') }}" class="btn-ghost">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                مسح
-            </a>
-            @endif
+            <div class="md:col-span-3 lg:col-span-2">
+                <select name="status" onchange="this.form.submit()" class="form-input !w-full !min-w-0 !px-3.5 !h-9 !text-sm">
+                    <option value="">جميع الحالات</option>
+                    <option value="active" {{ ($filters['status'] ?? '') === 'active' ? 'selected' : '' }}>نشط فقط</option>
+                    <option value="inactive" {{ ($filters['status'] ?? '') === 'inactive' ? 'selected' : '' }}>معطّل فقط</option>
+                </select>
+            </div>
+            <div class="md:col-span-2 lg:col-span-2 flex md:justify-end">
+                @if(!empty($filters['search']) || !empty($filters['status']))
+                <a href="{{ route('employees.index') }}" class="btn-ghost btn-sm w-full md:w-auto justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    مسح
+                </a>
+                @endif
+            </div>
         </form>
     </div>
 </div>
 
-{{-- Employees Table --}}
 @if($employees->count() > 0)
-@if($isWorkforceViewer || auth()->user()->isViewer() || ($forceCards ?? false))
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-    @foreach($employees as $employee)
-    @php
-        $avatarUrl = $employee->user?->profile?->avatar_path
-            ? route('media.avatar', ['path' => $employee->user->profile->avatar_path])
-            : null;
-    @endphp
-    <div x-data="{ open: false }" class="card p-5">
-        <div class="flex items-center gap-3">
-            <div class="w-16 h-16 rounded-2xl overflow-hidden border border-slate-200 flex-shrink-0"
-                 style="background: linear-gradient(135deg, #4596cf, #4d9b97);">
-                @if($avatarUrl)
-                    <img src="{{ $avatarUrl }}" alt="{{ $employee->name }}" class="w-full h-full object-cover">
-                @else
-                    <div class="w-full h-full flex items-center justify-center text-white text-xl font-black">
-                        {{ mb_substr($employee->name, 0, 1) }}
-                    </div>
-                @endif
-            </div>
-            <div class="min-w-0 flex-1">
-                <button type="button" @click="open = !open" class="text-right w-full text-base font-bold text-slate-800 hover:text-[#31719d] transition">
-                    {{ $employee->name }}
-                </button>
-                <p class="text-xs text-slate-500 mt-1">{{ $employee->position_line }}</p>
-            </div>
-        </div>
-
-        <div x-show="open" x-transition class="mt-4 pt-4 border-t border-slate-100 space-y-3">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-                    <p class="text-[11px] font-semibold text-slate-500">القسم</p>
-                    <p class="text-sm text-slate-700 mt-1">{{ $employee->department?->name ?: 'غير محدد' }}</p>
-                </div>
-                <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-                    <p class="text-[11px] font-semibold text-slate-500">بداية العمل</p>
-                    <p class="text-sm text-slate-700 mt-1">
-                        {{ optional($employee->leaveProfile?->employment_start_date)->format('Y-m-d') ?: 'غير محدد' }}
-                    </p>
-                </div>
-            </div>
-
-            <div>
-                <p class="text-xs font-semibold text-slate-500 mb-1">Bio</p>
-                <p class="text-sm text-slate-700 leading-6">{{ $employee->user?->profile?->bio ?: 'لا يوجد نبذة شخصية.' }}</p>
-            </div>
-
-            <div class="rounded-xl border border-slate-100 bg-white px-3 py-2.5 space-y-1.5">
-                <p class="text-xs font-semibold text-slate-500">البيانات التعريفية</p>
-                <p class="text-sm text-slate-700">
-                    <span class="font-medium text-slate-600">المسمى:</span>
-                    {{ $employee->job_title_label ?: 'غير محدد' }}
-                </p>
-                <p class="text-sm text-slate-700">
-                    <span class="font-medium text-slate-600">البريد:</span>
-                    {{ $employee->user?->email ?: 'لا يوجد بريد مرتبط' }}
-                </p>
-            </div>
-
-            <div class="space-y-2">
-                <p class="text-xs font-semibold text-slate-500">روابط التواصل</p>
-                @if($employee->user?->profile?->social_link_1)
-                    <a href="{{ $employee->user->profile->social_link_1 }}" target="_blank" rel="noopener noreferrer" class="text-xs text-[#31719d] hover:underline break-all block">{{ $employee->user->profile->social_link_1 }}</a>
-                @endif
-                @if($employee->user?->profile?->social_link_2)
-                    <a href="{{ $employee->user->profile->social_link_2 }}" target="_blank" rel="noopener noreferrer" class="text-xs text-[#31719d] hover:underline break-all block">{{ $employee->user->profile->social_link_2 }}</a>
-                @endif
-                @if(!$employee->user?->profile?->social_link_1 && !$employee->user?->profile?->social_link_2)
-                    <p class="text-xs text-slate-400">لا توجد روابط تواصل.</p>
-                @endif
-            </div>
-        </div>
-    </div>
-    @endforeach
-</div>
-
-@if($employees->hasPages())
-<div class="mt-4">
-    {{ $employees->links() }}
-</div>
-@endif
-@else
 <div class="card overflow-hidden">
     <div class="overflow-x-auto">
         <table class="data-table">
@@ -254,34 +170,15 @@
     </div>
     @endif
 </div>
-@endif
-
 @else
-{{-- Empty State --}}
-<div class="card p-16 text-center">
-    <div class="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4"
-         style="background: rgba(69, 150, 207, 0.1);">
+<div class="empty-state animate-fade-in">
+    <div class="empty-state-icon animate-float-soft">
         <svg class="w-10 h-10" style="color: #4596cf;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
         </svg>
     </div>
     <h3 class="text-lg font-bold text-slate-700 mb-2">لا يوجد موظفون</h3>
-    <p class="text-slate-500 text-sm mb-6">
-        @if(!empty($filters['search']))
-            لم يُعثر على نتائج لـ "{{ $filters['search'] }}"
-        @else
-            لم يتم إضافة أي موظف بعد
-        @endif
-    </p>
-    @if(auth()->user()->isAdminLike())
-    <a href="{{ route('employees.create') }}" class="btn-primary">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-        </svg>
-        إضافة أول موظف
-    </a>
-    @endif
+    <p class="text-slate-500 text-sm mb-1">لا توجد نتائج مطابقة للفلاتر الحالية.</p>
 </div>
 @endif
-
 @endsection

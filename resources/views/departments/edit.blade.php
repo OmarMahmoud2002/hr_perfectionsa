@@ -7,7 +7,7 @@
 @section('content')
 <div class="max-w-3xl mx-auto">
     <div class="card p-6">
-        <form action="{{ route('departments.update', $department) }}" method="POST" class="space-y-5">
+        <form action="{{ route('departments.update', $department) }}" method="POST" class="space-y-5" id="department-form">
             @csrf
             @method('PUT')
             @include('departments._form', ['department' => $department])
@@ -20,3 +20,5 @@
     </div>
 </div>
 @endsection
+
+@include('partials.reassignment-confirmation-script', ['formId' => 'department-form', 'mode' => 'department'])

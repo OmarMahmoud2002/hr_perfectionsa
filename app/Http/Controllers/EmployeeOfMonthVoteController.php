@@ -32,7 +32,7 @@ class EmployeeOfMonthVoteController extends Controller
         $candidatesQuery = Employee::query()
             ->where('is_active', true)
             ->where('is_department_manager', false)
-            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()))
+            ->whereHas('user', fn ($q) => $q->whereIn('role', User::employeeOfMonthCandidateRoles()))
             ->with(['user.profile', 'department', 'jobTitleRef'])
             ->orderBy('name');
 

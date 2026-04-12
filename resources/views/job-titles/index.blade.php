@@ -36,7 +36,7 @@
             </thead>
             <tbody>
                 @forelse($jobTitles as $jobTitle)
-                    <tr>
+                    <tr x-data="{ showMembers: false }">
                         <td>
                             <p class="font-semibold text-slate-800">{{ $jobTitle->name_ar }}</p>
                             <p class="text-xs text-slate-500 mt-1">
@@ -53,20 +53,43 @@
                         </td>
                         <td>
                             <div class="flex items-center justify-center gap-2">
+                                <button type="button" class="btn-ghost btn-sm" @click="showMembers = true">عرض</button>
                                 <a href="{{ route('job-titles.edit', $jobTitle) }}" class="btn-ghost btn-sm">تعديل</a>
-                                @if($jobTitle->is_system)
-                                    <button type="button" class="btn-ghost btn-sm opacity-60 cursor-not-allowed" disabled>حذف</button>
-                                @else
-                                    <form action="{{ route('job-titles.destroy', $jobTitle) }}" method="POST"
-                                          data-confirm="{{ $jobTitle->employees_count > 0 ? 'هذه الوظيفة مرتبطة بـ '.$jobTitle->employees_count.' موظف. عند المتابعة سيتم فك الارتباط ثم الحذف. هل تريد المتابعة؟' : 'هل تريد حذف هذه الوظيفة؟' }}"
-                                          data-confirm-title="تأكيد حذف الوظيفة"
-                                          data-confirm-btn="حذف"
-                                          data-confirm-type="danger">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn-danger btn-sm">حذف</button>
-                                    </form>
-                                @endif
+                                <form action="{{ route('job-titles.destroy', $jobTitle) }}" method="POST"
+                                      data-confirm="{{ $jobTitle->employees_count > 0 ? 'هذه الوظيفة مرتبطة بـ '.$jobTitle->employees_count.' موظف. عند المتابعة سيتم فك الارتباط ثم الحذف. هل تريد المتابعة؟' : 'هل تريد حذف هذه الوظيفة؟' }}"
+                                      data-confirm-title="تأكيد حذف الوظيفة"
+                                      data-confirm-btn="حذف"
+                                      data-confirm-type="danger">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn-danger btn-sm">حذف</button>
+                                </form>
+
+                                <div x-show="showMembers" x-transition.opacity class="fixed inset-0 z-[950] flex items-center justify-center p-4" style="display:none;" @keydown.escape.window="showMembers = false">
+                                    <div class="absolute inset-0 bg-black/50" @click="showMembers = false"></div>
+                                    <div class="relative w-full max-w-2xl rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
+                                        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                                            <div class="text-right">
+                                                <p class="text-base font-extrabold text-slate-800">الموظفون داخل وظيفة {{ $jobTitle->name_ar }}</p>
+                                                <p class="text-xs text-slate-500 mt-1">إجمالي {{ $jobTitle->employees->count() }} موظف</p>
+                                            </div>
+                                            <button type="button" class="btn-ghost btn-sm" @click="showMembers = false">إغلاق</button>
+                                        </div>
+
+                                        <div class="max-h-[65vh] overflow-y-auto p-4 space-y-2">
+                                            @forelse($jobTitle->employees->sortBy('name') as $member)
+                                                <div class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-right">
+                                                    <p class="text-sm font-bold text-slate-800">{{ $member->name }}</p>
+                                                    <p class="text-xs text-slate-500 mt-1">رقم الموظف: {{ $member->ac_no ?: 'غير محدد' }}</p>
+                                                    <p class="text-xs text-slate-500 mt-1">الوظيفة: {{ $member->position_line ?: 'غير محدد' }}</p>
+                                                    <p class="text-xs text-slate-500 mt-1">القسم: {{ $member->department?->name ?: 'غير محدد' }}</p>
+                                                </div>
+                                            @empty
+                                                <p class="text-sm text-slate-500 text-center py-6">لا يوجد موظفون داخل هذه الوظيفة.</p>
+                                            @endforelse
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </td>
                     </tr>

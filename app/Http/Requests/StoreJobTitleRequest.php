@@ -20,6 +20,7 @@ class StoreJobTitleRequest extends FormRequest
             'employee_ids' => ['nullable', 'array'],
             'employee_ids.*' => ['integer', 'exists:employees,id'],
             'submit_action' => ['nullable', 'string', 'in:save,save_and_add_new'],
+            'confirm_reassignment' => ['nullable', 'boolean'],
         ];
     }
 }

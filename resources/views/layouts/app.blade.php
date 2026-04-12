@@ -16,6 +16,16 @@
         $navAvatarUrl = $navUser->profile?->avatar_path
             ? route('media.avatar', ['path' => $navUser->profile->avatar_path])
             : null;
+        $roleLabel = match ($navUser->role) {
+            'admin' => 'مدير النظام',
+            'manager' => 'مدير عام',
+            'hr' => 'موارد بشرية',
+            'department_manager' => 'مدير قسم',
+            'employee' => 'موظف',
+            'office_girl' => 'موظف',
+            'user' => 'مقيّم',
+            default => 'مستخدم',
+        };
     @endphp
 
     <div class="flex h-screen overflow-hidden">
@@ -74,9 +84,7 @@
                             </div>
                             <div class="hidden sm:block">
                                 <p class="text-xs font-semibold text-slate-700 leading-tight">{{ $navUser->name }}</p>
-                                <p class="text-xs text-slate-400">
-                                    {{ $navUser->isAdminLike() ? 'إدارة النظام' : 'موظف' }}
-                                </p>
+                                <p class="text-xs text-slate-400">{{ $roleLabel }}</p>
                             </div>
                         </div>
 
@@ -169,20 +177,23 @@
     <div id="global-loading-overlay"
          class="fixed inset-0 z-[1000] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm"
          aria-live="polite" aria-busy="true" role="status">
-        <div class="rounded-2xl shadow-2xl px-6 py-5 border border-white/20 text-white"
+        <div class="rounded-2xl shadow-2xl px-6 py-5 border border-white/20 text-white min-w-[260px] max-w-[88vw]"
              style="background: radial-gradient(circle at 20% 20%, rgba(255,255,255,.14), transparent 45%), linear-gradient(135deg, #2e6d98 0%, #2f7c77 100%);">
             <div class="flex items-center gap-3">
-                <div class="relative">
+                <div class="relative flex-shrink-0">
                     <span class="absolute inset-0 rounded-full bg-white/20 animate-ping"></span>
                     <svg class="relative w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-30"></circle>
                         <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" class="opacity-100"></path>
                     </svg>
                 </div>
-                <p id="global-loading-text" class="text-sm font-black tracking-wide">جاري التحميل</p>
+                <div>
+                    <p id="global-loading-text" class="text-sm font-black tracking-wide leading-5">جاري التحميل</p>
+                    <p class="text-[11px] text-white/85 mt-0.5 leading-5">يرجى الانتظار لحظات...</p>
+                </div>
             </div>
             <div class="mt-3 h-1.5 rounded-full bg-white/20 overflow-hidden" aria-hidden="true">
-                <div class="h-full w-1/2 rounded-full bg-white/80 animate-pulse"></div>
+                <div class="h-full w-1/2 rounded-full bg-white/90 animate-pulse"></div>
             </div>
         </div>
     </div>
@@ -321,6 +332,12 @@
                 if (!(form instanceof HTMLFormElement)) return;
                 if (e.defaultPrevented) return;
                 if (form.dataset.confirm && !form._confirmed) return;
+
+                var reassignmentFlag = form.querySelector('[data-confirm-reassignment-flag]');
+                if (reassignmentFlag && reassignmentFlag.value !== '1') {
+                    return;
+                }
+
                 if (form.dataset.loadingSubmitted === '1') {
                     e.preventDefault();
                     return;

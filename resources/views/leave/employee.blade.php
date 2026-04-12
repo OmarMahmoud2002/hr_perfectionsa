@@ -15,14 +15,12 @@
     $statusBadge = [
         'pending' => 'badge-warning',
         'approved' => 'badge-success',
-        'partially_approved' => 'badge-info',
         'rejected' => 'badge-danger',
     ];
 
     $statusLabel = [
         'pending' => 'قيد المراجعة',
         'approved' => 'معتمد',
-        'partially_approved' => 'اعتماد جزئي',
         'rejected' => 'مرفوض',
     ];
 @endphp
@@ -59,11 +57,13 @@
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div class="xl:col-span-2 space-y-5">
             <div class="card overflow-hidden animate-slide-up" style="animation-delay:60ms; animation-fill-mode:both;">
-                <div class="card-header flex items-center gap-2">
-                    <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <h3>الأهلية والرصيد</h3>
+                <div class="card-header">
+                    <h3 class="card-header-title">الأهلية والرصيد</h3>
+                    <span class="card-header-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5-2a9 9 0 11-18 0 9 9 0 0118 0"/>
+                        </svg>
+                    </span>
                 </div>
                 <div class="p-5">
                     <div class="rounded-2xl border p-4 {{ ($eligibility['eligible'] ?? false) ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' }}">
@@ -91,11 +91,13 @@
             </div>
 
             <div class="card overflow-hidden animate-slide-up" style="animation-delay:100ms; animation-fill-mode:both;">
-                <div class="card-header flex items-center gap-2">
-                    <svg class="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                    </svg>
-                    <h3>طلب إجازة جديد</h3>
+                <div class="card-header">
+                    <h3 class="card-header-title">طلب إجازة جديد</h3>
+                    <span class="card-header-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </span>
                 </div>
                 <div class="p-5">
                     <form action="{{ route('leave.requests.store') }}" method="POST" class="space-y-4" data-loading="true">
@@ -111,7 +113,7 @@
                             <div>
                                 <label for="end_date" class="form-label">نهاية الإجازة</label>
                                 <input type="date" id="end_date" name="end_date" class="form-input"
-                                       min="{{ $today }}" value="{{ old('end_date') }}"
+                                       :min="endMinDate" value="{{ old('end_date') }}"
                                        x-model="endDate" @change="recalculateDays">
                             </div>
                         </div>
@@ -145,23 +147,18 @@
                 <p class="text-sm font-semibold text-slate-700 mt-1">{{ $employee->department?->managerEmployee?->name ?? 'غير متاح' }}</p>
             </div>
 
-            <div class="card p-5 animate-slide-up" style="animation-delay:160ms; animation-fill-mode:both;">
-                <h3 class="text-sm font-bold text-slate-700">إرشادات سريعة</h3>
-                <ul class="mt-3 space-y-2 text-xs text-slate-500">
-                    <li>• الموافقة الجزئية يحددها HR فقط.</li>
-                    <li>• إذا تم رفض الطلب، يُغلق نهائيًا.</li>
-                    <li>• عند اكتمال الاعتماد يتم خصم الرصيد تلقائيًا.</li>
-                </ul>
-            </div>
+
         </div>
     </div>
 
     <div class="card overflow-hidden animate-slide-up" style="animation-delay:190ms; animation-fill-mode:both;">
-        <div class="card-header flex items-center gap-2">
-            <svg class="w-5 h-5 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9l-4-4H9z"/>
-            </svg>
-            <h3>سجل طلبات الإجازة</h3>
+        <div class="card-header">
+            <h3 class="card-header-title">سجل طلبات الإجازة</h3>
+            <span class="card-header-icon" aria-hidden="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9l-4-4H9z"/>
+                </svg>
+            </span>
         </div>
         <div class="p-5 space-y-3">
             @forelse($leaveRequests as $leave)
@@ -177,7 +174,9 @@
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="{{ $statusBadge[$leave->status] ?? 'badge-gray' }}">{{ $statusLabel[$leave->status] ?? $leave->status }}</span>
                             <span class="badge-gray">HR: {{ $statusLabel[$leave->hr_status] ?? $leave->hr_status }}</span>
-                            <span class="badge-gray">المدير: {{ $statusLabel[$leave->manager_status] ?? $leave->manager_status }}</span>
+                            @if($leave->manager_status !== 'not_required')
+                                <span class="badge-gray">المدير: {{ $statusLabel[$leave->manager_status] ?? $leave->manager_status }}</span>
+                            @endif
                         </div>
                     </div>
                     @if($leave->reason)
@@ -220,10 +219,23 @@ function leaveFormPage() {
         requestedDays: 0,
 
         init() {
+            this.syncEndDateWithStart();
             this.recalculateDays();
         },
 
+        syncEndDateWithStart() {
+            if (!this.startDate) {
+                return;
+            }
+
+            if (!this.endDate || this.endDate < this.startDate) {
+                this.endDate = this.startDate;
+            }
+        },
+
         recalculateDays() {
+            this.syncEndDateWithStart();
+
             if (!this.startDate || !this.endDate) {
                 this.requestedDays = 0;
                 return;
@@ -243,6 +255,14 @@ function leaveFormPage() {
 
         get requestedDaysLabel() {
             return this.requestedDays > 0 ? `${this.requestedDays} يوم` : '—';
+        },
+
+        get endMinDate() {
+            if (this.startDate && this.startDate > '{{ $today }}') {
+                return this.startDate;
+            }
+
+            return '{{ $today }}';
         }
     }
 }

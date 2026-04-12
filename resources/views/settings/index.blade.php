@@ -2,14 +2,14 @@
 
 @section('title', 'إعدادات النظام')
 @section('page-title', 'إعدادات النظام')
-@section('page-subtitle', 'ضبط معاملات الحضور والانصراف وإعدادات الإجازات')
+@section('page-subtitle', 'ضبط معاملات الحضور والانصراف')
 
 @section('content')
 <div class="max-w-3xl mx-auto animate-fade-in">
 
     <form action="{{ route('settings.update') }}" method="POST" id="settings-form"
           data-loading="true" data-loading-target="#settings-save" data-loading-text="جاري الحفظ..."
-          data-confirm="هل تريد حفظ هذه الإعدادات؟ التغييرات ستؤثر على الحسابات الجديدة فقط."
+                        data-confirm="هل تريد حفظ هذه الإعدادات؟"
           data-confirm-title="تأكيد الحفظ" data-confirm-btn="حفظ" data-confirm-type="warning">
         @csrf
         @method('PUT')
@@ -98,54 +98,6 @@
                 </div>
             </div>
 
-            {{-- ===== قسم افتراضيات الإجازات ===== --}}
-            <div class="card overflow-hidden">
-                <div class="card-header">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                            <svg class="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-sm sm:text-base font-bold text-white">افتراضيات الإجازات</h3>
-                            <p class="text-xs text-white/70 hidden sm:block">تُستخدم كقيم ابتدائية عند عدم وجود إعداد خاص لكل موظف</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                        <div class="form-group">
-                            <label class="form-label">أيام الخدمة المطلوبة قبل الإجازة</label>
-                            <div class="relative">
-                                <input type="number" name="default_required_work_days_before_leave" min="0" max="3650" step="1"
-                                       value="{{ old('default_required_work_days_before_leave', $settings['default_required_work_days_before_leave'] ?? 120) }}"
-                                       class="form-input ltr-input pl-12" required>
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">يوم</span>
-                            </div>
-                            <p class="text-xs text-slate-400 mt-1">يمكن تغييره لكل موظف من شاشة إعدادات موظفي الإجازات.</p>
-                            @error('default_required_work_days_before_leave')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">الرصيد السنوي الافتراضي للإجازة</label>
-                            <div class="relative">
-                                <input type="number" name="default_annual_leave_days" min="0" max="365" step="1"
-                                       value="{{ old('default_annual_leave_days', $settings['default_annual_leave_days'] ?? 21) }}"
-                                       class="form-input ltr-input pl-12" required>
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">يوم</span>
-                            </div>
-                            <p class="text-xs text-slate-400 mt-1">يتم تطبيقه على من ليس لديهم رصيد مخصص في إعدادات الموظفين.</p>
-                            @error('default_annual_leave_days')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {{-- ===== قسم قواعد الحضور ===== --}}
             <div class="card overflow-hidden">
                 <div class="card-header">
@@ -188,6 +140,22 @@
 
                     </div>
 
+                    <div class="mt-4 rounded-xl border border-slate-200 p-4 bg-slate-50">
+                        <div class="flex items-start gap-3">
+                            <input type="hidden" name="allow_remote_without_location" value="0">
+                            <input type="checkbox"
+                                   id="allow_remote_without_location"
+                                   name="allow_remote_without_location"
+                                   value="1"
+                                   class="mt-1 h-4 w-4"
+                                   @checked((string) old('allow_remote_without_location', $settings['allow_remote_without_location'] ?? '0') === '1')>
+                            <div>
+                                <label for="allow_remote_without_location" class="form-label !mb-1">السماح بالحضور الأونلاين بدون عنوان</label>
+                                <p class="text-xs text-slate-500">عند التفعيل، يمكن للموظف المصرح له بالريموت تسجيل الحضور والانصراف من أي مكان بدون التقيد بالمواقع المعتمدة.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     {{-- حساب الراتب اليومي التوضيحي --}}
                     <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
                         <p class="text-xs font-bold text-blue-700 mb-2">معادلة الحساب التلقائية (مبنية على راتب كل موظف)</p>
@@ -212,7 +180,7 @@
                     <svg class="w-3.5 h-3.5 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                     </svg>
-                    التغييرات تؤثر على الحسابات الجديدة، ويمكن تجاوز إعدادات الإجازة لكل موظف من شاشة إعدادات الموظفين
+                    هذه الإعدادات تؤثر مباشرة على قواعد الحضور والانصراف
                 </p>
                 <button type="submit"
                         id="settings-save"

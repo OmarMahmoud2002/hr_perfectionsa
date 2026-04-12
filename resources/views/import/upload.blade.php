@@ -10,17 +10,15 @@
     {{-- رفع الملف --}}
     <div class="card">
         <div class="card-header">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-secondary-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-base font-bold text-white">رفع ملف Excel</h3>
-                    <p class="text-xs text-white/70">يدعم صيغ .xlsx و .xls بحجم أقصى 10MB</p>
-                </div>
+            <div>
+                <h3 class="card-header-title text-base">رفع ملف Excel</h3>
+                <p class="text-xs text-white/70 mt-0.5">يدعم صيغ .xlsx و .xls بحجم أقصى 10MB</p>
             </div>
+            <span class="card-header-icon" aria-hidden="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+            </span>
         </div>
         <div class="card-body">
             <form action="{{ route('import.upload') }}" method="POST" enctype="multipart/form-data" id="uploadForm"
@@ -118,19 +116,15 @@
     {{-- سجل الاستيرادات --}}
     <div class="card">
         <div class="card-header">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center shadow-md">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-bold text-white">سجل الاستيرادات</h3>
-                        <p class="text-xs text-white/70">جميع الدفعات المستوردة</p>
-                    </div>
-                </div>
+            <div>
+                <h3 class="card-header-title text-base">سجل الاستيرادات</h3>
+                <p class="text-xs text-white/70 mt-0.5">جميع الدفعات المستوردة</p>
             </div>
+            <span class="card-header-icon" aria-hidden="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+            </span>
         </div>
         <div class="card-body p-0">
             @if($batches->isEmpty())

@@ -6,19 +6,28 @@ use App\Http\Requests\StoreJobTitleRequest;
 use App\Http\Requests\UpdateJobTitleRequest;
 use App\Models\Employee;
 use App\Models\JobTitle;
+use App\Services\Employee\EmployeeAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class JobTitleController extends Controller
 {
+    public function __construct(
+        private readonly EmployeeAccountService $accountService,
+    ) {}
+
     public function index(): View
     {
         $jobTitles = JobTitle::query()
+            ->with([
+                'employees:id,name,ac_no,department_id,job_title_id,job_title',
+                'employees.department:id,name',
+            ])
             ->withCount('employees')
-            ->orderByDesc('is_system')
             ->orderBy('name_ar')
             ->get();
 
@@ -28,6 +37,7 @@ class JobTitleController extends Controller
     public function create(): View
     {
         $employees = Employee::query()
+            ->with('jobTitleRef:id,name_ar')
             ->active()
             ->orderBy('name')
             ->get(['id', 'name', 'job_title_id']);
@@ -38,6 +48,17 @@ class JobTitleController extends Controller
     public function store(StoreJobTitleRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $selectedEmployeeIds = $this->normalizeEmployeeIds($request->input('employee_ids', []));
+        $conflicts = $this->collectJobTitleReassignmentConflicts($selectedEmployeeIds);
+
+        if ($conflicts->isNotEmpty() && ! $request->boolean('confirm_reassignment')) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'employee_ids' => 'تم اكتشاف موظفين مرتبطين مسبقا بوظائف. يلزم تأكيد النقل لإتمام العملية.',
+                ]);
+        }
+
         $generatedKey = $this->generateUniqueKeyFromName((string) $validated['name_ar']);
 
         $jobTitle = JobTitle::query()->create([
@@ -67,6 +88,7 @@ class JobTitleController extends Controller
         $jobTitle->loadMissing('employees:id,name,job_title_id');
 
         $employees = Employee::query()
+            ->with('jobTitleRef:id,name_ar')
             ->active()
             ->orderBy('name')
             ->get(['id', 'name', 'job_title_id']);
@@ -77,31 +99,45 @@ class JobTitleController extends Controller
     public function update(UpdateJobTitleRequest $request, JobTitle $jobTitle): RedirectResponse
     {
         $validated = $request->validated();
+        $shouldSyncAssignments = $request->boolean('manage_employee_assignments');
 
-        if ($jobTitle->is_system) {
-            $jobTitle->update([
-                'name_ar' => $validated['name_ar'],
-                'system_role_mapping' => $validated['system_role_mapping'] ?? $jobTitle->system_role_mapping,
-                'is_active' => (bool) ($validated['is_active'] ?? $jobTitle->is_active),
-            ]);
-        } else {
-            $updateData = [
-                'name_ar' => $validated['name_ar'],
-                'system_role_mapping' => $validated['system_role_mapping'] ?? null,
-                'is_active' => (bool) ($validated['is_active'] ?? $jobTitle->is_active),
-            ];
+        if ($shouldSyncAssignments) {
+            $selectedEmployeeIds = $this->normalizeEmployeeIds($request->input('employee_ids', []));
+            $conflicts = $this->collectJobTitleReassignmentConflicts($selectedEmployeeIds);
 
-            if (array_key_exists('key', $validated) && ! empty($validated['key'])) {
-                $updateData['key'] = $validated['key'];
+            if ($conflicts->isNotEmpty() && ! $request->boolean('confirm_reassignment')) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'employee_ids' => 'تم اكتشاف موظفين مرتبطين مسبقا بوظائف. يلزم تأكيد النقل لإتمام العملية.',
+                    ]);
             }
-
-            $jobTitle->update($updateData);
         }
+
+        $updateData = [
+            'name_ar' => $validated['name_ar'],
+            'system_role_mapping' => $validated['system_role_mapping'] ?? null,
+            'is_active' => (bool) ($validated['is_active'] ?? $jobTitle->is_active),
+        ];
+
+        if (array_key_exists('key', $validated) && ! empty($validated['key'])) {
+            $updateData['key'] = $validated['key'];
+        }
+
+        $jobTitle->update($updateData);
 
         $this->syncEmployees(
             $jobTitle,
             $request->input('employee_ids', []),
-            $request->boolean('manage_employee_assignments')
+            $shouldSyncAssignments
+        );
+
+        $this->syncEmployeeAccountsByIds(
+            Employee::query()
+                ->where('job_title_id', (int) $jobTitle->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all()
         );
 
         return redirect()
@@ -111,10 +147,6 @@ class JobTitleController extends Controller
 
     public function toggle(JobTitle $jobTitle, Request $request): RedirectResponse
     {
-        if ($jobTitle->is_system) {
-            return back()->with('error', 'لا يمكن تعطيل الوظائف النظامية.');
-        }
-
         $jobTitle->update(['is_active' => ! $jobTitle->is_active]);
 
         return back()->with('success', 'تم تحديث حالة الوظيفة بنجاح.');
@@ -122,9 +154,11 @@ class JobTitleController extends Controller
 
     public function destroy(JobTitle $jobTitle): RedirectResponse
     {
-        if ($jobTitle->is_system) {
-            return back()->with('error', 'لا يمكن حذف وظيفة نظامية.');
-        }
+        $affectedEmployeeIds = Employee::query()
+            ->where('job_title_id', (int) $jobTitle->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
         DB::transaction(function () use ($jobTitle): void {
             Employee::query()
@@ -137,6 +171,8 @@ class JobTitleController extends Controller
             $jobTitle->delete();
         });
 
+        $this->syncEmployeeAccountsByIds($affectedEmployeeIds);
+
         return redirect()
             ->route('job-titles.index')
             ->with('success', 'تم حذف الوظيفة بنجاح.');
@@ -148,9 +184,13 @@ class JobTitleController extends Controller
             return;
         }
 
-        $ids = collect(is_array($employeeIds) ? $employeeIds : [])
+        $ids = $this->normalizeEmployeeIds($employeeIds);
+
+        $affectedEmployeeIds = Employee::query()
+            ->where('job_title_id', (int) $jobTitle->id)
+            ->pluck('id')
             ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+            ->merge($ids)
             ->unique()
             ->values()
             ->all();
@@ -173,6 +213,63 @@ class JobTitleController extends Controller
                     ]);
             }
         });
+
+        $this->syncEmployeeAccountsByIds($affectedEmployeeIds);
+    }
+
+    /**
+     * @param mixed $employeeIds
+     * @return array<int,int>
+     */
+    private function normalizeEmployeeIds(mixed $employeeIds): array
+    {
+        return collect(is_array($employeeIds) ? $employeeIds : [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int,int> $employeeIds
+     */
+    private function collectJobTitleReassignmentConflicts(array $employeeIds): Collection
+    {
+        if (empty($employeeIds)) {
+            return collect();
+        }
+
+        return Employee::query()
+            ->whereIn('id', $employeeIds)
+            ->whereNotNull('job_title_id')
+            ->with('jobTitleRef:id,name_ar')
+            ->get(['id', 'name', 'job_title_id'])
+            ->map(function (Employee $employee): array {
+                return [
+                    'id' => (int) $employee->id,
+                    'name' => (string) $employee->name,
+                    'current_job_title' => (string) ($employee->jobTitleRef?->name_ar ?? 'غير محدد'),
+                ];
+            });
+    }
+
+    /**
+     * @param array<int,int> $employeeIds
+     */
+    private function syncEmployeeAccountsByIds(array $employeeIds): void
+    {
+        if (empty($employeeIds)) {
+            return;
+        }
+
+        Employee::query()
+            ->whereIn('id', $employeeIds)
+            ->with(['user', 'jobTitleRef'])
+            ->get()
+            ->each(function (Employee $employee): void {
+                $this->accountService->provisionForEmployee($employee);
+            });
     }
 
     private function generateUniqueKeyFromName(string $name): string

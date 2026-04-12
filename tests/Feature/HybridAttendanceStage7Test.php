@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\Location;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,6 +30,10 @@ class HybridAttendanceStage7Test extends TestCase
             'is_remote_worker' => true,
         ]);
 
+        $employee->remoteWorkDays()->create([
+            'work_date' => now()->toDateString(),
+        ]);
+
         $user = User::factory()->create([
             'role' => 'employee',
             'employee_id' => $employee->id,
@@ -36,6 +41,38 @@ class HybridAttendanceStage7Test extends TestCase
         ]);
 
         return [$user, $employee];
+    }
+
+    public function test_employee_cannot_check_in_on_unscheduled_remote_day(): void
+    {
+        [$user, $employee] = $this->makeEmployeeUser();
+
+        $employee->remoteWorkDays()->delete();
+        $employee->remoteWorkDays()->create([
+            'work_date' => Carbon::tomorrow()->toDateString(),
+        ]);
+
+        $location = Location::create([
+            'name' => 'مكتب التجربة',
+            'latitude' => 30.0444,
+            'longitude' => 31.2357,
+            'radius' => 250,
+        ]);
+
+        $employee->locations()->sync([$location->id]);
+
+        $response = $this->actingAs($user)->postJson(route('attendance.check-in'), [
+            'latitude' => 30.0444,
+            'longitude' => 31.2357,
+            'accuracy' => 20,
+            'client_local_date' => now()->toDateString(),
+            'client_local_time' => '09:42:13',
+            'client_timezone' => 'Asia/Riyadh',
+            'client_timezone_offset_minutes' => 180,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['message' => 'هذا اليوم غير مجدول كدوام ريموت لك.']);
     }
 
     public function test_employee_can_check_in_inside_assigned_location(): void

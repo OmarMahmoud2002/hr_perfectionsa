@@ -14,7 +14,7 @@
 
 {{-- Breadcrumb --}}
 <nav class="breadcrumb">
-    <a href="{{ route('employees.index') }}">الموظفين</a>
+    <a href="{{ route('employees.all-cards') }}">الموظفين</a>
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     <a href="{{ route('employees.show', $employee) }}">{{ $employee->name }}</a>
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -134,6 +134,17 @@
                     <p class="form-error">{{ $message }}</p>
                 @enderror
             </div>
+
+            <div class="form-group md:col-span-2">
+                <label for="employment_start_date" class="form-label">تاريخ بداية العمل</label>
+                <input type="date" id="employment_start_date" name="employment_start_date"
+                       value="{{ old('employment_start_date', optional($employee->leaveProfile?->employment_start_date)->format('Y-m-d')) }}"
+                       class="form-input @error('employment_start_date') border-red-400 focus:ring-red-300 @enderror">
+                <p class="mt-1.5 text-xs text-slate-400">يُستخدم مباشرة في حساب أهلية الإجازة وعدد الأيام المتبقية للأهلية.</p>
+                @error('employment_start_date')
+                    <p class="form-error">{{ $message }}</p>
+                @enderror
+            </div>
             </div>
 
             <hr class="border-slate-100">
@@ -232,6 +243,8 @@
                 </div>
             </div>
 
+            @include('employees.partials.remote-days-selector')
+
             <div id="remote-locations-section" class="space-y-3 {{ $isRemoteWorker ? '' : 'hidden' }}">
                 <div class="flex items-center gap-2">
                     <div class="h-px flex-1 bg-slate-100"></div>
@@ -242,6 +255,7 @@
                 @if(($locations ?? collect())->isNotEmpty())
                     @php
                         $selectedLocationIds = collect($selectedLocationIds ?? old('location_ids', []))->map(fn ($id) => (int) $id)->all();
+                        $allowRemoteFromAnywhere = old('allow_remote_from_anywhere', $employee->allow_remote_from_anywhere ? '1' : '0') === '1';
                     @endphp
 
                     <div class="form-group mb-0">
@@ -262,6 +276,23 @@
                         <p class="mt-1.5 text-xs text-slate-400">يمكن اختيار موقع واحد أو موقعين فقط للدوام الريموت.</p>
                         @error('location_ids')<p class="form-error">{{ $message }}</p>@enderror
                         @error('location_ids.*')<p class="form-error">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 p-4">
+                        <input type="hidden" name="allow_remote_from_anywhere" value="0">
+                        <label class="flex items-start gap-3 cursor-pointer" for="allow_remote_from_anywhere">
+                            <input type="checkbox"
+                                   id="allow_remote_from_anywhere"
+                                   name="allow_remote_from_anywhere"
+                                   value="1"
+                                   class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                   @checked($allowRemoteFromAnywhere)>
+                            <span>
+                                <span class="font-semibold text-slate-700 block">غير مقيد بمكان</span>
+                                <span class="text-xs text-slate-500">عند التفعيل، الموظف يقدر يسجل حضور ريموت من أي مكان في الأيام المسموح بها للريموت.</span>
+                            </span>
+                        </label>
+                        @error('allow_remote_from_anywhere')<p class="form-error mt-2">{{ $message }}</p>@enderror
                     </div>
 
                     <div id="employee-location-map" class="rounded-2xl border border-slate-200 overflow-hidden" style="height: 360px;"></div>

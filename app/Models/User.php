@@ -19,6 +19,8 @@ class User extends Authenticatable
 
     public const WORKFORCE_ROLES = ['employee', 'office_girl'];
 
+    public const EMPLOYEE_OF_MONTH_CANDIDATE_ROLES = ['employee'];
+
     public const EMPLOYEE_OF_MONTH_VOTER_ROLES = ['employee', 'admin', 'manager', 'hr', 'department_manager'];
 
     /**
@@ -106,6 +108,11 @@ class User extends Authenticatable
     public static function employeeOfMonthVoterRoles(): array
     {
         return self::EMPLOYEE_OF_MONTH_VOTER_ROLES;
+    }
+
+    public static function employeeOfMonthCandidateRoles(): array
+    {
+        return self::EMPLOYEE_OF_MONTH_CANDIDATE_ROLES;
     }
 
     public function employee(): BelongsTo

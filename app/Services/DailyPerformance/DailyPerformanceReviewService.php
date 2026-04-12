@@ -35,7 +35,7 @@ class DailyPerformanceReviewService
 
         $employeesQuery = Employee::query()
             ->active()
-            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()))
+            ->whereHas('user', fn ($q) => $q->where('role', 'employee'))
             ->withExists([
                 'dailyPerformanceEntries as has_daily_entry' => fn ($q) => $q->whereDate('work_date', $selectedDate),
             ])
@@ -52,7 +52,9 @@ class DailyPerformanceReviewService
             ->orderByDesc('has_daily_entry')
             ->orderBy('name');
 
-        $this->departmentScopeService->applyEmployeeScope($employeesQuery, $reviewer);
+        if (! $reviewer->isEvaluatorUser()) {
+            $this->departmentScopeService->applyEmployeeScope($employeesQuery, $reviewer);
+        }
 
         if ($employeeId !== null) {
             $employeesQuery->whereKey($employeeId);
@@ -137,9 +139,9 @@ class DailyPerformanceReviewService
     {
         $baseEmployees = Employee::query()
             ->active()
-            ->whereHas('user', fn ($q) => $q->whereIn('role', User::workforceRoles()));
+            ->whereHas('user', fn ($q) => $q->where('role', 'employee'));
 
-        if ($reviewer !== null) {
+        if ($reviewer !== null && ! $reviewer->isEvaluatorUser()) {
             $this->departmentScopeService->applyEmployeeScope($baseEmployees, $reviewer);
         }
 

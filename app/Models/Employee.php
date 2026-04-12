@@ -25,6 +25,7 @@ class Employee extends Model
         'basic_salary',
         'is_active',
         'is_remote_worker',
+        'allow_remote_from_anywhere',
         'work_start_time',
         'work_end_time',
         'overtime_start_time',
@@ -35,6 +36,7 @@ class Employee extends Model
         'basic_salary'       => 'decimal:2',
         'is_active'          => 'boolean',
         'is_remote_worker'   => 'boolean',
+        'allow_remote_from_anywhere' => 'boolean',
         'is_department_manager' => 'boolean',
         'late_grace_minutes' => 'integer',
         'job_title'          => LegacyJobTitle::class,
@@ -89,6 +91,11 @@ class Employee extends Model
     {
         return $this->belongsToMany(Location::class, 'employee_location')
             ->withTimestamps();
+    }
+
+    public function remoteWorkDays(): HasMany
+    {
+        return $this->hasMany(EmployeeRemoteWorkDay::class, 'employee_id');
     }
 
     public function dailyPerformanceEntries(): HasMany

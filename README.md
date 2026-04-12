@@ -59,6 +59,10 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 - راقب حدود الرفع (`upload_max_filesize`, `post_max_size`).
 - احتفظ بـ `APP_KEY` سرياً، ولا ترفع ملف `.env` للمستودع.
 
+### توثيق الصلاحيات
+- مرجع الصلاحيات ومسارات الوصول الحساسة موجود في: `docs/access-control-rules.md`.
+- عند أي تعديل في الصلاحيات أو المسارات، يجب تحديث الوثيقة وتشغيل اختبارات الصلاحيات.
+
 ### هيكل مختصر
 - `app/Http/Controllers` — منطق الحضور، الاستيراد، الرواتب، الإعدادات.
 - `app/Services` — الحسابات ومعالجة Excel.

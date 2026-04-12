@@ -5,7 +5,11 @@
 @section('page-subtitle', 'مراجعة الإعدادات والإجازات قبل تنفيذ الاستيراد')
 
 @section('content')
-<div class="space-y-6 animate-fade-in">
+<div id="import-confirm-page"
+    class="space-y-6 animate-fade-in"
+    data-requires-replacement="{{ $existingBatch ? '1' : '0' }}"
+    data-import-month="{{ $batch->month_name }}"
+    data-import-year="{{ $batch->year }}">
 
     {{-- معاينة الدفعة --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -105,18 +109,16 @@
             {{-- إعدادات الاستيراد --}}
             <div class="card">
                 <div class="card-header">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-secondary-600 rounded-xl flex items-center justify-center shadow-md">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-base font-bold text-white">إعدادات الحساب</h3>
-                            <p class="text-xs text-white/70">تخصيص لهذا الشهر فقط (اختياري)</p>
-                        </div>
+                    <div>
+                        <h3 class="card-header-title text-base">إعدادات الحساب</h3>
+                        <p class="text-xs text-white/70 mt-0.5">تخصيص لهذا الشهر فقط (اختياري)</p>
                     </div>
+                    <span class="card-header-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </span>
                 </div>
                 <div class="card-body space-y-5">
 
@@ -185,7 +187,7 @@
                     <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                         <p class="text-xs text-slate-500 leading-relaxed">
                             <svg class="w-3.5 h-3.5 inline ml-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            اترك الحقول فارغة لاستخدام الإعدادات الافتراضية. يمكنك تعديل الإعدادات الافتراضية من صفحة <a href="{{ route('settings.index') }}" class="text-secondary-600 hover:underline">الإعدادات</a>.
+                            اترك الحقول فارغة لاستخدام الإعدادات الافتراضية. يمكنك تعديل افتراضيات الإجازات من صفحة <a href="{{ route('leave.approvals.employee-settings') }}" class="text-secondary-600 hover:underline">لوحة إعدادات الموظفين</a>.
                         </p>
                     </div>
                 </div>
@@ -194,17 +196,15 @@
             {{-- الإجازات الرسمية --}}
             <div class="card">
                 <div class="card-header">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center shadow-md">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-base font-bold text-white">الإجازات الرسمية</h3>
-                            <p class="text-xs text-white/70">اختياري — أضف إجازات لاستثنائها من الحساب إن وجدت</p>
-                        </div>
+                    <div>
+                        <h3 class="card-header-title text-base">الإجازات الرسمية</h3>
+                        <p class="text-xs text-white/70 mt-0.5">اختياري — أضف إجازات لاستثنائها من الحساب إن وجدت</p>
                     </div>
+                    <span class="card-header-icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </span>
                 </div>
                 <div class="card-body space-y-4">
 
@@ -316,7 +316,11 @@
 
 @push('scripts')
 <script>
-    @if($existingBatch)
+    const pageRoot = document.getElementById('import-confirm-page');
+    const requiresReplacementConfirmation = pageRoot?.dataset.requiresReplacement === '1';
+    const importMonthName = pageRoot?.dataset.importMonth || '';
+    const importYear = pageRoot?.dataset.importYear || '';
+
     function handleConfirmImport() {
         const checkbox = document.getElementById('replaceToggle');
         if (!checkbox?.checked) {
@@ -339,7 +343,7 @@
         }
         showConfirm({
             title:       'تأكيد استبدال البيانات',
-            message:     'سيتم حذف بيانات شهر {{ $batch->month_name }} {{ $batch->year }} القديمة نهائياً واستبدالها بالبيانات الجديدة.',
+            message:     `سيتم حذف بيانات شهر ${importMonthName} ${importYear} القديمة نهائياً واستبدالها بالبيانات الجديدة.`,
             confirmText: 'نعم، استبدل',
             type:        'danger',
             onConfirm: function () {
@@ -350,18 +354,19 @@
             },
         });
     }
-    @else
-    document.getElementById('confirmForm').addEventListener('submit', function(e) {
-        const btn = document.getElementById('confirmBtn');
-        btn.disabled = true;
-        btn.innerHTML = `
-            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            جاري الاستيراد...
-        `;
-    });
-    @endif
+
+    if (!requiresReplacementConfirmation) {
+        document.getElementById('confirmForm').addEventListener('submit', function () {
+            const btn = document.getElementById('confirmBtn');
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                جاري الاستيراد...
+            `;
+        });
+    }
 </script>
 @endpush

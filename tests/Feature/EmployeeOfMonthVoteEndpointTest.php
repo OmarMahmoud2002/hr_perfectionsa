@@ -141,6 +141,28 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
         ]);
     }
 
+    public function test_non_employee_roles_are_not_valid_vote_candidates(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
+
+        [$voterUser] = $this->createEmployeeUser('Voter Candidate Guard', 'AC-VCG');
+        [, $officeGirlEmployee] = $this->createUserWithRoleAndEmployee('Office Candidate', 'AC-OC', 'office_girl');
+
+        $this->actingAs($voterUser)
+            ->get(route('employee-of-month.vote.page'))
+            ->assertOk()
+            ->assertDontSee($officeGirlEmployee->name);
+
+        $this->actingAs($voterUser)
+            ->postJson(route('employee-of-month.vote.store'), [
+                'voted_employee_id' => $officeGirlEmployee->id,
+            ])
+            ->assertStatus(422)
+            ->assertJson([
+                'reason' => 'ineligible_candidate',
+            ]);
+    }
+
     public function test_duplicate_vote_returns_already_voted_without_new_row(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 3, 10, 12, 0, 0, config('app.timezone')));
@@ -214,6 +236,11 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
 
     private function createEmployeeUser(string $name, string $acNo): array
     {
+        return $this->createUserWithRoleAndEmployee($name, $acNo, 'employee');
+    }
+
+    private function createUserWithRoleAndEmployee(string $name, string $acNo, string $role): array
+    {
         $employee = Employee::factory()->create([
             'name' => $name,
             'ac_no' => $acNo,
@@ -222,7 +249,7 @@ class EmployeeOfMonthVoteEndpointTest extends TestCase
 
         $user = User::factory()->create([
             'name' => $name,
-            'role' => 'employee',
+            'role' => $role,
             'employee_id' => $employee->id,
             'must_change_password' => false,
         ]);

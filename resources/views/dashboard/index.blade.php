@@ -191,7 +191,7 @@
                 <span class="leading-tight">حساب الرواتب</span>
             </a>
 
-            <a href="{{ route('employees.index') }}"
+                <a href="{{ route('employees.index') }}"
                class="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-2xl text-slate-700 text-center text-xs font-semibold
                       bg-slate-100 hover:bg-slate-200 transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98]">
                 <svg class="w-6 h-6 sm:w-7 sm:h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

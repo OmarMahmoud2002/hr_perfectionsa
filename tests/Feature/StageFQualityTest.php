@@ -36,7 +36,7 @@ class StageFQualityTest extends TestCase
         $this->actingAs($admin)->get(route('tasks.my.index'))->assertForbidden();
 
         $this->actingAs($evaluator)->get(route('tasks.evaluator.index'))->assertOk();
-        $this->actingAs($evaluator)->get(route('employees.index'))->assertForbidden();
+        $this->actingAs($evaluator)->get(route('employees.index'))->assertOk();
         $this->actingAs($evaluator)->get(route('account.my'))->assertOk();
         $this->actingAs($evaluator)->get(route('tasks.admin.index'))->assertForbidden();
         $this->actingAs($evaluator)->get(route('employee-of-month.admin.index'))->assertForbidden();

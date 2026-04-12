@@ -31,19 +31,53 @@ class EmployeeController extends Controller
      */
     public function index(Request $request): View
     {
-        $filters = $request->only(['search', 'status']);
         $actor = $request->user();
-        $showAllEmployees = $actor?->isDepartmentManager() && $request->boolean('all_employees');
-        $forceCards = $request->boolean('cards');
 
+        if (in_array((string) $actor?->role, ['employee', 'office_girl'], true)) {
+            return $this->allCards($request);
+        }
+
+        $filters = $request->only(['search', 'status']);
         $employees = $this->employeeService->getEmployees(
             $filters,
             perPage: 15,
             actor: $actor,
-            applyVisibilityScope: ! $showAllEmployees,
         );
 
-        return view('employees.index', compact('employees', 'filters', 'forceCards', 'showAllEmployees'));
+        return view('employees.index', [
+            'employees' => $employees,
+            'filters' => $filters,
+        ]);
+    }
+
+    public function allCards(Request $request): View
+    {
+        $actor = $request->user();
+
+        abort_unless(
+            in_array((string) $actor?->role, ['admin', 'manager', 'hr', 'department_manager', 'employee', 'office_girl', 'user'], true),
+            403
+        );
+
+        $search = trim((string) $request->query('search', ''));
+
+        $query = Employee::query()
+            ->with(['user.profile', 'department:id,name', 'jobTitleRef:id,name_ar', 'leaveProfile:employee_id,employment_start_date'])
+            ->orderBy('name');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search): void {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('ac_no', 'like', "%{$search}%");
+            });
+        }
+
+        $employees = $query->paginate(18)->withQueryString();
+
+        return view('employees.all-cards', [
+            'employees' => $employees,
+            'search' => $search,
+        ]);
     }
 
     /**
@@ -77,8 +111,17 @@ class EmployeeController extends Controller
         $locationIds = $request->boolean('is_remote_worker')
             ? $request->input('location_ids', [])
             : [];
+        $remoteAllowedDates = $request->boolean('is_remote_worker')
+            ? array_values(array_unique((array) $request->input('remote_allowed_dates', [])))
+            : [];
 
         $employee->locations()->sync($locationIds);
+        $employee->remoteWorkDays()->delete();
+        if (! empty($remoteAllowedDates)) {
+            $employee->remoteWorkDays()->createMany(
+                collect($remoteAllowedDates)->map(fn (string $date) => ['work_date' => $date])->all()
+            );
+        }
         $account = $employee->user;
 
         return redirect()
@@ -140,7 +183,7 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): View
     {
-        $employee->loadMissing('user', 'locations', 'department', 'jobTitleRef');
+        $employee->loadMissing('user', 'locations', 'department', 'jobTitleRef', 'remoteWorkDays');
 
         $locations = Location::query()
             ->orderBy('name')
@@ -157,8 +200,12 @@ class EmployeeController extends Controller
             ->get(['id', 'name_ar', 'key', 'system_role_mapping']);
 
         $selectedLocationIds = old('location_ids', $employee->locations->pluck('id')->all());
+        $selectedRemoteDates = old(
+            'remote_allowed_dates',
+            $employee->remoteWorkDays->pluck('work_date')->map(fn ($date) => (string) $date->toDateString())->all()
+        );
 
-        return view('employees.edit', compact('employee', 'locations', 'selectedLocationIds', 'departments', 'jobTitles'));
+        return view('employees.edit', compact('employee', 'locations', 'selectedLocationIds', 'selectedRemoteDates', 'departments', 'jobTitles'));
     }
 
     /**
@@ -170,8 +217,17 @@ class EmployeeController extends Controller
         $locationIds = $request->boolean('is_remote_worker')
             ? $request->input('location_ids', [])
             : [];
+        $remoteAllowedDates = $request->boolean('is_remote_worker')
+            ? array_values(array_unique((array) $request->input('remote_allowed_dates', [])))
+            : [];
 
         $employee->locations()->sync($locationIds);
+        $employee->remoteWorkDays()->delete();
+        if (! empty($remoteAllowedDates)) {
+            $employee->remoteWorkDays()->createMany(
+                collect($remoteAllowedDates)->map(fn (string $date) => ['work_date' => $date])->all()
+            );
+        }
         $account = $employee->user;
 
         return redirect()

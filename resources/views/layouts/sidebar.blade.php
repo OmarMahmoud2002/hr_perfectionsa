@@ -32,6 +32,15 @@
             $activeClass = "bg-white/20 text-white shadow-inner";
             $inactiveClass = "text-white/70 hover:bg-white/10 hover:text-white";
             $isAdminLike = auth()->user()->isAdminLike();
+            $isEmployeeCardsOnly = in_array((string) auth()->user()->role, ['employee', 'office_girl', 'user', 'department_manager'], true);
+            $employeesRoute = $isEmployeeCardsOnly ? route('employees.all-cards') : route('employees.index');
+            $employeesActive = request()->routeIs('employees.index')
+                || request()->routeIs('employees.all-cards')
+                || request()->routeIs('employees.show')
+                || request()->routeIs('employees.edit')
+                || request()->routeIs('employees.create');
+            $role = (string) auth()->user()->role;
+            $canUseRemoteAttendance = in_array($role, ['employee', 'office_girl', 'department_manager', 'hr', 'admin', 'manager'], true);
         @endphp
 
         @if(!auth()->user()->isEvaluatorUser())
@@ -76,7 +85,7 @@
         </a>
         @endif
 
-        @if(auth()->user()->isEmployee())
+        @if($canUseRemoteAttendance)
         <a href="{{ route('attendance.remote.page') }}"
            class="{{ $linkClass }} {{ request()->routeIs('attendance.remote.page') ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,17 +126,6 @@
             @endif
         </a>
 
-        <a href="{{ route('leave.approvals.index') }}"
-           class="{{ $linkClass }} {{ request()->routeIs('leave.approvals.*') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 12h6m-3-9v18m9-9H3"/>
-            </svg>
-            <span>مراجعة طلبات الإجازة</span>
-            @if(request()->routeIs('leave.approvals.*'))
-                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
-            @endif
-        </a>
         @endif
 
         @if(auth()->user()->isEmployee())
@@ -169,17 +167,6 @@
             @endif
         </a>
 
-        <a href="{{ route('leave.approvals.index') }}"
-           class="{{ $linkClass }} {{ request()->routeIs('leave.approvals.*') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 12h6m-3-9v18m9-9H3"/>
-            </svg>
-            <span>طلبات الإجازات</span>
-            @if(request()->routeIs('leave.approvals.*'))
-                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
-            @endif
-        </a>
         @endif
 
         @if($isAdminLike)
@@ -231,17 +218,33 @@
             @endif
         </a>
 
+        @if(in_array(auth()->user()->role, ['hr', 'admin'], true))
+        <a href="{{ route('leave.requests.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('leave.requests.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <span>طلب إجازة</span>
+            @if(request()->routeIs('leave.requests.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+        @endif
+
+        @if(in_array(auth()->user()->role, ['hr', 'admin', 'manager'], true))
         <a href="{{ route('leave.approvals.index') }}"
            class="{{ $linkClass }} {{ request()->routeIs('leave.approvals.*') ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M9 12h6m-3-9v18m9-9H3"/>
             </svg>
-            <span>اعتمادات الإجازات</span>
+            <span>مراجعة طلبات الإجازة</span>
             @if(request()->routeIs('leave.approvals.*'))
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
+        @endif
         @endif
 
         @if(auth()->user()->isDepartmentManager())
@@ -292,6 +295,19 @@
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
+
+        <a href="{{ route('leave.approvals.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('leave.approvals.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12h6m-3-9v18m9-9H3"/>
+            </svg>
+            <span>مراجعة طلبات الإجازة</span>
+            @if(request()->routeIs('leave.approvals.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+
         @endif
 
         {{-- Divider --}}
@@ -301,31 +317,17 @@
 
         @can('viewAny', \App\Models\Employee::class)
         {{-- Employees --}}
-        <a href="{{ auth()->user()->isDepartmentManager() ? route('employees.index', ['cards' => 1]) : route('employees.index') }}"
-           class="{{ $linkClass }} {{ request()->routeIs('employees.*') ? $activeClass : $inactiveClass }}">
+        <a href="{{ $employeesRoute }}"
+           class="{{ $linkClass }} {{ $employeesActive ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
             </svg>
-            <span>{{ auth()->user()->isDepartmentManager() ? 'موظفي القسم' : 'الموظفين' }}</span>
-            @if(request()->routeIs('employees.*'))
+            <span>{{ $isEmployeeCardsOnly ? 'عرض كل الموظفين' : 'الموظفين' }}</span>
+            @if($employeesActive)
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
-
-        @if(auth()->user()->isDepartmentManager())
-        <a href="{{ route('employees.index', ['all_employees' => 1, 'cards' => 1]) }}"
-           class="{{ $linkClass }} {{ request()->routeIs('employees.*') && request('all_employees') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-            <span>كل الموظفين</span>
-            @if(request()->routeIs('employees.*') && request('all_employees'))
-                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
-            @endif
-        </a>
-        @endif
         @endcan
 
         @if($isAdminLike)

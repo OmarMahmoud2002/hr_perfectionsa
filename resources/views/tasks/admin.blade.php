@@ -162,12 +162,20 @@
                         <label class="form-label" for="employee_ids">
                             <span class="text-red-500 ml-1">*</span>اختر الموظفين
                         </label>
-                        <select id="employee_ids" name="employee_ids[]" class="form-input" multiple size="5" required>
+                        <div class="rounded-xl border border-slate-200 p-2 max-h-56 overflow-y-auto space-y-1.5">
                             @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}">{{ $employee->name }} — {{ $employee->position_line }}</option>
+                                <label class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 cursor-pointer hover:bg-slate-50 transition">
+                                    <input type="checkbox" name="employee_ids[]" value="{{ $employee->id }}"
+                                           class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-300"
+                                           @checked(in_array((int) $employee->id, old('employee_ids', []), true))>
+                                    <span class="flex-1 text-sm text-slate-700">
+                                        <span class="font-semibold text-slate-800">{{ $employee->name }}</span>
+                                        <span class="text-slate-500"> — {{ $employee->position_line }}</span>
+                                    </span>
+                                </label>
                             @endforeach
-                        </select>
-                        <p class="form-hint">اضغط <kbd class="px-1.5 py-0.5 text-xs bg-slate-100 rounded border border-slate-300">Ctrl</kbd> لاختيار أكثر من موظف.</p>
+                        </div>
+                        <p class="form-hint">اختر موظفًا واحدًا على الأقل.</p>
                     </div>
                 </div>
 
@@ -415,13 +423,19 @@
                             </div>
                             <div class="form-group mb-0">
                                 <label class="form-label">الموظفون</label>
-                                <select name="employee_ids[]" class="form-input" multiple size="4" required>
+                                <div class="rounded-xl border border-slate-200 p-2 max-h-52 overflow-y-auto space-y-1.5">
                                     @foreach($employees as $emp)
-                                        <option value="{{ $emp->id }}" {{ $task->employees->contains('id', $emp->id) ? 'selected' : '' }}>
-                                            {{ $emp->name }} - {{ $emp->position_line }}
-                                        </option>
+                                        <label class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 cursor-pointer hover:bg-slate-50 transition">
+                                            <input type="checkbox" name="employee_ids[]" value="{{ $emp->id }}"
+                                                   class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-300"
+                                                   @checked($task->employees->contains('id', $emp->id))>
+                                            <span class="flex-1 text-sm text-slate-700">
+                                                <span class="font-semibold text-slate-800">{{ $emp->name }}</span>
+                                                <span class="text-slate-500"> — {{ $emp->position_line }}</span>
+                                            </span>
+                                        </label>
                                     @endforeach
-                                </select>
+                                </div>
                             </div>
 
                             {{-- Existing Attachments --}}

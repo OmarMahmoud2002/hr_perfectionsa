@@ -11,7 +11,8 @@ class EmployeeVisibilityPolicy
     {
         return $user->isAdminLike()
             || $user->isDepartmentManager()
-            || $user->isWorkforceMember();
+            || $user->isWorkforceMember()
+            || $user->isEvaluatorUser();
     }
 
     public function view(User $user, Employee $employee): bool

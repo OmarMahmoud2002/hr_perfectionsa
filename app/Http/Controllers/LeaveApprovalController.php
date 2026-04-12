@@ -8,8 +8,10 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Services\Leave\LeaveApprovalService;
+use App\Services\Leave\LeaveBalanceService;
 use App\Services\Leave\LeaveEligibilityService;
 use App\Services\Leave\LeaveRequestException;
+use App\Services\Setting\SettingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,17 +23,23 @@ class LeaveApprovalController extends Controller
     public function __construct(
         private readonly LeaveApprovalService $approvalService,
         private readonly LeaveEligibilityService $eligibilityService,
+        private readonly LeaveBalanceService $balanceService,
+        private readonly SettingService $settingService,
     ) {}
 
     private function ensureHrLikeAccess(Request $request): void
     {
-        abort_unless(in_array((string) $request->user()?->role, ['admin', 'manager', 'hr'], true), 403);
+        abort_unless(in_array((string) $request->user()?->role, ['hr', 'admin', 'manager'], true), 403);
     }
 
     public function index(Request $request): View
     {
         $actor = $request->user();
-        $isHrLike = in_array($actor->role, ['admin', 'manager', 'hr'], true);
+        $actorRole = (string) ($actor->role ?? '');
+        $isHrLike = in_array($actorRole, ['hr', 'admin'], true);
+        $isManager = $actorRole === 'manager';
+        $isDepartmentManager = $actorRole === 'department_manager';
+        $actorEmployeeId = (int) ($actor->employee_id ?? 0);
 
         $statusFilter = (string) $request->query('status', 'all');
         $monthFilter = (int) $request->query('month', (int) now()->month);
@@ -49,10 +57,8 @@ class LeaveApprovalController extends Controller
             ->orderByDesc('submitted_at')
             ->orderByDesc('id');
 
-        if (! $isHrLike) {
-            $query
-                ->where('manager_employee_id', (int) ($actor->employee_id ?? 0))
-                ->where('manager_status', '!=', 'not_required');
+        if ($isDepartmentManager) {
+            $query->where('manager_employee_id', $actorEmployeeId);
         }
 
         if ($statusFilter !== 'all') {
@@ -67,7 +73,9 @@ class LeaveApprovalController extends Controller
             'monthFilter' => $monthFilter,
             'yearFilter' => $yearFilter,
             'isHrLike' => $isHrLike,
-            'actorEmployeeId' => (int) ($actor->employee_id ?? 0),
+            'isManager' => $isManager,
+            'isDepartmentManager' => $isDepartmentManager,
+            'actorEmployeeId' => $actorEmployeeId,
         ]);
     }
 
@@ -84,7 +92,7 @@ class LeaveApprovalController extends Controller
                 'department:id,name,manager_employee_id',
                 'department.managerEmployee.user:id,name,employee_id',
                 'leaveProfile:employee_id,employment_start_date,required_work_days_before_leave,annual_leave_quota',
-                'leaveBalances' => fn ($q) => $q->where('year', $year),
+                'leaveBalances',
             ])
             ->orderBy('name');
 
@@ -103,8 +111,13 @@ class LeaveApprovalController extends Controller
 
         $employees->getCollection()->transform(function (Employee $employee) use ($year) {
             $eligibility = $this->eligibilityService->evaluate($employee);
-            $balance = $employee->leaveBalances->first();
-            $annualQuota = (int) ($employee->leaveProfile?->annual_leave_quota ?? $eligibility['annual_leave_quota']);
+            $cycle = $this->balanceService->resolveCycleForDate($employee, now());
+            $cycleYear = (int) ($cycle['cycle_year'] ?? 0);
+            $balance = $employee->leaveBalances->firstWhere('year', $cycleYear)
+                ?? $employee->leaveBalances->firstWhere('year', $year);
+            $annualQuota = (int) ($balance?->annual_quota_days
+                ?? $employee->leaveProfile?->annual_leave_quota
+                ?? $eligibility['annual_leave_quota']);
             $usedDays = (int) ($balance?->used_days ?? 0);
             $remainingDays = (int) ($balance?->remaining_days ?? max(0, $annualQuota - $usedDays));
 
@@ -115,6 +128,9 @@ class LeaveApprovalController extends Controller
                 'used_days' => $usedDays,
                 'remaining_days' => $remainingDays,
                 'required_work_days' => (int) ($eligibility['required_work_days'] ?? 0),
+                'cycle_year' => $cycleYear,
+                'cycle_start' => $cycle['cycle_start']?->format('Y-m-d'),
+                'cycle_end' => $cycle['cycle_end']?->format('Y-m-d'),
             ]);
 
             return $employee;
@@ -180,21 +196,15 @@ class LeaveApprovalController extends Controller
     {
         $this->ensureHrLikeAccess($request);
 
-        $year = (int) $request->input('year', (int) now()->year);
-
         $validator = Validator::make($request->all(), [
             'year' => ['required', 'integer', 'min:2020', 'max:2100'],
-            'rows' => ['required', 'array', 'min:1'],
-            'rows.*.employee_id' => ['required', 'integer', 'exists:employees,id'],
-            'rows.*.employment_start_date' => ['nullable', 'date'],
-            'rows.*.required_work_days_before_leave' => ['nullable', 'integer', 'min:0', 'max:3650'],
-            'rows.*.annual_leave_quota' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'global_required_work_days_before_leave' => ['required', 'integer', 'min:0', 'max:3650'],
+            'global_annual_leave_quota' => ['required', 'integer', 'min:0', 'max:365'],
         ], [
-            'rows.required' => 'لا توجد بيانات للحفظ.',
-            'rows.*.employee_id.exists' => 'أحد الموظفين المحددين غير موجود.',
-            'rows.*.employment_start_date.date' => 'تاريخ بداية العمل غير صالح.',
-            'rows.*.required_work_days_before_leave.integer' => 'أيام الخدمة يجب أن تكون رقمًا صحيحًا.',
-            'rows.*.annual_leave_quota.integer' => 'الرصيد السنوي يجب أن يكون رقمًا صحيحًا.',
+            'global_required_work_days_before_leave.required' => 'يرجى إدخال عدد أيام الخدمة قبل الإجازة.',
+            'global_required_work_days_before_leave.integer' => 'أيام الخدمة يجب أن تكون رقمًا صحيحًا.',
+            'global_annual_leave_quota.required' => 'يرجى إدخال إجمالي الرصيد السنوي.',
+            'global_annual_leave_quota.integer' => 'الرصيد السنوي يجب أن يكون رقمًا صحيحًا.',
         ]);
 
         if ($validator->fails()) {
@@ -202,36 +212,37 @@ class LeaveApprovalController extends Controller
         }
 
         $validated = $validator->validated();
+        $year = (int) $validated['year'];
+        $globalRequiredDays = (int) $validated['global_required_work_days_before_leave'];
+        $globalAnnualQuota = (int) $validated['global_annual_leave_quota'];
 
-        DB::transaction(function () use ($validated, $year): void {
-            foreach ($validated['rows'] as $row) {
-                $employee = Employee::query()->findOrFail((int) $row['employee_id']);
+        $this->settingService->save([
+            'default_required_work_days_before_leave' => $globalRequiredDays,
+            'default_annual_leave_days' => $globalAnnualQuota,
+        ], 'attendance');
 
+        $employees = Employee::query()->get(['id']);
+
+        DB::transaction(function () use ($employees, $year, $globalRequiredDays, $globalAnnualQuota): void {
+            foreach ($employees as $employee) {
                 $profile = $employee->leaveProfile()->firstOrNew();
                 $profile->employee_id = (int) $employee->id;
-                $profile->employment_start_date = $row['employment_start_date'] ?: null;
-                $profile->required_work_days_before_leave = $row['required_work_days_before_leave'] !== null
-                    ? (int) $row['required_work_days_before_leave']
-                    : null;
-                $profile->annual_leave_quota = $row['annual_leave_quota'] !== null
-                    ? (int) $row['annual_leave_quota']
-                    : null;
+                $profile->required_work_days_before_leave = $globalRequiredDays;
+                $profile->annual_leave_quota = $globalAnnualQuota;
                 $profile->save();
-
-                $annualQuota = (int) ($profile->annual_leave_quota ?? $this->eligibilityService->annualLeaveQuota());
 
                 $balance = LeaveBalance::query()->firstOrCreate(
                     ['employee_id' => (int) $employee->id, 'year' => $year],
-                    ['annual_quota_days' => $annualQuota, 'used_days' => 0, 'remaining_days' => $annualQuota]
+                    ['annual_quota_days' => $globalAnnualQuota, 'used_days' => 0, 'remaining_days' => $globalAnnualQuota]
                 );
 
-                $balance->annual_quota_days = $annualQuota;
+                $balance->annual_quota_days = $globalAnnualQuota;
                 $balance->remaining_days = max(0, (int) $balance->annual_quota_days - (int) $balance->used_days);
                 $balance->save();
             }
         });
 
-        return back()->with('success', 'تم حفظ جميع تعديلات إعدادات الموظفين بنجاح.');
+        return back()->with('success', 'تم تطبيق الإعدادات الموحدة على جميع الموظفين وتحديث الافتراضيات بنجاح.');
     }
 
     public function applyDefaultEmployeeSettings(Request $request): RedirectResponse
@@ -274,16 +285,14 @@ class LeaveApprovalController extends Controller
     public function decide(DecideLeaveRequestRequest $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         try {
-            $approvedDates = $request->input('approved_dates');
-
             $this->approvalService->decide(
                 $leaveRequest,
                 $request->user(),
                 (string) $request->string('decision'),
-                $request->filled('approved_days') ? (int) $request->integer('approved_days') : null,
+                null,
                 $request->filled('note') ? (string) $request->string('note') : null,
                 now(),
-                is_array($approvedDates) ? $approvedDates : null,
+                null,
             );
         } catch (LeaveRequestException $e) {
             return back()->withInput()->with('error', $e->getMessage());

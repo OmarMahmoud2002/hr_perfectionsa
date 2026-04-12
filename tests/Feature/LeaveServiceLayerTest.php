@@ -67,7 +67,7 @@ class LeaveServiceLayerTest extends TestCase
         $this->assertSame(3, $request->requested_days);
     }
 
-    public function test_leave_request_dual_approval_with_hr_partial_approval_updates_balance(): void
+    public function test_leave_request_dual_approval_with_hr_full_approval_updates_balance(): void
     {
         $managerEmployee = Employee::factory()->create([
             'is_active' => true,
@@ -120,34 +120,34 @@ class LeaveServiceLayerTest extends TestCase
             'must_change_password' => false,
         ]);
 
-        $updated = $approvalService->decide($request, $hrUser, 'partially_approved', 2, 'Reduced by HR');
+        $updated = $approvalService->decide($request, $hrUser, 'approved', null, 'Approved by HR');
 
-        $this->assertSame('partially_approved', $updated->status);
+        $this->assertSame('approved', $updated->status);
         $this->assertSame('approved', $updated->manager_status);
-        $this->assertSame('partially_approved', $updated->hr_status);
-        $this->assertSame(2, $updated->final_approved_days);
+        $this->assertSame('approved', $updated->hr_status);
+        $this->assertSame(4, $updated->final_approved_days);
         $this->assertNotNull($updated->finalized_at);
 
         $this->assertDatabaseHas('leave_balances', [
             'employee_id' => $employee->id,
             'year' => app(LeaveBalanceService::class)->resolveCycleForDate($employee, $request->start_date->copy())['cycle_year'],
             'annual_quota_days' => 10,
-            'used_days' => 2,
-            'remaining_days' => 8,
+            'used_days' => 4,
+            'remaining_days' => 6,
         ]);
 
         $this->assertDatabaseCount('leave_request_approvals', 2);
 
         $this->assertDatabaseHas('leave_requests', [
             'id' => $request->id,
-            'status' => 'partially_approved',
-            'final_approved_days' => 2,
+            'status' => 'approved',
+            'final_approved_days' => 4,
         ]);
 
         $this->assertDatabaseHas('leave_request_approvals', [
             'leave_request_id' => $request->id,
             'actor_user_id' => $managerUser->id,
-            'actor_role' => 'department_manager',
+            'actor_role' => 'manager',
             'decision' => 'approved',
         ]);
     }
@@ -194,5 +194,59 @@ class LeaveServiceLayerTest extends TestCase
             'Boundary spanning request',
             Carbon::create(2026, 6, 1)
         );
+    }
+
+    public function test_finalized_leave_request_does_not_consume_balance_twice_on_redecision_attempt(): void
+    {
+        $employee = Employee::factory()->create(['is_active' => true]);
+
+        EmployeeLeaveProfile::query()->create([
+            'employee_id' => $employee->id,
+            'employment_start_date' => now()->subDays(300)->toDateString(),
+            'required_work_days_before_leave' => 120,
+            'annual_leave_quota' => 12,
+        ]);
+
+        $request = app(LeaveRequestService::class)->submit(
+            $employee,
+            Carbon::create((int) now()->year, 7, 5),
+            Carbon::create((int) now()->year, 7, 6),
+            'Double decision guard',
+            now()
+        );
+
+        $approvalService = app(LeaveApprovalService::class);
+        $hrUser = User::factory()->create([
+            'role' => 'hr',
+            'must_change_password' => false,
+        ]);
+
+        $approvalService->decide($request, $hrUser, 'approved', null, 'Initial approve');
+
+        $cycleYear = app(LeaveBalanceService::class)
+            ->resolveCycleForDate($employee, $request->start_date->copy())['cycle_year'];
+
+        $balanceAfterFirstDecision = \App\Models\LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('year', $cycleYear)
+            ->firstOrFail();
+
+        $this->assertSame(2, (int) $balanceAfterFirstDecision->used_days);
+        $this->assertSame(10, (int) $balanceAfterFirstDecision->remaining_days);
+
+        try {
+            $approvalService->decide($request, $hrUser, 'approved', null, 'Second approve attempt');
+            $this->fail('Expected LeaveRequestException was not thrown on re-decision attempt.');
+        } catch (LeaveRequestException $e) {
+            $this->assertSame('request_already_finalized', $e->reason());
+        }
+
+        $balanceAfterSecondAttempt = \App\Models\LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('year', $cycleYear)
+            ->firstOrFail();
+
+        $this->assertSame(2, (int) $balanceAfterSecondAttempt->used_days);
+        $this->assertSame(10, (int) $balanceAfterSecondAttempt->remaining_days);
     }
 }
