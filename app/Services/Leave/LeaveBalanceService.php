@@ -18,7 +18,7 @@ class LeaveBalanceService
 
         $annualQuota = $this->eligibilityService->annualLeaveQuota($employee->leaveProfile);
 
-        return LeaveBalance::query()->firstOrCreate(
+        $balance = LeaveBalance::query()->firstOrCreate(
             [
                 'employee_id' => (int) $employee->id,
                 'year' => $year,
@@ -29,6 +29,12 @@ class LeaveBalanceService
                 'remaining_days' => $annualQuota,
             ]
         );
+
+        $balance->annual_quota_days = $annualQuota;
+        $balance->remaining_days = max(0, (int) $balance->annual_quota_days - (int) $balance->used_days);
+        $balance->save();
+
+        return $balance;
     }
 
     public function ensureBalanceForDate(Employee $employee, Carbon $at): LeaveBalance

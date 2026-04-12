@@ -162,8 +162,9 @@ class Employee extends Model
 
     public function getJobTitleLabelAttribute(): ?string
     {
-        if ($this->job_title instanceof \App\Enums\JobTitle) {
-            return $this->job_title->label();
+        $legacyJobTitle = $this->resolveLegacyJobTitle();
+        if ($legacyJobTitle instanceof LegacyJobTitle) {
+            return $legacyJobTitle->label();
         }
 
         if ($this->relationLoaded('jobTitleRef')) {
@@ -218,7 +219,22 @@ class Employee extends Model
             }
         }
 
-        $jobTitle = $this->job_title?->value;
+        $jobTitle = $this->resolveLegacyJobTitle()?->value;
         return in_array($jobTitle, ['manager', 'hr'], true);
+    }
+
+    private function resolveLegacyJobTitle(): ?LegacyJobTitle
+    {
+        $rawValue = $this->getRawOriginal('job_title');
+
+        if ($rawValue instanceof LegacyJobTitle) {
+            return $rawValue;
+        }
+
+        if (! is_string($rawValue) || $rawValue === '') {
+            return null;
+        }
+
+        return LegacyJobTitle::tryFrom($rawValue);
     }
 }

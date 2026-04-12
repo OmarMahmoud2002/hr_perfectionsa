@@ -113,8 +113,8 @@ class LeaveApprovalController extends Controller
             $eligibility = $this->eligibilityService->evaluate($employee);
             $cycle = $this->balanceService->resolveCycleForDate($employee, now());
             $cycleYear = (int) ($cycle['cycle_year'] ?? 0);
-            $balance = $employee->leaveBalances->firstWhere('year', $cycleYear)
-                ?? $employee->leaveBalances->firstWhere('year', $year);
+            $balanceYear = $cycleYear > 0 ? $cycleYear : $year;
+            $balance = $this->balanceService->ensureYearBalance($employee, $balanceYear);
             $annualQuota = (int) ($balance?->annual_quota_days
                 ?? $employee->leaveProfile?->annual_leave_quota
                 ?? $eligibility['annual_leave_quota']);
@@ -231,14 +231,7 @@ class LeaveApprovalController extends Controller
                 $profile->annual_leave_quota = $globalAnnualQuota;
                 $profile->save();
 
-                $balance = LeaveBalance::query()->firstOrCreate(
-                    ['employee_id' => (int) $employee->id, 'year' => $year],
-                    ['annual_quota_days' => $globalAnnualQuota, 'used_days' => 0, 'remaining_days' => $globalAnnualQuota]
-                );
-
-                $balance->annual_quota_days = $globalAnnualQuota;
-                $balance->remaining_days = max(0, (int) $balance->annual_quota_days - (int) $balance->used_days);
-                $balance->save();
+                $this->syncEmployeeLeaveBalances($employee, $globalAnnualQuota, $year);
             }
         });
 
@@ -269,17 +262,33 @@ class LeaveApprovalController extends Controller
             $profile->annual_leave_quota = $defaultAnnualQuota;
             $profile->save();
 
-            $balance = LeaveBalance::query()->firstOrCreate(
-                ['employee_id' => (int) $employee->id, 'year' => $year],
-                ['annual_quota_days' => $defaultAnnualQuota, 'used_days' => 0, 'remaining_days' => $defaultAnnualQuota]
-            );
-
-            $balance->annual_quota_days = $defaultAnnualQuota;
-            $balance->remaining_days = max(0, (int) $balance->annual_quota_days - (int) $balance->used_days);
-            $balance->save();
+            $this->syncEmployeeLeaveBalances($employee, $defaultAnnualQuota, $year);
         }
 
         return back()->with('success', 'تم تطبيق القيم الافتراضية على الموظفين المحددين.');
+    }
+
+    private function syncEmployeeLeaveBalances(Employee $employee, int $annualQuota, int $year): void
+    {
+        $balances = LeaveBalance::query()
+            ->where('employee_id', (int) $employee->id)
+            ->get();
+
+        foreach ($balances as $balance) {
+            $balance->annual_quota_days = $annualQuota;
+            $balance->remaining_days = max(0, $annualQuota - (int) $balance->used_days);
+            $balance->save();
+        }
+
+        if (! $balances->contains(fn (LeaveBalance $balance) => (int) $balance->year === $year)) {
+            LeaveBalance::query()->create([
+                'employee_id' => (int) $employee->id,
+                'year' => $year,
+                'annual_quota_days' => $annualQuota,
+                'used_days' => 0,
+                'remaining_days' => $annualQuota,
+            ]);
+        }
     }
 
     public function decide(DecideLeaveRequestRequest $request, LeaveRequest $leaveRequest): RedirectResponse
