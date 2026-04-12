@@ -42,17 +42,51 @@ php artisan tinker --execute="\\App\\Models\\Employee::factory()->count(500)->cr
 ### النشر على GoDaddy (استضافة مشتركة)
 1) اجعل جذر الموقع يشير إلى مجلد `public/`.
 2) فعّل PHP 8.2+ من لوحة التحكم.
-3) ثبّت الاعتمادات:
+3) اضبط ملف `.env` للإنتاج (مهم جدًا لتجنب خطأ 419):
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.com
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_DOMAIN=your-domain.com
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=lax
+```
+إذا كنت تستخدم `www`، ثبّت خيارًا واحدًا فقط (إما `www` أو بدونه) وأعد توجيه الآخر له.
+4) شغّل الترحيلات (يتضمن جدول `sessions`):
+```bash
+php artisan migrate --force
+```
+5) امسح كاش Laravel بعد أي تعديل في `.env`:
+```bash
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+6) أذونات الكتابة للمجلدات:
+- `storage/`
+- `bootstrap/cache/`
+
+بدون صلاحيات كتابة للجلسات سيظهر 419 حتى لو `@csrf` صحيح.
+7) ثبّت الاعتمادات وابنِ الأصول:
 ```bash
 composer install --no-dev --optimize-autoloader
 npm install && npm run build
 php artisan key:generate
-php artisan migrate --force
 php artisan storage:link
-php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
-4) أذونات الكتابة لـ `storage/` و `bootstrap/cache/`.
-5) في الإنتاج: `APP_DEBUG=false`, `QUEUE_CONNECTION=sync` (مناسب للاستضافة المشتركة)، وحدد بيانات SMTP وقاعدة البيانات في `.env`.
+8) في الإنتاج: `QUEUE_CONNECTION=sync` (مناسب للاستضافة المشتركة)، وحدد بيانات SMTP وقاعدة البيانات في `.env`.
+
+### تشخيص سريع لخطأ 419 بعد النشر
+- جرّب تسجيل الدخول من نافذة خاصة (Incognito) بعد مسح الكوكيز.
+- تأكد أن عنوان الصفحة و `APP_URL` بنفس البروتوكول والدومين (HTTPS + نفس الدومين).
+- راجع آخر أخطاء Laravel:
+```bash
+tail -n 100 storage/logs/laravel.log
+```
 
 ### نقاط أمان سريعة
 - استخدم كلمات مرور قوية للحسابات الإدارية وفعّل البريد للتنبيهات.
