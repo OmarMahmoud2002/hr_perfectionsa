@@ -71,6 +71,7 @@
             @endif
         </a>
 
+        @feature('employee_of_month')
         @if(auth()->user()->isEmployee())
         <a href="{{ route('employee-of-month.vote.page') }}"
            class="{{ $linkClass }} {{ request()->routeIs('employee-of-month.vote.*') ? $activeClass : $inactiveClass }}">
@@ -84,6 +85,7 @@
             @endif
         </a>
         @endif
+        @endfeature
 
         @if($canUseRemoteAttendance)
         <a href="{{ route('attendance.remote.page') }}"
@@ -170,6 +172,7 @@
         @endif
 
         @if($isAdminLike)
+        @feature('employee_of_month')
         <a href="{{ route('employee-of-month.admin.index') }}"
            class="{{ $linkClass }} {{ request()->routeIs('employee-of-month.admin.*') ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -193,6 +196,7 @@
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
+        @endfeature
 
         <a href="{{ route('tasks.admin.index') }}"
            class="{{ $linkClass }} {{ request()->routeIs('tasks.admin.*') ? $activeClass : $inactiveClass }}">
@@ -272,6 +276,7 @@
             @endif
         </a>
 
+        @feature('employee_of_month')
         <a href="{{ route('employee-of-month.vote.page') }}"
            class="{{ $linkClass }} {{ request()->routeIs('employee-of-month.vote.*') ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,6 +288,7 @@
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
+        @endfeature
 
         <a href="{{ route('leave.requests.index') }}"
            class="{{ $linkClass }} {{ request()->routeIs('leave.requests.*') ? $activeClass : $inactiveClass }}">

@@ -85,7 +85,7 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     Route::put('/my-account', [MyAccountController::class, 'updateProfile'])->name('account.my.update');
 
     // Employee of Month - Voting endpoint (employee + admin/manager/hr)
-    Route::middleware(['role:employee,admin,manager,hr,department_manager'])->group(function () {
+    Route::middleware(['feature:employee_of_month', 'role:employee,admin,manager,hr,department_manager'])->group(function () {
         Route::get('/employee-of-month/vote', [EmployeeOfMonthVoteController::class, 'page'])
             ->name('employee-of-month.vote.page');
         Route::get('/employee-of-month/vote/status', [EmployeeOfMonthVoteController::class, 'status'])
@@ -94,7 +94,7 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
             ->name('employee-of-month.vote.store');
     });
 
-    Route::middleware(['role:admin,manager,hr'])->group(function () {
+    Route::middleware(['feature:employee_of_month', 'role:admin,manager,hr'])->group(function () {
         Route::get('/employee-of-month/admin', [EmployeeOfMonthAdminController::class, 'index'])
             ->name('employee-of-month.admin.index');
         Route::get('/employee-of-month/admin/export', [EmployeeOfMonthAdminController::class, 'exportRanking'])

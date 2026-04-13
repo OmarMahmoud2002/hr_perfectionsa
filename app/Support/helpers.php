@@ -21,3 +21,10 @@ if (! function_exists('tenant')) {
         };
     }
 }
+
+if (! function_exists('feature')) {
+    function feature(string $key, ?bool $default = null): bool
+    {
+        return app(\App\Services\Feature\FeatureService::class)->enabled($key, $default);
+    }
+}
