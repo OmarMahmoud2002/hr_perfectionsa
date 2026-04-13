@@ -56,4 +56,17 @@ return [
         'initial_password' => '123456789',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Multi-Database Tenancy By Domain
+    |--------------------------------------------------------------------------
+    */
+    'tenancy' => [
+        'fallback_tenant' => env('TENANCY_FALLBACK_TENANT', 'eg'),
+        'domain_connection_map' => [
+            'hr.perfectionsa.com' => ['tenant' => 'eg', 'connection' => 'mysql_eg'],
+            'hrsa.perfectionsa.com' => ['tenant' => 'sa', 'connection' => 'mysql_sa'],
+        ],
+    ],
+
 ];

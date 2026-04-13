@@ -17,6 +17,11 @@ class SettingService
      */
     private const CACHE_TTL = 86400;
 
+    private function tenantCacheKey(string $key): string
+    {
+        return tenant() . '_' . $key;
+    }
+
     /**
      * الإعدادات الافتراضية للنظام
      */
@@ -40,7 +45,7 @@ class SettingService
      */
     public function all(): array
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_TTL, function () {
+        return Cache::remember($this->tenantCacheKey(self::CACHE_KEY), self::CACHE_TTL, function () {
             $dbSettings = Setting::getAllAsArray();
             return array_merge(self::DEFAULTS, $dbSettings);
         });
@@ -68,7 +73,7 @@ class SettingService
         $this->clearCache();
 
         // مسح cache الـ Dashboard أيضاً (قد تتأثر الحسابات)
-        Cache::forget('dashboard_stats');
+        Cache::forget($this->tenantCacheKey('dashboard_stats'));
     }
 
     /**
@@ -76,7 +81,7 @@ class SettingService
      */
     public function clearCache(): void
     {
-        Cache::forget(self::CACHE_KEY);
+        Cache::forget($this->tenantCacheKey(self::CACHE_KEY));
     }
 
     /**
@@ -84,7 +89,9 @@ class SettingService
      */
     public function getGroup(string $group): array
     {
-        return Cache::remember("settings_group_{$group}", self::CACHE_TTL, function () use ($group) {
+        $cacheKey = $this->tenantCacheKey("settings_group_{$group}");
+
+        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($group) {
             return Setting::group($group)->pluck('value', 'key')->toArray();
         });
     }

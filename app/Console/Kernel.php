@@ -12,8 +12,12 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('employee-of-month:auto-finalize')
+        $schedule->command('employee-of-month:auto-finalize --tenant=eg')
             ->monthlyOn(21, '23:45')
+            ->withoutOverlapping();
+
+        $schedule->command('employee-of-month:auto-finalize --tenant=sa')
+            ->monthlyOn(21, '23:50')
             ->withoutOverlapping();
     }
 

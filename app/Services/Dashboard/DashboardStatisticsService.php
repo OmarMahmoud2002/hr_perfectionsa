@@ -24,14 +24,19 @@ class DashboardStatisticsService
      */
     private const CACHE_TTL = 300;
 
+    private function tenantCacheKey(string $key): string
+    {
+        return tenant() . '_' . $key;
+    }
+
     /**
      * جلب جميع إحصائيات لوحة التحكم
      */
     public function getStats(?User $actor = null): array
     {
         $cacheKey = $actor
-            ? "dashboard_stats_user_{$actor->id}_{$actor->role}"
-            : 'dashboard_stats';
+            ? $this->tenantCacheKey("dashboard_stats_user_{$actor->id}_{$actor->role}")
+            : $this->tenantCacheKey('dashboard_stats');
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($actor) {
             return [
@@ -52,7 +57,7 @@ class DashboardStatisticsService
      */
     public function clearCache(): void
     {
-        Cache::forget('dashboard_stats');
+        Cache::forget($this->tenantCacheKey('dashboard_stats'));
     }
 
     // ========================
