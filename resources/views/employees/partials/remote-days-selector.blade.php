@@ -10,14 +10,14 @@
 <div id="remote-days-section" class="space-y-3 {{ $isRemoteWorker ? '' : 'hidden' }}">
     <div class="flex items-center gap-2 px-1">
         <div class="h-px flex-1 bg-slate-100"></div>
-        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">تقويم أيام الريموت</span>
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">تقويم أيام الاونلاين</span>
         <div class="h-px flex-1 bg-slate-100"></div>
     </div>
 
     <div class="remote-days-shell" data-remote-days-root data-initial-dates='@json($initialRemoteDates)' data-max-days="62">
         <div class="remote-days-head">
             <div>
-                <p class="remote-days-title">اختر الأيام المسموح بها للريموت</p>
+                <p class="remote-days-title">اختر الأيام المسموح بها للاونلاين</p>
                 <p class="remote-days-subtitle">عرض شهري واضح مثل التقويم. لا يمكن اختيار يوم الجمعة أو أي يوم ماضٍ.</p>
             </div>
 

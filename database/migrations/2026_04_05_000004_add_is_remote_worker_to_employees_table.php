@@ -12,7 +12,7 @@ return new class extends Migration
             $table->boolean('is_remote_worker')
                 ->default(false)
                 ->after('is_active')
-                ->comment('هل الموظف يعمل بنمط ريموت');
+                ->comment('هل الموظف يعمل بنمط اونلاين');
         });
     }
 

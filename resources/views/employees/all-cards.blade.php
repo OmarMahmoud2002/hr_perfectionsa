@@ -59,8 +59,8 @@
                     <div x-show="open" x-transition class="mt-4 pt-4 border-t border-slate-100 space-y-3">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-                                <p class="text-[11px] font-semibold text-slate-500">القسم</p>
-                                <p class="text-sm text-slate-700 mt-1">{{ $employee->department?->name ?: 'غير محدد' }}</p>
+                                <p class="text-[11px] font-semibold text-slate-500">الوظيفه</p>
+                                <p class="text-sm text-slate-700 mt-1">{{ $employee->job_title_label ?: 'غير محدد' }}</p>
                             </div>
                             <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
                                 <p class="text-[11px] font-semibold text-slate-500">رقم الموظف</p>
@@ -76,13 +76,13 @@
                         <div class="rounded-xl border border-slate-100 bg-white px-3 py-2.5 space-y-1.5">
                             <p class="text-xs font-semibold text-slate-500">البيانات التعريفية</p>
                             <p class="text-sm text-slate-700">
-                                <span class="font-medium text-slate-600">المسمى:</span>
-                                {{ $employee->job_title_label ?: 'غير محدد' }}
+                                <span class="font-medium text-slate-600">القسم:</span>
+                                {{ $employee->department?->name ?: 'غير محدد' }}
                             </p>
-                            <p class="text-sm text-slate-700">
+                            <!-- <p class="text-sm text-slate-700">
                                 <span class="font-medium text-slate-600">البريد:</span>
                                 {{ $employee->user?->email ?: 'لا يوجد بريد مرتبط' }}
-                            </p>
+                            </p> -->
                         </div>
 
                         <div class="space-y-2">

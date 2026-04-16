@@ -24,7 +24,7 @@
 <div class="card mb-5">
     <div class="card-body">
         <form action="{{ route('employees.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-            <div class="relative w-full md:col-span-7 lg:col-span-8">
+            <div class="relative w-full md:col-span-10">
                 <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -35,15 +35,8 @@
                        placeholder="ابحث بالاسم أو رقم الموظف..."
                        class="form-input pr-10 !px-3.5 !h-9 !text-sm !w-full">
             </div>
-            <div class="md:col-span-3 lg:col-span-2">
-                <select name="status" onchange="this.form.submit()" class="form-input !w-full !min-w-0 !px-3.5 !h-9 !text-sm">
-                    <option value="">جميع الحالات</option>
-                    <option value="active" {{ ($filters['status'] ?? '') === 'active' ? 'selected' : '' }}>نشط فقط</option>
-                    <option value="inactive" {{ ($filters['status'] ?? '') === 'inactive' ? 'selected' : '' }}>معطّل فقط</option>
-                </select>
-            </div>
-            <div class="md:col-span-2 lg:col-span-2 flex md:justify-end">
-                @if(!empty($filters['search']) || !empty($filters['status']))
+            <div class="md:col-span-2 flex md:justify-end">
+                @if(!empty($filters['search']))
                 <a href="{{ route('employees.index') }}" class="btn-ghost btn-sm w-full md:w-auto justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -141,17 +134,17 @@
                             </a>
 
                             <form action="{{ route('employees.destroy', $employee) }}" method="POST"
-                                data-confirm="هل تريد تعطيل الموظف «{{ $employee->name }}»؟"
-                                data-confirm-title="تأكيد التعطيل"
-                                data-confirm-btn="تعطيل"
-                                data-confirm-type="warning">
+                                data-confirm="هل تريد حذف الموظف «{{ $employee->name }}» نهائياً؟ لا يمكن التراجع."
+                                data-confirm-title="تأكيد الحذف النهائي"
+                                data-confirm-btn="حذف"
+                                data-confirm-type="danger">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit"
                                         class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
-                                        title="تعطيل">
+                                        title="حذف">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-7 0h8"/>
                                     </svg>
                                 </button>
                             </form>

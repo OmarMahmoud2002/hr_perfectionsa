@@ -43,7 +43,7 @@ class RemoteAttendanceController extends Controller
         }
 
         if (!$employee->is_remote_worker) {
-            return response()->json(['message' => 'هذا الموظف غير مفعّل له الحضور الريموت.'], 422);
+            return response()->json(['message' => 'هذا الموظف غير مفعّل له الحضور اونلاين.'], 422);
         }
 
         $locations = $employee->locations()->get();
@@ -61,7 +61,7 @@ class RemoteAttendanceController extends Controller
         [$localDate, $localTime, $clientTimezoneMeta] = $this->resolveClientLocalDateTime($data);
 
         if (! $this->isAllowedRemoteWorkDate($employee, $localDate)) {
-            return response()->json(['message' => 'هذا اليوم غير مجدول كدوام ريموت لك.'], 422);
+            return response()->json(['message' => 'هذا اليوم غير مجدول كدوام اونلاين لك.'], 422);
         }
 
         $existing = AttendanceRecord::query()
@@ -119,7 +119,7 @@ class RemoteAttendanceController extends Controller
         }
 
         if (!$employee->is_remote_worker) {
-            return response()->json(['message' => 'هذا الموظف غير مفعّل له الحضور الريموت.'], 422);
+            return response()->json(['message' => 'هذا الموظف غير مفعّل له الحضور اونلاين.'], 422);
         }
 
         $locations = $employee->locations()->get();
@@ -137,7 +137,7 @@ class RemoteAttendanceController extends Controller
         [$localDate, $localTime, $clientTimezoneMeta] = $this->resolveClientLocalDateTime($data);
 
         if (! $this->isAllowedRemoteWorkDate($employee, $localDate)) {
-            return response()->json(['message' => 'هذا اليوم غير مجدول كدوام ريموت لك.'], 422);
+            return response()->json(['message' => 'هذا اليوم غير مجدول كدوام اونلاين لك.'], 422);
         }
 
         $record = AttendanceRecord::query()

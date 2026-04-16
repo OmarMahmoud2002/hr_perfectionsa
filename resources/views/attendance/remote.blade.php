@@ -46,11 +46,11 @@
             </div>
         @elseif(!$allowRemoteWithoutLocation && $allowedLocations->isEmpty())
             <div class="alert-warning">
-                <p>لم يتم تحديد أي موقع ريموت لك حتى الآن. برجاء التواصل مع الإدارة.</p>
+                <p>لم يتم تحديد أي موقع اونلاين لك حتى الآن. برجاء التواصل مع الإدارة.</p>
             </div>
         @elseif(!$isTodayScheduledRemote)
             <div class="alert-warning">
-                <p>اليوم غير مجدول لك كدوام ريموت، لذلك لا يمكن تسجيل الحضور الأونلاين اليوم.</p>
+                <p>اليوم غير مجدول لك كدوام اونلاين، لذلك لا يمكن تسجيل الحضور الأونلاين اليوم.</p>
             </div>
         @else
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -108,7 +108,7 @@
 
     @if(($scheduledRemoteDaysThisMonth ?? collect())->filter()->isNotEmpty())
         <div class="card card-interactive p-5">
-            <h3 class="text-sm font-bold text-slate-700 mb-3">أيام الريموت المجدولة لهذا الشهر</h3>
+            <h3 class="text-sm font-bold text-slate-700 mb-3">أيام الاونلاين المجدولة لهذا الشهر</h3>
             <div class="flex flex-wrap gap-2">
                 @foreach($scheduledRemoteDaysThisMonth->filter() as $day)
                     <span class="px-2.5 py-1 rounded-full border text-xs {{ $day === $todayDate ? 'border-sky-300 bg-sky-100 text-slate-900' : 'border-slate-200 text-slate-700 bg-slate-50' }}">
@@ -124,14 +124,14 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 8v4m0 4h.01M3.33 18h17.34c1.54 0 2.5-1.67 1.73-3L13.73 3c-.77-1.33-2.69-1.33-3.46 0L1.6 15c-.77 1.33.19 3 1.73 3z"/>
                 </svg>
             </div>
-            <h3 class="text-sm font-bold text-amber-800 mb-2">لا توجد أيام ريموت مجدولة هذا الشهر</h3>
-            <p class="text-xs text-amber-700">لن يظهر زر التسجيل إلا في الأيام المجدولة لك كدوام ريموت.</p>
+            <h3 class="text-sm font-bold text-amber-800 mb-2">لا توجد أيام اونلاين مجدولة هذا الشهر</h3>
+            <p class="text-xs text-amber-700">لن يظهر زر التسجيل إلا في الأيام المجدولة لك كدوام اونلاين.</p>
         </div>
     @endif
 
     @if(($remoteRecordsThisMonth ?? collect())->isNotEmpty())
         <div class="card card-interactive p-5">
-            <h3 class="text-sm font-bold text-slate-700 mb-3">الأيام المسجلة ريموت خلال هذا الشهر</h3>
+            <h3 class="text-sm font-bold text-slate-700 mb-3">الأيام المسجلة اونلاين خلال هذا الشهر</h3>
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>

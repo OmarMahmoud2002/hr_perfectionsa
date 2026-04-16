@@ -37,15 +37,6 @@ class EmployeeService
             });
         }
 
-        // فلترة بالحالة
-        if (isset($filters['status']) && $filters['status'] !== '') {
-            if ($filters['status'] === 'active') {
-                $query->where('is_active', true);
-            } elseif ($filters['status'] === 'inactive') {
-                $query->where('is_active', false);
-            }
-        }
-
         return $query->orderBy('name')->paginate($perPage)->withQueryString();
     }
 
@@ -123,12 +114,11 @@ class EmployeeService
     }
 
     /**
-     * تعطيل موظف (Soft Delete)
+     * حذف نهائي للموظف (Hard Delete)
      */
-    public function deactivate(Employee $employee): void
+    public function deletePermanently(Employee $employee): void
     {
-        $employee->update(['is_active' => false]);
-        $employee->delete();
+        $employee->forceDelete();
     }
 
     /**

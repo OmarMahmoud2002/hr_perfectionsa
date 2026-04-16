@@ -68,7 +68,7 @@
         </div>
         <div class="card p-3 animate-slide-up" style="animation-delay:130ms; animation-fill-mode:both;">
             <p class="text-xs text-slate-500">صلاحية اتخاذ القرار</p>
-            <p class="text-sm font-bold mt-2 text-slate-700">{{ $isHrLike ? 'HR/مسؤول النظام' : ($isManager ? 'مدير عام' : ($isDepartmentManager ? 'مدير قسم' : 'عرض فقط')) }}</p>
+            <p class="text-sm font-bold mt-2 text-slate-700">{{ $isHrLike ? 'HR' : ($isManager ? 'مدير عام' : ($isDepartmentManager ? 'مدير قسم' : 'عرض فقط')) }}</p>
         </div>
     </div>
 

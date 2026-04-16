@@ -151,7 +151,7 @@
                                    @checked((string) old('allow_remote_without_location', $settings['allow_remote_without_location'] ?? '0') === '1')>
                             <div>
                                 <label for="allow_remote_without_location" class="form-label !mb-1">السماح بالحضور الأونلاين بدون عنوان</label>
-                                <p class="text-xs text-slate-500">عند التفعيل، يمكن للموظف المصرح له بالريموت تسجيل الحضور والانصراف من أي مكان بدون التقيد بالمواقع المعتمدة.</p>
+                                <p class="text-xs text-slate-500">عند التفعيل، يمكن للموظف المصرح له بالاونلاين تسجيل الحضور والانصراف من أي مكان بدون التقيد بالمواقع المعتمدة.</p>
                             </div>
                         </div>
                     </div>

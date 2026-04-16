@@ -44,15 +44,15 @@ class UpdateEmployeeRequest extends FormRequest
             $remoteAllowedDates = array_values(array_filter((array) $this->input('remote_allowed_dates', []), fn ($date) => $date !== null && $date !== ''));
 
             if (!$this->boolean('is_remote_worker') && count($locationIds) > 0) {
-                $validator->errors()->add('location_ids', 'لا يمكن اختيار مواقع إلا إذا كان نمط الدوام ريموت.');
+                $validator->errors()->add('location_ids', 'لا يمكن اختيار مواقع إلا إذا كان نمط الدوام اونلاين.');
             }
 
             if (!$this->boolean('is_remote_worker') && count($remoteAllowedDates) > 0) {
-                $validator->errors()->add('remote_allowed_dates', 'لا يمكن تحديد أيام الريموت إلا إذا كان نمط الدوام ريموت.');
+                $validator->errors()->add('remote_allowed_dates', 'لا يمكن تحديد أيام الاونلاين إلا إذا كان نمط الدوام اونلاين.');
             }
 
             if (!$this->boolean('is_remote_worker') && $this->boolean('allow_remote_from_anywhere')) {
-                $validator->errors()->add('allow_remote_from_anywhere', 'خيار غير مقيد بمكان متاح فقط عند تفعيل الدوام الريموت.');
+                $validator->errors()->add('allow_remote_from_anywhere', 'خيار غير مقيد بمكان متاح فقط عند تفعيل الدوام الاونلاين.');
             }
         });
     }
@@ -83,15 +83,15 @@ class UpdateEmployeeRequest extends FormRequest
             'late_grace_minutes.integer' => 'مدة السماح يجب أن تكون رقماً صحيحاً.',
             'late_grace_minutes.min'     => 'مدة السماح لا تكون سالبة.',
             'late_grace_minutes.max'     => 'مدة السماح لا تتجاوز 240 دقيقة.',
-            'location_ids.required'      => 'يجب اختيار موقع واحد على الأقل للموظف الريموت.',
+            'location_ids.required'      => 'يجب اختيار موقع واحد على الأقل للموظف الاونلاين.',
             'location_ids.array'         => 'صيغة المواقع المختارة غير صحيحة.',
-            'location_ids.min'           => 'يجب اختيار موقع واحد على الأقل للموظف الريموت.',
-            'location_ids.max'           => 'يمكن اختيار موقعين كحد أقصى للموظف الريموت.',
+            'location_ids.min'           => 'يجب اختيار موقع واحد على الأقل للموظف الاونلاين.',
+            'location_ids.max'           => 'يمكن اختيار موقعين كحد أقصى للموظف الاونلاين.',
             'location_ids.*.exists'      => 'أحد المواقع المختارة غير موجود.',
-            'remote_allowed_dates.array' => 'صيغة أيام الريموت المختارة غير صحيحة.',
+            'remote_allowed_dates.array' => 'صيغة أيام الاونلاين المختارة غير صحيحة.',
             'remote_allowed_dates.max' => 'يمكن حفظ 62 يوماً كحد أقصى في كل مرة.',
-            'remote_allowed_dates.*.date_format' => 'صيغة يوم الريموت يجب أن تكون YYYY-MM-DD.',
-            'remote_allowed_dates.*.distinct' => 'تم تكرار أحد أيام الريموت أكثر من مرة.',
+            'remote_allowed_dates.*.date_format' => 'صيغة يوم الاونلاين يجب أن تكون YYYY-MM-DD.',
+            'remote_allowed_dates.*.distinct' => 'تم تكرار أحد أيام الاونلاين أكثر من مرة.',
         ];
     }
 
@@ -105,7 +105,7 @@ class UpdateEmployeeRequest extends FormRequest
             'department_id'       => 'القسم',
             'employment_start_date' => 'تاريخ بداية العمل',
             'basic_salary'        => 'المرتب الأساسي',
-            'is_remote_worker'    => 'نمط الدوام ريموت',
+            'is_remote_worker'    => 'نمط الدوام اونلاين',
             'allow_remote_from_anywhere' => 'غير مقيد بمكان',
             'work_start_time'     => 'وقت الحضور',
             'work_end_time'       => 'وقت الانصراف',
@@ -113,8 +113,8 @@ class UpdateEmployeeRequest extends FormRequest
             'late_grace_minutes'  => 'مدة السماح بالتأخير',
             'location_ids'        => 'المواقع المسموح بها',
             'location_ids.*'      => 'الموقع المحدد',
-            'remote_allowed_dates' => 'أيام الدوام الريموت',
-            'remote_allowed_dates.*' => 'يوم الدوام الريموت',
+            'remote_allowed_dates' => 'أيام الدوام الاونلاين',
+            'remote_allowed_dates.*' => 'يوم الدوام الاونلاين',
         ];
     }
 }

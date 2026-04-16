@@ -37,7 +37,7 @@ class EmployeeController extends Controller
             return $this->allCards($request);
         }
 
-        $filters = $request->only(['search', 'status']);
+        $filters = $request->only(['search']);
         $employees = $this->employeeService->getEmployees(
             $filters,
             perPage: 15,
@@ -237,16 +237,16 @@ class EmployeeController extends Controller
     }
 
     /**
-     * تعطيل / حذف ناعم للموظف
+     * حذف نهائي للموظف
      */
     public function destroy(Employee $employee): RedirectResponse
     {
         $name = $employee->name;
-        $this->employeeService->deactivate($employee);
+        $this->employeeService->deletePermanently($employee);
 
         return redirect()
             ->route('employees.index')
-            ->with('success', "تم تعطيل الموظف «{$name}» بنجاح.");
+            ->with('success', "تم حذف الموظف «{$name}» نهائياً بنجاح.");
     }
 }
 

@@ -72,7 +72,7 @@ class HybridAttendanceStage7Test extends TestCase
         ]);
 
         $response->assertStatus(422)
-            ->assertJson(['message' => 'هذا اليوم غير مجدول كدوام ريموت لك.']);
+            ->assertJson(['message' => 'هذا اليوم غير مجدول كدوام اونلاين لك.']);
     }
 
     public function test_employee_can_check_in_inside_assigned_location(): void
@@ -316,7 +316,7 @@ class HybridAttendanceStage7Test extends TestCase
         ]);
 
         $response->assertStatus(422)
-            ->assertJson(['message' => 'هذا الموظف غير مفعّل له الحضور الريموت.']);
+            ->assertJson(['message' => 'هذا الموظف غير مفعّل له الحضور الاونلاين.']);
     }
 
     public function test_remote_attendance_page_shows_check_in_button_for_remote_employee(): void

@@ -92,7 +92,7 @@ class EmployeeManagementTest extends TestCase
 
         $response = $this->actingAs($admin)->post(route('employees.store'), [
             'ac_no' => 'AC-2001',
-            'name' => 'موظف ريموت',
+            'name' => 'موظف اونلاين',
             'job_title' => 'developer',
             'basic_salary' => 6500,
             'is_remote_worker' => 1,

@@ -222,7 +222,7 @@
                                class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                                @checked($isRemoteWorker)>
                         <span>
-                            <span class="font-semibold text-slate-700 block">دوام ريموت</span>
+                            <span class="font-semibold text-slate-700 block">دوام اونلاين</span>
                             <span class="text-xs text-slate-500">عند التفعيل يجب اختيار موقع حضور واحد أو موقعين كحد أقصى.</span>
                         </span>
                     </label>
@@ -264,7 +264,7 @@
                                 </option>
                             @endforeach
                         </select>
-                        <p class="mt-1.5 text-xs text-slate-400">يمكن اختيار موقع واحد أو موقعين فقط للموظف الريموت.</p>
+                        <p class="mt-1.5 text-xs text-slate-400">يمكن اختيار موقع واحد أو موقعين فقط للموظف الاونلاين.</p>
                         @error('location_ids')<p class="form-error">{{ $message }}</p>@enderror
                         @error('location_ids.*')<p class="form-error">{{ $message }}</p>@enderror
                     </div>
@@ -285,7 +285,7 @@
                                @checked($allowRemoteFromAnywhere)>
                         <span>
                             <span class="font-semibold text-slate-700 block">غير مقيد بمكان</span>
-                            <span class="text-xs text-slate-500">عند التفعيل، الموظف يقدر يسجل حضور ريموت من أي مكان في الأيام المسموح بها للريموت.</span>
+                            <span class="text-xs text-slate-500">عند التفعيل، الموظف يقدر يسجل حضور اونلاين من أي مكان في الأيام المسموح بها للاونلاين.</span>
                         </span>
                     </label>
                     @error('allow_remote_from_anywhere')<p class="form-error mt-2">{{ $message }}</p>@enderror
@@ -471,7 +471,7 @@
         selectEl.addEventListener('change', function () {
             if (Array.from(selectEl.selectedOptions).length > maxSelectedLocations) {
                 restoreSelection();
-                window.alert('يمكن اختيار موقعين كحد أقصى للموظف الريموت.');
+                window.alert('يمكن اختيار موقعين كحد أقصى للموظف الاونلاين.');
                 return;
             }
 
