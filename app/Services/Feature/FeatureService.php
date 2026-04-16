@@ -40,7 +40,9 @@ class FeatureService
 
     private function cacheKey(string $key): string
     {
-        return tenant() . '_feature_' . $key;
+        $tenant = (string) config('app.tenant', 'eg');
+
+        return $tenant . '_feature_' . $key;
     }
 
     private function isStrictMode(): bool

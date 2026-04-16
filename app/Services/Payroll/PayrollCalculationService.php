@@ -2,12 +2,14 @@
 
 namespace App\Services\Payroll;
 
+use App\Models\AttendanceRecord;
 use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\PayrollReport;
 use App\Enums\ImportStatus;
 use App\Services\Attendance\AbsenceDetectionService;
 use App\Services\Attendance\PublicHolidayService;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -79,6 +81,14 @@ class PayrollCalculationService
             $hourlyRate        = $dailyRate / 8;
             $hourlyRateWith1_5 = $hourlyRate * 1.5;
 
+            // كل حضور فعلي في يوم إجازة رسمية يضيف يومية كاملة على الراتب.
+            $attendedPublicHolidayDays = $this->countAttendedPublicHolidayDays(
+                $employee,
+                $month,
+                $year,
+                $publicHolidays
+            );
+
             /*
              * قاعدة الأوفرتايم والتأخير:
              *
@@ -110,7 +120,9 @@ class PayrollCalculationService
             // بونص الحضور الكامل الأسبوعي:
             // إذا حضر الموظف جميع أيام الأسبوع (السبت → الخميس) بدون أي غياب
             // يُضاف له يوم راتب إضافي لكل أسبوع كامل
-            $attendanceBonus = round($fullAttendanceWeeks * $dailyRate, 2);
+            $weeklyAttendanceBonus = round($fullAttendanceWeeks * $dailyRate, 2);
+            $holidayAttendanceBonus = round($attendedPublicHolidayDays * $dailyRate, 2);
+            $attendanceBonus = round($weeklyAttendanceBonus + $holidayAttendanceBonus, 2);
 
             $netSalary = $basicSalary - $lateDeduction - $absentDeduction + $overtimeBonus + $attendanceBonus;
 
@@ -163,6 +175,51 @@ class PayrollCalculationService
 
             return $report->fresh();
         });
+    }
+
+    /**
+     * عدد أيام الإجازات الرسمية التي حضر فيها الموظف فعلياً خلال فترة الراتب.
+     */
+    private function countAttendedPublicHolidayDays(Employee $employee, int $month, int $year, array $publicHolidays): int
+    {
+        if (empty($publicHolidays)) {
+            return 0;
+        }
+
+        [$periodStartDate, $periodEndDate] = PayrollPeriod::resolve($month, $year);
+        $periodStart = $periodStartDate->toDateString();
+        $periodEnd = $periodEndDate->toDateString();
+
+        $holidayDates = collect($publicHolidays)
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->filter(fn ($date) => $date >= $periodStart && $date <= $periodEnd)
+            ->unique()
+            ->values();
+
+        if ($holidayDates->isEmpty()) {
+            return 0;
+        }
+
+        return AttendanceRecord::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('date', $holidayDates->all())
+            ->get()
+            ->filter(fn (AttendanceRecord $record) => $this->isPresentOnPublicHoliday($record))
+            ->map(fn (AttendanceRecord $record) => Carbon::parse($record->date)->toDateString())
+            ->unique()
+            ->count();
+    }
+
+    /**
+     * تحديد ما إذا كان السجل يمثل حضوراً فعلياً في يوم إجازة رسمية.
+     */
+    private function isPresentOnPublicHoliday(AttendanceRecord $record): bool
+    {
+        return match ($record->manual_status) {
+            'present' => true,
+            'absent', 'weekly_leave', 'public_holiday' => false,
+            default => ! (bool) $record->is_absent,
+        };
     }
 
     // =========================================================

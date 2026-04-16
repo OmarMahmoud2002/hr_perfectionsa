@@ -16,7 +16,8 @@ if (! function_exists('tenant')) {
         $host = request()->getHost();
 
         return match ($host) {
-            'hrsa.perfectionsa.com' => 'sa',
+            'hrsa.perfectionsa.com',
+            'hrsa.localhost' => 'sa',
             default => 'eg',
         };
     }
@@ -28,3 +29,4 @@ if (! function_exists('feature')) {
         return app(\App\Services\Feature\FeatureService::class)->enabled($key, $default);
     }
 }
+

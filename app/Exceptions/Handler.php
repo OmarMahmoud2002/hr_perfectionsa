@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
@@ -49,6 +50,19 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $e)
     {
+        if ($e instanceof TokenMismatchException && ! $request->expectsJson()) {
+            if ($request->isMethod('post') && $request->routeIs('login')) {
+                return redirect()
+                    ->route('login')
+                    ->withInput($request->except(['password', 'password_confirmation']))
+                    ->with('error', 'انتهت الجلسة، تم تحديث الصفحة تلقائيا. برجاء إدخال كلمة المرور مرة أخرى.');
+            }
+
+            return back()
+                ->withInput($request->except(['password', 'password_confirmation']))
+                ->with('error', 'انتهت الجلسة، برجاء إعادة المحاولة.');
+        }
+
         if ($e instanceof HttpExceptionInterface) {
             $status = (int) $e->getStatusCode();
 

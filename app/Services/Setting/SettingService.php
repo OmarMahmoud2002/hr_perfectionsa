@@ -19,7 +19,9 @@ class SettingService
 
     private function tenantCacheKey(string $key): string
     {
-        return tenant() . '_' . $key;
+        $tenant = (string) config('app.tenant', 'eg');
+
+        return $tenant . '_' . $key;
     }
 
     /**

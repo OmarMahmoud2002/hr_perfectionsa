@@ -33,6 +33,10 @@ return [
 
     'google_maps' => [
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
+        'api_keys' => [
+            'eg' => env('GOOGLE_MAPS_API_KEY_EG', env('GOOGLE_MAPS_API_KEY')),
+            'sa' => env('GOOGLE_MAPS_API_KEY_SA', env('GOOGLE_MAPS_API_KEY')),
+        ],
     ],
 
 ];

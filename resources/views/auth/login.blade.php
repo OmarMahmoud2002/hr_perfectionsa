@@ -22,7 +22,7 @@
             {{-- الشعار والعنوان --}}
             <div class="text-center mb-6">
                 <div class="inline-flex items-center justify-center mb-4">
-                    <img src="{{ asset('logo.png') }}" alt="شعار النظام" class="h-20 w-auto object-contain"
+                    <img src="{{ asset('logo3.png') }}" alt="شعار النظام" class="h-20 w-auto object-contain"
                          onerror="this.style.display='none'; document.getElementById('fallback-logo').style.display='flex';">
                     <div id="fallback-logo" class="hidden w-16 h-16 rounded-2xl items-center justify-center shadow-xl"
                          style="background: linear-gradient(135deg, #4596cf, #4d9b97);">

@@ -333,8 +333,24 @@
     };
 })();
 </script>
-@if(config('services.google_maps.api_key'))
-<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.api_key') }}&libraries=places&callback=initLocationPickerMap" async defer></script>
+@php
+    $tenant = (string) config('app.tenant', 'eg');
+    $tenantMapKeys = config('services.google_maps.api_keys', []);
+    $googleMapsApiKey = $tenantMapKeys[$tenant] ?? config('services.google_maps.api_key');
+@endphp
+@if($googleMapsApiKey)
+<script>
+window.gm_authFailure = function () {
+    var mapEl = document.getElementById('location-map');
+    if (!mapEl) {
+        return;
+    }
+
+    mapEl.classList.add('flex', 'items-center', 'justify-center', 'text-sm', 'text-red-700', 'bg-red-50');
+    mapEl.textContent = 'تعذر تحميل خرائط Google لهذا الدومين. تأكد من ضبط GOOGLE_MAPS_API_KEY_EG و GOOGLE_MAPS_API_KEY_SA وتفويض الدومين الحالي داخل Google Cloud.';
+};
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ $googleMapsApiKey }}&libraries=places&callback=initLocationPickerMap&loading=async" async defer></script>
 @else
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -344,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     mapEl.classList.add('flex', 'items-center', 'justify-center', 'text-sm', 'text-amber-700', 'bg-amber-50');
-    mapEl.textContent = 'مفتاح خرائط Google غير مضبوط. الرجاء تعيين GOOGLE_MAPS_API_KEY في ملف ENV.';
+    mapEl.textContent = 'مفتاح خرائط Google غير مضبوط. الرجاء تعيين GOOGLE_MAPS_API_KEY_EG و GOOGLE_MAPS_API_KEY_SA (أو GOOGLE_MAPS_API_KEY كمفتاح عام).';
 });
 </script>
 @endif

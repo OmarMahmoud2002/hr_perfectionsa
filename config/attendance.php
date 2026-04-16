@@ -66,6 +66,9 @@ return [
         'domain_connection_map' => [
             'hr.perfectionsa.com' => ['tenant' => 'eg', 'connection' => 'mysql_eg'],
             'hrsa.perfectionsa.com' => ['tenant' => 'sa', 'connection' => 'mysql_sa'],
+            'localhost' => ['tenant' => 'eg', 'connection' => 'mysql_eg'],
+            'hr.localhost' => ['tenant' => 'eg', 'connection' => 'mysql_eg'],
+            'hrsa.localhost' => ['tenant' => 'sa', 'connection' => 'mysql_sa'],
         ],
     ],
 

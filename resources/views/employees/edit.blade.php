@@ -252,12 +252,12 @@
                     <div class="h-px flex-1 bg-slate-100"></div>
                 </div>
 
-                @if(($locations ?? collect())->isNotEmpty())
-                    @php
-                        $selectedLocationIds = collect($selectedLocationIds ?? old('location_ids', []))->map(fn ($id) => (int) $id)->all();
-                        $allowRemoteFromAnywhere = old('allow_remote_from_anywhere', $employee->allow_remote_from_anywhere ? '1' : '0') === '1';
-                    @endphp
+                @php
+                    $selectedLocationIds = collect($selectedLocationIds ?? old('location_ids', []))->map(fn ($id) => (int) $id)->all();
+                    $allowRemoteFromAnywhere = old('allow_remote_from_anywhere', $employee->allow_remote_from_anywhere ? '1' : '0') === '1';
+                @endphp
 
+                @if(($locations ?? collect())->isNotEmpty())
                     <div class="form-group mb-0">
                         <label for="location_ids" class="form-label">المواقع المسموح بها</label>
                         <select id="location_ids" name="location_ids[]" multiple size="6"
@@ -277,29 +277,31 @@
                         @error('location_ids')<p class="form-error">{{ $message }}</p>@enderror
                         @error('location_ids.*')<p class="form-error">{{ $message }}</p>@enderror
                     </div>
-
-                    <div class="rounded-xl border border-slate-200 p-4">
-                        <input type="hidden" name="allow_remote_from_anywhere" value="0">
-                        <label class="flex items-start gap-3 cursor-pointer" for="allow_remote_from_anywhere">
-                            <input type="checkbox"
-                                   id="allow_remote_from_anywhere"
-                                   name="allow_remote_from_anywhere"
-                                   value="1"
-                                   class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                   @checked($allowRemoteFromAnywhere)>
-                            <span>
-                                <span class="font-semibold text-slate-700 block">غير مقيد بمكان</span>
-                                <span class="text-xs text-slate-500">عند التفعيل، الموظف يقدر يسجل حضور ريموت من أي مكان في الأيام المسموح بها للريموت.</span>
-                            </span>
-                        </label>
-                        @error('allow_remote_from_anywhere')<p class="form-error mt-2">{{ $message }}</p>@enderror
-                    </div>
-
-                    <div id="employee-location-map" class="rounded-2xl border border-slate-200 overflow-hidden" style="height: 360px;"></div>
                 @else
                     <div class="alert-warning">
-                        <p class="text-sm">لا توجد مواقع متاحة حالياً. <a href="{{ route('locations.create') }}" class="underline font-semibold">أضف موقعاً أولاً</a> ثم حدّث الموظف.</p>
+                        <p class="text-sm">لا توجد مواقع متاحة حالياً. يمكنك تفعيل خيار غير مقيد بمكان أو <a href="{{ route('locations.create') }}" class="underline font-semibold">إضافة موقع</a> لاحقاً.</p>
                     </div>
+                @endif
+
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <input type="hidden" name="allow_remote_from_anywhere" value="0">
+                    <label class="flex items-start gap-3 cursor-pointer" for="allow_remote_from_anywhere">
+                        <input type="checkbox"
+                               id="allow_remote_from_anywhere"
+                               name="allow_remote_from_anywhere"
+                               value="1"
+                               class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                               @checked($allowRemoteFromAnywhere)>
+                        <span>
+                            <span class="font-semibold text-slate-700 block">غير مقيد بمكان</span>
+                            <span class="text-xs text-slate-500">عند التفعيل، الموظف يقدر يسجل حضور ريموت من أي مكان في الأيام المسموح بها للريموت.</span>
+                        </span>
+                    </label>
+                    @error('allow_remote_from_anywhere')<p class="form-error mt-2">{{ $message }}</p>@enderror
+                </div>
+
+                @if(($locations ?? collect())->isNotEmpty())
+                    <div id="employee-location-map" class="rounded-2xl border border-slate-200 overflow-hidden" style="height: 360px;"></div>
                 @endif
             </div>
 
@@ -322,6 +324,23 @@
 @endsection
 
 @push('scripts')
+<script>
+(function () {
+    var remoteToggle = document.getElementById('is_remote_worker');
+    var remoteSection = document.getElementById('remote-locations-section');
+
+    if (!remoteToggle || !remoteSection) {
+        return;
+    }
+
+    function applyRemoteSectionState() {
+        remoteSection.classList.toggle('hidden', !remoteToggle.checked);
+    }
+
+    remoteToggle.addEventListener('change', applyRemoteSectionState);
+    applyRemoteSectionState();
+})();
+</script>
 <script>
 (function () {
     var map;
@@ -468,7 +487,23 @@
     };
 })();
 </script>
-@if(config('services.google_maps.api_key'))
-<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.api_key') }}&callback=initEmployeeLocationsMap" async defer></script>
+@php
+    $tenant = (string) config('app.tenant', 'eg');
+    $tenantMapKeys = config('services.google_maps.api_keys', []);
+    $googleMapsApiKey = $tenantMapKeys[$tenant] ?? config('services.google_maps.api_key');
+@endphp
+@if($googleMapsApiKey)
+<script>
+window.gm_authFailure = function () {
+    var mapEl = document.getElementById('employee-location-map');
+    if (!mapEl) {
+        return;
+    }
+
+    mapEl.classList.add('flex', 'items-center', 'justify-center', 'text-sm', 'text-red-700', 'bg-red-50');
+    mapEl.textContent = 'تعذر تحميل خرائط Google لهذا الدومين. تأكد من ضبط GOOGLE_MAPS_API_KEY_EG و GOOGLE_MAPS_API_KEY_SA وتفويض الدومين الحالي داخل Google Cloud.';
+};
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ $googleMapsApiKey }}&callback=initEmployeeLocationsMap&loading=async" async defer></script>
 @endif
 @endpush
