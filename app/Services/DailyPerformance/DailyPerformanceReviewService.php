@@ -46,6 +46,7 @@ class DailyPerformanceReviewService
                     ->whereDate('work_date', $selectedDate)
                     ->with([
                         'attachments',
+                        'links',
                         'reviews.reviewer:id,name',
                     ]),
             ])

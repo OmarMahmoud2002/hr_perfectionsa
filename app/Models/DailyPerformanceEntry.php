@@ -35,6 +35,11 @@ class DailyPerformanceEntry extends Model
         return $this->hasMany(DailyPerformanceAttachment::class, 'entry_id');
     }
 
+    public function links(): HasMany
+    {
+        return $this->hasMany(DailyPerformanceLink::class, 'entry_id');
+    }
+
     public function reviews(): HasMany
     {
         return $this->hasMany(DailyPerformanceReview::class, 'entry_id');

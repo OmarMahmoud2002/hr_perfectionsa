@@ -23,6 +23,8 @@ class StoreDailyPerformanceEntryRequest extends FormRequest
                 'max:10240',
                 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,txt,zip',
             ],
+            'links' => ['nullable', 'array', 'max:10'],
+            'links.*' => ['nullable', 'string', 'max:2048', 'url', 'starts_with:http://,https://'],
         ];
     }
 
@@ -36,6 +38,11 @@ class StoreDailyPerformanceEntryRequest extends FormRequest
             'attachments.max' => 'الحد الأقصى للمرفقات هو 5 ملفات.',
             'attachments.*.max' => 'حجم الملف الواحد يجب ألا يتجاوز 10 ميجابايت.',
             'attachments.*.mimes' => 'نوع الملف غير مدعوم.',
+            'links.array' => 'الروابط يجب أن تكون في صيغة قائمة.',
+            'links.max' => 'الحد الأقصى للروابط هو 10 روابط.',
+            'links.*.url' => 'أحد الروابط المدخلة غير صالح.',
+            'links.*.max' => 'طول الرابط يجب ألا يزيد عن 2048 حرفا.',
+            'links.*.starts_with' => 'الرابط يجب أن يبدأ بـ http:// أو https://.',
         ];
     }
 }

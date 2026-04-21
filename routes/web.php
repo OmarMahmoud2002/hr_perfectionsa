@@ -147,6 +147,8 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
             ->name('daily-performance.employee.upsert');
         Route::delete('/daily-performance/attachments/{attachment}', [DailyPerformanceEmployeeController::class, 'destroyAttachment'])
             ->name('daily-performance.employee.attachment.destroy');
+        Route::delete('/daily-performance/links/{link}', [DailyPerformanceEmployeeController::class, 'destroyLink'])
+            ->name('daily-performance.employee.link.destroy');
     });
 
     Route::middleware(['role:employee,office_girl,department_manager,hr,admin,manager'])->group(function () {

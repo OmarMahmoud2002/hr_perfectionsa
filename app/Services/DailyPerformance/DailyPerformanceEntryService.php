@@ -4,6 +4,7 @@ namespace App\Services\DailyPerformance;
 
 use App\Models\DailyPerformanceAttachment;
 use App\Models\DailyPerformanceEntry;
+use App\Models\DailyPerformanceLink;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
@@ -15,6 +16,7 @@ use RuntimeException;
 class DailyPerformanceEntryService
 {
     private const MAX_ATTACHMENTS_PER_ENTRY = 5;
+    private const MAX_LINKS_PER_ENTRY = 10;
 
     /**
      * @param Collection<int, UploadedFile>|array<int, UploadedFile> $files
@@ -58,8 +60,32 @@ class DailyPerformanceEntryService
                 }
             }
 
+            $normalizedLinks = collect($payload['links'] ?? [])
+                ->map(fn ($link) => trim((string) $link))
+                ->filter()
+                ->unique();
+
+            if ($normalizedLinks->isNotEmpty()) {
+                $currentCount = $entry->links()->count();
+                $existingLinks = $entry->links()->pluck('url');
+                $newLinks = $normalizedLinks
+                    ->reject(fn (string $link) => $existingLinks->contains($link))
+                    ->values();
+
+                if ($currentCount + $newLinks->count() > self::MAX_LINKS_PER_ENTRY) {
+                    throw new RuntimeException('الحد الأقصى للروابط لكل سجل هو 10 روابط.');
+                }
+
+                foreach ($newLinks as $link) {
+                    $entry->links()->create([
+                        'url' => $link,
+                    ]);
+                }
+            }
+
             return $entry->fresh([
                 'attachments',
+                'links',
                 'reviews.reviewer:id,name',
             ]);
         });
@@ -74,6 +100,7 @@ class DailyPerformanceEntryService
             ->whereDate('work_date', $workDate)
             ->with([
                 'attachments',
+                'links',
                 'reviews.reviewer:id,name',
             ])
             ->first();
@@ -136,6 +163,18 @@ class DailyPerformanceEntryService
             Storage::disk($attachment->disk)->delete($attachment->path);
             $attachment->delete();
         });
+    }
+
+    public function deleteLink(User $user, DailyPerformanceLink $link): void
+    {
+        $employee = $this->assertEmployeeContext($user);
+        $link->loadMissing('entry');
+
+        if ((int) $link->entry->employee_id !== (int) $employee->id) {
+            throw new RuntimeException('لا يمكنك حذف روابط تخص موظفا آخر.');
+        }
+
+        $link->delete();
     }
 
     private function assertEmployeeContext(User $user)

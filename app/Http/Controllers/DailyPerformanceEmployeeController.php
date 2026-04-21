@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreDailyPerformanceEntryRequest;
 use App\Models\DailyPerformanceAttachment;
+use App\Models\DailyPerformanceLink;
 use App\Services\DailyPerformance\DailyPerformanceEntryService;
 use App\Services\DailyPerformance\DailyPerformanceReviewService;
 use Carbon\Carbon;
@@ -79,6 +80,17 @@ class DailyPerformanceEmployeeController extends Controller
         }
 
         return back()->with('success', 'تم حذف المرفق بنجاح.');
+    }
+
+    public function destroyLink(Request $request, DailyPerformanceLink $link): RedirectResponse
+    {
+        try {
+            $this->entryService->deleteLink($request->user(), $link);
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'تم حذف الرابط بنجاح.');
     }
 
     public function media(Request $request, string $path): BinaryFileResponse

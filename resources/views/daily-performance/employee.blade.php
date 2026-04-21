@@ -20,8 +20,16 @@
 @section('content')
 @php
     $entryAttachments = $entry?->attachments ?? collect();
+    $entryLinks = $entry?->links ?? collect();
     $reviews = $ratingSummary['reviews'] ?? collect();
     $selectedDateCarbon = \Carbon\Carbon::parse($selectedDate);
+    $oldLinks = old('links');
+    $initialLinkInputs = is_array($oldLinks)
+        ? array_values(array_filter(array_map(fn ($value) => trim((string) $value), $oldLinks)))
+        : [];
+    if (empty($initialLinkInputs)) {
+        $initialLinkInputs = [''];
+    }
 @endphp
 
 <div class="space-y-5">
@@ -63,7 +71,21 @@
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div class="xl:col-span-2 space-y-5" x-data="{ openForm: {{ ($isToday && ($errors->any() || !$entry)) ? 'true' : 'false' }} }">
+        <div class="xl:col-span-2 space-y-5" x-data="{
+            openForm: {{ ($isToday && ($errors->any() || !$entry)) ? 'true' : 'false' }},
+            linkInputs: @js($initialLinkInputs),
+            addLink() {
+                if (this.linkInputs.length < 10) {
+                    this.linkInputs.push('');
+                }
+            },
+            removeLink(index) {
+                this.linkInputs.splice(index, 1);
+                if (this.linkInputs.length === 0) {
+                    this.linkInputs.push('');
+                }
+            }
+        }">
             <div class="card p-5 animate-slide-up">
                 <div class="flex items-center justify-between gap-3 mb-4">
                     <h3 class="text-lg font-extrabold text-slate-800">
@@ -140,6 +162,27 @@
                         <p class="text-xs text-slate-500 mt-1">الحد الأقصى 5 ملفات، وحجم الملف الواحد حتى 10MB.</p>
                     </div>
 
+                    <div class="form-group mb-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <label class="form-label mb-0">روابط (اختياري)</label>
+                            <button type="button" class="btn-ghost btn-sm !h-8 !px-3 !text-xs" @click="addLink()" :disabled="linkInputs.length >= 10" style="background-color: aquamarine;">
+                                إضافة رابط
+                            </button>
+                        </div>
+
+                        <div class="space-y-2 mt-2">
+                            <template x-for="(link, index) in linkInputs" :key="index">
+                                <div class="flex items-center gap-2">
+                                    <input type="url" name="links[]" class="form-input" x-model="linkInputs[index]"
+                                           placeholder="https://example.com/task-details" dir="ltr">
+                                    <button type="button" class="btn-ghost btn-sm !h-10 !px-3 text-red-600" @click="removeLink(index)" x-show="linkInputs.length > 1">حذف</button>
+                                </div>
+                            </template>
+                        </div>
+
+                        <p class="text-xs text-slate-500 mt-1">يمكنك إضافة حتى 10 روابط. يجب أن يبدأ الرابط بـ http:// أو https://.</p>
+                    </div>
+
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <button class="btn-primary" type="submit">{{ $entry ? 'تحديث السجل' : 'حفظ السجل' }}</button>
                         @if($entry)
@@ -190,6 +233,33 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
+            <div class="card p-5 animate-slide-up">
+                <h3 class="text-base font-extrabold text-slate-800 mb-4">روابط اليوم</h3>
+
+                @if($entryLinks->isEmpty())
+                    <p class="text-sm text-slate-500">لا توجد روابط لهذا اليوم.</p>
+                @else
+                    <div class="space-y-2">
+                        @foreach($entryLinks as $link)
+                            <div class="rounded-xl border border-slate-200 bg-white p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <a href="{{ $link->url }}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-sky-700 hover:text-sky-800 break-all">
+                                    {{ $link->url }}
+                                </a>
+
+                                @if($isToday)
+                                <form method="POST" action="{{ route('daily-performance.employee.link.destroy', $link) }}" data-confirm data-confirm-title="حذف الرابط"
+                                      data-confirm-message="هل أنت متأكد من حذف هذا الرابط؟" data-confirm-type="danger" data-confirm-text="حذف" data-cancel-text="إلغاء">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn-ghost btn-sm !h-8 !px-3 !text-xs text-red-600">حذف</button>
+                                </form>
+                                @endif
                             </div>
                         @endforeach
                     </div>

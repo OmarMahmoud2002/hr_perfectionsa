@@ -173,6 +173,22 @@
                                 @endif
                             </div>
 
+                            <div class="rounded-xl bg-white p-4 border border-slate-200">
+                                <p class="text-xs text-slate-500 mb-2">الروابط</p>
+
+                                @if($entry->links->isEmpty())
+                                    <p class="text-sm text-slate-500">لا توجد روابط.</p>
+                                @else
+                                    <div class="space-y-2">
+                                        @foreach($entry->links as $link)
+                                            <a href="{{ $link->url }}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-sky-700 hover:text-sky-800 break-all block">
+                                                {{ $link->url }}
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+
                             @if($entry->reviews->isNotEmpty())
                                 <div class="rounded-xl bg-white p-4 border border-slate-200">
                                     <p class="text-xs text-slate-500 mb-2">آخر التقييمات</p>
