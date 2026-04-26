@@ -31,7 +31,7 @@
             </div>
             <div class="xl:col-span-3">
                 <label class="form-label !mb-1 text-xs">القسم</label>
-                <select name="department_id" class="form-input !h-9 !min-h-0 !py-1.5 !text-xs">
+                <select name="department_id" class="form-input !h-9 !min-h-0 !py-1.5 !text-xs" style="padding-right: 35px;">
                     <option value="0">كل الأقسام</option>
                     @foreach($departments as $department)
                         <option value="{{ $department->id }}" {{ (int) $departmentId === (int) $department->id ? 'selected' : '' }}>{{ $department->name }}</option>

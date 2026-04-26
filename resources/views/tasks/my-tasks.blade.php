@@ -22,14 +22,14 @@
             </div>
 
             <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <select name="month" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                <select name="month" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                     @foreach(range(1, 12) as $m)
                         <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>
                             {{ \Carbon\Carbon::create(null, $m, 1)->locale('ar')->isoFormat('MMMM') }}
                         </option>
                     @endforeach
                 </select>
-                <select name="year" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                <select name="year" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                     @foreach(range(now()->year, now()->year - 4) as $y)
                         <option value="{{ $y }}" {{ $year === $y ? 'selected' : '' }}>{{ $y }}</option>
                     @endforeach
@@ -96,7 +96,7 @@
                             @csrf
                             @method('PATCH')
                             <label class="text-xs text-slate-500">الحالة</label>
-                            <select name="status" class="form-input !h-8 !min-h-0 !py-1 !px-2.5 !text-xs !w-36">
+                            <select name="status" class="form-input !h-8 !min-h-0 !py-1 !px-2.5 !text-xs !w-36" style="padding-right: 35px;">
                                 <option value="to_do" {{ $taskStatus->value === 'to_do' ? 'selected' : '' }}>To Do</option>
                                 <option value="in_progress" {{ $taskStatus->value === 'in_progress' ? 'selected' : '' }}>In Progress</option>
                                 <option value="done" {{ $taskStatus->value === 'done' ? 'selected' : '' }}>Done</option>

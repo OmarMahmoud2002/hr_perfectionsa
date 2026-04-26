@@ -5,12 +5,17 @@ namespace App\Services\EmployeeOfMonth;
 use App\Models\EmployeeMonthTask;
 use App\Models\EmployeeMonthTaskEvaluation;
 use App\Models\User;
+use App\Services\Notifications\EmailNotificationService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class TaskEvaluationService
 {
+    public function __construct(
+        private readonly EmailNotificationService $emailNotificationService,
+    ) {}
+
     public function getTasksForEvaluator(User $evaluator, int $month, int $year, ?string $taskDate = null, ?string $status = null): Collection
     {
         $this->assertEvaluatorRole($evaluator);
@@ -54,7 +59,7 @@ class TaskEvaluationService
             throw new RuntimeException('Invalid score value. Score must be between 1 and 10.');
         }
 
-        return DB::transaction(function () use ($evaluator, $task, $score, $note) {
+        $evaluation = DB::transaction(function () use ($evaluator, $task, $score, $note) {
             $existing = EmployeeMonthTaskEvaluation::query()
                 ->where('task_id', $task->id)
                 ->lockForUpdate()
@@ -80,6 +85,11 @@ class TaskEvaluationService
                 'note' => $note,
             ]);
         });
+
+        $task->loadMissing('employees');
+        $this->emailNotificationService->notifyTaskEvaluated($task, $evaluator, $evaluation->score, $evaluation->note);
+
+        return $evaluation;
     }
 
     private function assertEvaluatorRole(User $evaluator): void

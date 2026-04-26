@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\TaskAssignmentStatus;
 use App\Models\EmployeeMonthTask;
 use App\Models\EmployeeMonthTaskAssignment;
+use App\Services\Notifications\EmailNotificationService;
 use App\Services\Payroll\PayrollPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,10 @@ use Illuminate\View\View;
 
 class EmployeeMyTasksController extends Controller
 {
+    public function __construct(
+        private readonly EmailNotificationService $emailNotificationService,
+    ) {}
+
     public function index(Request $request): View
     {
         $user = $request->user()->loadMissing('employee');
@@ -69,9 +74,18 @@ class EmployeeMyTasksController extends Controller
             return back()->with('error', 'لا يمكنك تعديل حالة مهمة غير مسندة إليك.');
         }
 
+        $wasDone = $assignment->status === TaskAssignmentStatus::Done;
+
         $assignment->update([
             'status' => $validated['status'],
         ]);
+
+        if (! $wasDone && $validated['status'] === TaskAssignmentStatus::Done->value) {
+            $this->emailNotificationService->notifyTaskCompleted(
+                $assignment->fresh(['task', 'employee']),
+                $request->user(),
+            );
+        }
 
         return back()->with('success', 'تم تحديث حالة المهمة بنجاح.');
     }

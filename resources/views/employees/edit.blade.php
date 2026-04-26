@@ -118,7 +118,7 @@
                     الوظيفة
                     <span class="text-red-500">*</span>
                 </label>
-                <select id="job_title_id" name="job_title_id" class="form-input @error('job_title_id') border-red-400 focus:ring-red-300 @enderror">
+                <select id="job_title_id" name="job_title_id" class="form-input @error('job_title_id') border-red-400 focus:ring-red-300 @enderror" style="padding-right: 35px;">
                     <option value="">اختر الوظيفة</option>
                     @foreach(($jobTitles ?? collect()) as $job)
                         <option value="{{ $job->id }}"
@@ -137,7 +137,7 @@
 
             <div class="form-group">
                 <label for="department_id" class="form-label">القسم</label>
-                <select id="department_id" name="department_id" class="form-input @error('department_id') border-red-400 focus:ring-red-300 @enderror">
+                <select id="department_id" name="department_id" class="form-input @error('department_id') border-red-400 focus:ring-red-300 @enderror" style="padding-right: 35px;">
                     <option value="">بدون قسم</option>
                     @foreach(($departments ?? collect()) as $department)
                         <option value="{{ $department->id }}" {{ (string) old('department_id', $employee->department_id) === (string) $department->id ? 'selected' : '' }}>

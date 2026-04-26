@@ -104,7 +104,7 @@
 
             <div class="col-span-1 xl:col-span-3">
                 <label for="email_status" class="form-label">حالة الحساب</label>
-                <select id="email_status" name="email_status" class="form-input !rounded-2xl !border-slate-200 !bg-slate-50/80 shadow-sm" onchange="this.form.submit()">
+                <select id="email_status" name="email_status" class="form-input !rounded-2xl !border-slate-200 !bg-slate-50/80 shadow-sm" onchange="this.form.submit()" style="padding-right: 35px;">
                     <option value="all" @selected($emailFilter === 'all')>الكل</option>
                     <option value="missing" @selected($emailFilter === 'missing')>يحتاج بريد</option>
                     <option value="ready" @selected($emailFilter === 'ready')>جاهز للدخول</option>
@@ -291,6 +291,7 @@
                         <input type="hidden" name="email_status" value="{{ $emailFilter }}">
                         <label for="bottom_per_page" class="whitespace-nowrap font-semibold text-slate-500">لكل صفحة</label>
                         <select id="bottom_per_page" name="per_page"
+                                style="padding-right: 35px;"
                                 class="min-w-[68px] rounded-full border-0 bg-transparent py-0 pr-1 pl-5 text-xs font-black text-slate-700 focus:ring-0"
                                 onchange="this.form.submit()">
                             <option value="10" @selected($perPageFilter === 10)>10</option>

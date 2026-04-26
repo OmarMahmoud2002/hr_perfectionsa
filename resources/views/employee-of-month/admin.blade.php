@@ -37,14 +37,14 @@
 
                 <div class="w-full xl:w-auto space-y-2">
                     <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 gap-2 xl:min-w-[280px]">
-                        <select name="month" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                        <select name="month" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                             @foreach(range(1, 12) as $m)
                                 <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>
                                     {{ \Carbon\Carbon::create(null, $m, 1)->locale('ar')->isoFormat('MMMM') }}
                                 </option>
                             @endforeach
                         </select>
-                        <select name="year" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                        <select name="year" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                             @foreach(range(now()->year, now()->year - 4) as $y)
                                 <option value="{{ $y }}" {{ $year === $y ? 'selected' : '' }}>{{ $y }}</option>
                             @endforeach

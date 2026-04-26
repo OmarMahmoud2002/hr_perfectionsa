@@ -48,7 +48,7 @@
             <form method="GET" id="dailyPerformanceReviewFiltersForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <input type="date" name="date" value="{{ $filters['date'] }}" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
 
-                <select name="employee_id" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                <select name="employee_id" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                     <option value="">كل الموظفين</option>
                     @foreach($employees as $employee)
                         <option value="{{ $employee->id }}" {{ (string) $filters['employee_id'] === (string) $employee->id ? 'selected' : '' }}>
@@ -57,7 +57,7 @@
                     @endforeach
                 </select>
 
-                <select name="status" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                <select name="status" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                     <option value="all" {{ $filters['status'] === 'all' ? 'selected' : '' }}>الكل</option>
                     <option value="submitted" {{ $filters['status'] === 'submitted' ? 'selected' : '' }}>سجل الأداء</option>
                     <option value="not_submitted" {{ $filters['status'] === 'not_submitted' ? 'selected' : '' }}>لم يسجل</option>

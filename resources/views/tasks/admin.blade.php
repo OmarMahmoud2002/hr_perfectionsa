@@ -23,7 +23,7 @@
             </div>
 
             <form method="GET" id="adminTaskFiltersForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                    <select name="month" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                    <select name="month" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                         @foreach(range(1, 12) as $m)
                             <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>
                                 {{ \Carbon\Carbon::create(null, $m, 1)->locale('ar')->isoFormat('MMMM') }}
@@ -31,13 +31,13 @@
                         @endforeach
                     </select>
 
-                    <select name="year" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                    <select name="year" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                         @foreach(range(now()->year, now()->year - 4) as $y)
                             <option value="{{ $y }}" {{ $year === $y ? 'selected' : '' }}>{{ $y }}</option>
                         @endforeach
                     </select>
 
-                    <select name="employee_id" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl">
+                    <select name="employee_id" onchange="this.form.submit()" class="form-input !h-11 !min-h-0 !py-1.5 !px-4 !text-sm !bg-white/95 !border-white/30 !rounded-xl" style="padding-right: 35px;">
                         <option value="">اسم الموظف</option>
                         @foreach($employees as $employee)
                             <option value="{{ $employee->id }}" {{ (int) $employeeId === (int) $employee->id ? 'selected' : '' }}>

@@ -7,6 +7,7 @@ use App\Models\DailyPerformanceReview;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Department\DepartmentScopeService;
+use App\Services\Notifications\EmailNotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class DailyPerformanceReviewService
 
     public function __construct(
         private readonly DepartmentScopeService $departmentScopeService,
+        private readonly EmailNotificationService $emailNotificationService,
     ) {}
 
     /**
@@ -92,7 +94,7 @@ class DailyPerformanceReviewService
             throw new RuntimeException('قيمة التقييم يجب أن تكون بين 1 و 5.');
         }
 
-        return DB::transaction(function () use ($reviewer, $entry, $rating, $comment) {
+        $review = DB::transaction(function () use ($reviewer, $entry, $rating, $comment) {
             $existing = DailyPerformanceReview::query()
                 ->where('entry_id', $entry->id)
                 ->where('reviewer_user_id', $reviewer->id)
@@ -117,6 +119,11 @@ class DailyPerformanceReviewService
                 'reviewed_at' => now(),
             ])->fresh(['reviewer:id,name']);
         });
+
+        $entry->loadMissing('employee.user');
+        $this->emailNotificationService->notifyDailyPerformanceReviewed($entry, $reviewer, $review->rating, $review->comment);
+
+        return $review;
     }
 
     public function getEmployeeEntryRatingSummary(DailyPerformanceEntry $entry): array

@@ -2,14 +2,20 @@
 
 namespace App\Services\Notifications;
 
+use App\Models\DailyPerformanceEntry;
 use App\Models\EmployeeMonthTask;
+use App\Models\EmployeeMonthTaskAssignment;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Notifications\AttendanceMonthImportedNotification;
+use App\Notifications\DailyPerformanceReviewedNotification;
 use App\Notifications\EmployeeOfMonthPublishedNotification;
 use App\Notifications\LeaveRequestDecisionNotification;
 use App\Notifications\LeaveRequestSubmittedNotification;
+use App\Notifications\TaskCompletedNotification;
 use App\Notifications\TaskAssignedNotification;
+use App\Notifications\TaskEvaluationSubmittedNotification;
 use App\Notifications\WelcomeEmployeeNotification;
 use Illuminate\Support\Collection;
 
@@ -90,6 +96,77 @@ class EmailNotificationService
             ->get();
 
         $users->each(fn (User $user) => $user->notify(new TaskAssignedNotification($task)));
+    }
+
+    public function notifyTaskCompleted(EmployeeMonthTaskAssignment $assignment, User $actor): void
+    {
+        $assignment->loadMissing('task', 'employee');
+
+        $notification = new TaskCompletedNotification(
+            $assignment->task,
+            $assignment->employee,
+            (string) $actor->name,
+        );
+
+        User::query()
+            ->whereIn('role', ['user', 'admin', 'hr'])
+            ->get()
+            ->each(fn (User $user) => $user->notify($notification));
+    }
+
+    public function notifyTaskEvaluated(EmployeeMonthTask $task, User $evaluator, float $score, ?string $note = null): void
+    {
+        $employeeIds = $task->employees()
+            ->pluck('employees.id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($employeeIds === []) {
+            return;
+        }
+
+        $notification = new TaskEvaluationSubmittedNotification(
+            $task,
+            (string) $evaluator->name,
+            $score,
+            $note,
+        );
+
+        User::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereIn('role', User::workforceRoles())
+            ->get()
+            ->each(fn (User $user) => $user->notify($notification));
+    }
+
+    public function notifyDailyPerformanceReviewed(DailyPerformanceEntry $entry, User $reviewer, int $rating, ?string $comment = null): void
+    {
+        $entry->loadMissing('employee.user');
+
+        $employeeUser = $entry->employee?->user;
+        if (! $employeeUser instanceof User) {
+            return;
+        }
+
+        $employeeUser->notify(new DailyPerformanceReviewedNotification(
+            $entry,
+            (string) $reviewer->name,
+            $rating,
+            $comment,
+        ));
+    }
+
+    public function notifyAttendanceMonthImported(int $month, int $year): void
+    {
+        $notification = new AttendanceMonthImportedNotification($month, $year);
+
+        User::query()
+            ->whereIn('role', User::workforceRoles())
+            ->get()
+            ->each(fn (User $user) => $user->notify($notification));
     }
 
     public function sendWelcomeOnFirstEmail(User $user, ?string $oldEmail): void

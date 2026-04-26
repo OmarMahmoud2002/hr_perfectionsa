@@ -2,11 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ImportStatus;
 use App\Models\Employee;
 use App\Models\EmployeeMonthTask;
+use App\Models\EmployeeMonthTaskAssignment;
+use App\Models\ImportBatch;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Notifications\AttendanceMonthImportedNotification;
+use App\Notifications\TaskCompletedNotification;
+use App\Notifications\TaskEvaluationSubmittedNotification;
 use App\Notifications\TaskAssignedNotification;
+use App\Services\Import\ImportService;
 use App\Services\Notifications\EmailNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -217,5 +224,142 @@ class NotificationCenterTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame(0, $user->fresh()->unreadNotifications()->count());
+    }
+
+    public function test_marking_task_as_done_notifies_user_admin_and_hr_only(): void
+    {
+        Notification::fake();
+
+        $employee = Employee::factory()->create(['name' => 'Done Employee']);
+        $employeeUser = User::factory()->create([
+            'role' => 'employee',
+            'employee_id' => $employee->id,
+            'must_change_password' => false,
+        ]);
+
+        $admin = User::factory()->create(['role' => 'admin', 'must_change_password' => false]);
+        $hr = User::factory()->create(['role' => 'hr', 'must_change_password' => false]);
+        $evaluator = User::factory()->create(['role' => 'user', 'must_change_password' => false]);
+        $manager = User::factory()->create(['role' => 'manager', 'must_change_password' => false]);
+
+        $task = EmployeeMonthTask::query()->create([
+            'title' => 'Finish Notification Flow',
+            'description' => 'Complete the task and notify reviewers.',
+            'period_month' => (int) now()->month,
+            'period_year' => (int) now()->year,
+            'period_start_date' => now()->startOfMonth()->toDateString(),
+            'period_end_date' => now()->endOfMonth()->toDateString(),
+            'task_date' => now()->toDateString(),
+            'created_by' => $admin->id,
+            'is_active' => true,
+        ]);
+
+        EmployeeMonthTaskAssignment::query()->create([
+            'task_id' => $task->id,
+            'employee_id' => $employee->id,
+            'status' => 'to_do',
+        ]);
+
+        $this->actingAs($employeeUser)
+            ->patch(route('tasks.my.status.update', $task), [
+                'status' => 'done',
+            ])
+            ->assertRedirect();
+
+        Notification::assertSentTo($admin, TaskCompletedNotification::class);
+        Notification::assertSentTo($hr, TaskCompletedNotification::class);
+        Notification::assertSentTo($evaluator, TaskCompletedNotification::class);
+        Notification::assertNotSentTo($manager, TaskCompletedNotification::class);
+    }
+
+    public function test_task_evaluation_notifies_assigned_employee_users(): void
+    {
+        Notification::fake();
+
+        $creator = User::factory()->create(['role' => 'admin', 'must_change_password' => false]);
+        $evaluator = User::factory()->create(['role' => 'user', 'must_change_password' => false]);
+
+        $employeeOne = Employee::factory()->create(['name' => 'Assigned One']);
+        $employeeTwo = Employee::factory()->create(['name' => 'Assigned Two']);
+
+        $employeeOneUser = User::factory()->create([
+            'role' => 'employee',
+            'employee_id' => $employeeOne->id,
+            'must_change_password' => false,
+        ]);
+
+        $employeeTwoUser = User::factory()->create([
+            'role' => 'employee',
+            'employee_id' => $employeeTwo->id,
+            'must_change_password' => false,
+        ]);
+
+        $task = EmployeeMonthTask::query()->create([
+            'title' => 'Evaluated Task',
+            'description' => 'This task will be evaluated.',
+            'created_by' => $creator->id,
+            'period_month' => (int) now()->month,
+            'period_year' => (int) now()->year,
+            'period_start_date' => now()->startOfMonth()->toDateString(),
+            'period_end_date' => now()->endOfMonth()->toDateString(),
+            'task_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $task->employees()->sync([$employeeOne->id, $employeeTwo->id]);
+
+        $this->actingAs($evaluator)
+            ->post(route('tasks.evaluator.upsert', $task), [
+                'score' => 8.5,
+                'note' => 'عمل ممتاز',
+            ])
+            ->assertRedirect();
+
+        Notification::assertSentTo($employeeOneUser, TaskEvaluationSubmittedNotification::class);
+        Notification::assertSentTo($employeeTwoUser, TaskEvaluationSubmittedNotification::class);
+    }
+
+    public function test_completed_monthly_import_notifies_workforce_users(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->create(['role' => 'admin', 'must_change_password' => false]);
+        $employeeUser = User::factory()->create(['role' => 'employee', 'must_change_password' => false]);
+        $officeGirlUser = User::factory()->create(['role' => 'office_girl', 'must_change_password' => false]);
+        $hrUser = User::factory()->create(['role' => 'hr', 'must_change_password' => false]);
+
+        $batch = ImportBatch::query()->create([
+            'file_name' => 'attendance.xlsx',
+            'file_path' => 'imports/attendance.xlsx',
+            'month' => 4,
+            'year' => 2026,
+            'status' => ImportStatus::Pending,
+            'records_count' => 0,
+            'employees_count' => 0,
+            'uploaded_by' => $admin->id,
+        ]);
+
+        $completedBatch = $batch->replicate();
+        $completedBatch->id = $batch->id;
+        $completedBatch->status = ImportStatus::Completed;
+        $completedBatch->records_count = 25;
+        $completedBatch->employees_count = 5;
+
+        $this->mock(ImportService::class, function ($mock) use ($batch, $completedBatch): void {
+            $mock->shouldReceive('processImport')
+                ->once()
+                ->withArgs(function ($passedBatch, array $importSettings, bool $replaceExisting) use ($batch): bool {
+                    return (int) $passedBatch->id === (int) $batch->id;
+                })
+                ->andReturn($completedBatch);
+        });
+
+        $this->actingAs($admin)
+            ->post(route('import.confirm', $batch))
+            ->assertRedirect(route('import.form'));
+
+        Notification::assertSentTo($employeeUser, AttendanceMonthImportedNotification::class);
+        Notification::assertSentTo($officeGirlUser, AttendanceMonthImportedNotification::class);
+        Notification::assertNotSentTo($hrUser, AttendanceMonthImportedNotification::class);
     }
 }

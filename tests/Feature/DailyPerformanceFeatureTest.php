@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\DailyPerformanceEntry;
 use App\Models\Employee;
 use App\Models\User;
+use App\Notifications\DailyPerformanceReviewedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -93,12 +95,14 @@ class DailyPerformanceFeatureTest extends TestCase
 
     public function test_reviewer_can_upsert_daily_review(): void
     {
+        Notification::fake();
+
         $reviewer = User::factory()->create([
             'role' => 'user',
             'must_change_password' => false,
         ]);
 
-        [, $employee] = $this->createEmployeeUser('Emp Daily 3', 'AC-DP-3');
+        [$employeeUser, $employee] = $this->createEmployeeUser('Emp Daily 3', 'AC-DP-3');
 
         $entry = DailyPerformanceEntry::query()->create([
             'employee_id' => $employee->id,
@@ -129,6 +133,8 @@ class DailyPerformanceFeatureTest extends TestCase
             'rating' => 5,
             'comment' => 'Excellent follow-up.',
         ]);
+
+        Notification::assertSentTo($employeeUser, DailyPerformanceReviewedNotification::class);
     }
 
     public function test_employee_can_see_reviews_on_his_daily_performance_page(): void
