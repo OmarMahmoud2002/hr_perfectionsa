@@ -17,6 +17,7 @@ class StoreEmployeeRequest extends FormRequest
         return [
             'ac_no'               => ['required', 'string', 'max:50', 'unique:employees,ac_no'],
             'name'                => ['required', 'string', 'max:255'],
+            'account_email'       => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users', 'email')],
             'job_title_id'        => ['nullable', 'integer', 'exists:job_titles,id', 'required_without:job_title'],
             'job_title'           => ['nullable', 'string', 'max:50', 'exists:job_titles,key', 'required_without:job_title_id'],
             'department_id'       => ['nullable', 'integer', 'exists:departments,id'],
@@ -63,6 +64,10 @@ class StoreEmployeeRequest extends FormRequest
             'ac_no.max'                  => 'رقم الموظف لا يتجاوز 50 حرفاً.',
             'name.required'              => 'اسم الموظف مطلوب.',
             'name.max'                   => 'اسم الموظف لا يتجاوز 255 حرفاً.',
+            'account_email.required'     => 'بريد الدخول للموظف مطلوب.',
+            'account_email.email'        => 'صيغة بريد الدخول غير صحيحة.',
+            'account_email.max'          => 'بريد الدخول لا يتجاوز 255 حرفاً.',
+            'account_email.unique'       => 'هذا البريد مستخدم بالفعل من حساب آخر.',
             'job_title_id.required'      => 'الوظيفة مطلوبة.',
             'job_title_id.exists'        => 'الوظيفة المختارة غير صالحة.',
             'job_title.required'         => 'الوظيفة مطلوبة.',
@@ -98,6 +103,7 @@ class StoreEmployeeRequest extends FormRequest
         return [
             'ac_no'               => 'رقم الموظف',
             'name'                => 'اسم الموظف',
+            'account_email'       => 'بريد الدخول',
             'job_title_id'        => 'الوظيفة',
             'job_title'           => 'الوظيفة',
             'department_id'       => 'القسم',

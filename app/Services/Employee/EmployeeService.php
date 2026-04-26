@@ -7,8 +7,10 @@ use App\Models\Employee;
 use App\Models\JobTitle;
 use App\Models\User;
 use App\Services\Department\DepartmentScopeService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class EmployeeService
 {
@@ -18,34 +20,49 @@ class EmployeeService
     ) {}
 
     /**
-     * جلب قائمة الموظفين مع بحث وفلترة وتقسيم صفحات
+     * Ø¬Ù„Ø¨ Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ù…ÙˆØ¸ÙÙŠÙ† Ù…Ø¹ Ø¨Ø­Ø« ÙˆÙÙ„ØªØ±Ø© ÙˆØªÙ‚Ø³ÙŠÙ… ØµÙØ­Ø§Øª
      */
-    public function getEmployees(array $filters = [], int $perPage = 15, ?User $actor = null, bool $applyVisibilityScope = true): LengthAwarePaginator
+    public function getEmployees(array $filters = [], int $perPage = 20, ?User $actor = null, bool $applyVisibilityScope = true): LengthAwarePaginator
     {
-        $query = Employee::query()->with(['user.profile', 'department:id,name', 'jobTitleRef:id,name_ar', 'leaveProfile:employee_id,employment_start_date']);
-
-        if ($actor !== null && $applyVisibilityScope && ! $actor->isEvaluatorUser()) {
-            $this->departmentScopeService->applyEmployeeScope($query, $actor);
-        }
-
-        // البحث بالاسم أو الرقم
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('ac_no', 'like', "%{$search}%");
-            });
-        }
+        $query = $this->buildEmployeesQuery($actor, $applyVisibilityScope);
+        $this->applyEmployeeFilters($query, $filters);
 
         return $query->orderBy('name')->paginate($perPage)->withQueryString();
     }
 
+    public function getEmployeeDirectorySummary(?User $actor = null, bool $applyVisibilityScope = true): array
+    {
+        $baseQuery = $this->buildEmployeesQuery($actor, $applyVisibilityScope);
+
+        $totalEmployees = (clone $baseQuery)->count();
+        $readyAccounts = (clone $baseQuery)
+            ->whereHas('user', fn (Builder $query) => $query->whereNotNull('email')->where('email', '<>', ''))
+            ->count();
+        $missingEmail = (clone $baseQuery)
+            ->whereHas('user', fn (Builder $query) => $query->where(function (Builder $emailQuery): void {
+                $emailQuery->whereNull('email')->orWhere('email', '');
+            }))
+            ->count();
+        $withoutAccount = (clone $baseQuery)
+            ->whereDoesntHave('user')
+            ->count();
+
+        return [
+            'total_employees' => $totalEmployees,
+            'ready_accounts' => $readyAccounts,
+            'missing_email' => $missingEmail,
+            'without_account' => $withoutAccount,
+            'pending_login_setup' => $missingEmail + $withoutAccount,
+        ];
+    }
+
     /**
-     * إنشاء موظف جديد
+     * Ø¥Ù†Ø´Ø§Ø¡ Ù…ÙˆØ¸Ù Ø¬Ø¯ÙŠØ¯
      */
     public function create(array $data): Employee
     {
         $jobTitle = $this->resolveJobTitleFromPayload($data);
+        $accountEmail = $this->extractAccountEmail($data);
 
         $legacyJobTitle = $this->resolveLegacyJobTitleKey($jobTitle);
 
@@ -65,7 +82,7 @@ class EmployeeService
             'late_grace_minutes'  => isset($data['late_grace_minutes']) && $data['late_grace_minutes'] !== '' ? (int) $data['late_grace_minutes'] : null,
         ]);
 
-        $this->accountService->provisionForEmployee($employee);
+        $this->accountService->provisionForEmployee($employee, $accountEmail, allowEmptyEmail: false);
 
         if (! empty($data['employment_start_date'])) {
             $employee->leaveProfile()->updateOrCreate(
@@ -78,11 +95,12 @@ class EmployeeService
     }
 
     /**
-     * تحديث بيانات موظف
+     * ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ù…ÙˆØ¸Ù
      */
     public function update(Employee $employee, array $data): Employee
     {
         $jobTitle = $this->resolveJobTitleFromPayload($data);
+        $accountEmail = $this->extractAccountEmail($data);
 
         $legacyJobTitle = $this->resolveLegacyJobTitleKey($jobTitle);
 
@@ -108,13 +126,13 @@ class EmployeeService
             );
         }
 
-        $this->accountService->provisionForEmployee($employee);
+        $this->accountService->provisionForEmployee($employee, $accountEmail, allowEmptyEmail: true);
 
         return $employee->fresh();
     }
 
     /**
-     * حذف نهائي للموظف (Hard Delete)
+     * Ø­Ø°Ù Ù†Ù‡Ø§Ø¦ÙŠ Ù„Ù„Ù…ÙˆØ¸Ù (Hard Delete)
      */
     public function deletePermanently(Employee $employee): void
     {
@@ -122,7 +140,7 @@ class EmployeeService
     }
 
     /**
-     * تفعيل موظف
+     * ØªÙØ¹ÙŠÙ„ Ù…ÙˆØ¸Ù
      */
     public function activate(Employee $employee): void
     {
@@ -131,26 +149,31 @@ class EmployeeService
     }
 
     /**
-     * إنشاء أو تحديث موظف من بيانات Excel (يُستخدم أثناء الاستيراد)
+     * Ø¥Ù†Ø´Ø§Ø¡ Ø£Ùˆ ØªØ­Ø¯ÙŠØ« Ù…ÙˆØ¸Ù Ù…Ù† Ø¨ÙŠØ§Ù†Ø§Øª Excel (ÙŠÙØ³ØªØ®Ø¯Ù… Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯)
      */
     public function findOrCreateFromExcel(string $acNo, string $name): Employee
     {
         $employee = Employee::withTrashed()->where('ac_no', $acNo)->first();
 
         if ($employee) {
-            // تحديث الاسم إن اختلف
+            // ØªØ«Ø¨ÙŠØª Ø§Ø³Ù… Ø§Ù„Ù†Ø¸Ø§Ù… ÙˆØ¹Ø¯Ù… ØªØ­Ø¯ÙŠØ«Ù‡ Ù…Ù† Excel.
             if ($employee->name !== $name) {
-                $employee->name = $name;
-                $employee->save();
+                Log::info('Excel import name mismatch ignored for existing employee.', [
+                    'employee_id' => $employee->id,
+                    'ac_no' => $acNo,
+                    'system_name' => $employee->name,
+                    'excel_name' => $name,
+                ]);
             }
-            // استعادة إن كان محذوفاً
+
+            // Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø¥Ù† ÙƒØ§Ù† Ù…Ø­Ø°ÙˆÙØ§Ù‹
             if ($employee->trashed()) {
                 $employee->restore();
                 $employee->update(['is_active' => true]);
             }
 
-            // ضمان وجود حساب مستخدم للموظف أثناء الاستيراد.
-            $this->accountService->provisionForEmployee($employee);
+            // Ø¶Ù…Ø§Ù† ÙˆØ¬ÙˆØ¯ Ø­Ø³Ø§Ø¨ Ù…Ø³ØªØ®Ø¯Ù… Ù„Ù„Ù…ÙˆØ¸Ù Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯.
+            $this->accountService->provisionForEmployee($employee, allowEmptyEmail: true);
 
             return $employee;
         }
@@ -162,14 +185,14 @@ class EmployeeService
             'is_active'    => true,
         ]);
 
-        // إنشاء حساب المستخدم تلقائياً للموظف الجديد من الإكسيل.
-        $this->accountService->provisionForEmployee($employee);
+        // Ø¥Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ Ù„Ù„Ù…ÙˆØ¸Ù Ø§Ù„Ø¬Ø¯ÙŠØ¯ Ù…Ù† Ø§Ù„Ø¥ÙƒØ³ÙŠÙ„.
+        $this->accountService->provisionForEmployee($employee, allowEmptyEmail: true);
 
         return $employee;
     }
 
     /**
-     * قائمة بسيطة لاستخدامها في الـ Selects
+     * Ù‚Ø§Ø¦Ù…Ø© Ø¨Ø³ÙŠØ·Ø© Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù…Ù‡Ø§ ÙÙŠ Ø§Ù„Ù€ Selects
      */
     public function getForSelect(): Collection
     {
@@ -196,5 +219,56 @@ class EmployeeService
         }
 
         return null;
+    }
+
+    private function extractAccountEmail(array $data): ?string
+    {
+        if (! array_key_exists('account_email', $data)) {
+            return null;
+        }
+
+        $email = trim((string) $data['account_email']);
+
+        return $email === '' ? null : $email;
+    }
+
+    private function buildEmployeesQuery(?User $actor = null, bool $applyVisibilityScope = true): Builder
+    {
+        $query = Employee::query()
+            ->with(['user.profile', 'department:id,name', 'jobTitleRef:id,name_ar', 'leaveProfile:employee_id,employment_start_date']);
+
+        if ($actor !== null && $applyVisibilityScope && ! $actor->isEvaluatorUser()) {
+            $this->departmentScopeService->applyEmployeeScope($query, $actor);
+        }
+
+        return $query;
+    }
+
+    private function applyEmployeeFilters(Builder $query, array $filters): void
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $query->where(function (Builder $employeeQuery) use ($search): void {
+                $employeeQuery->where('name', 'like', "%{$search}%")
+                    ->orWhere('ac_no', 'like', "%{$search}%");
+            });
+        }
+
+        $emailStatus = (string) ($filters['email_status'] ?? 'all');
+
+        if ($emailStatus === 'missing') {
+            $query->where(function (Builder $employeeQuery): void {
+                $employeeQuery->whereDoesntHave('user')
+                    ->orWhereHas('user', fn (Builder $userQuery) => $userQuery->whereNull('email')->orWhere('email', ''));
+            });
+        }
+
+        if ($emailStatus === 'ready') {
+            $query->whereHas('user', fn (Builder $userQuery) => $userQuery->whereNotNull('email')->where('email', '<>', ''));
+        }
+
+        if ($emailStatus === 'no_account') {
+            $query->whereDoesntHave('user');
+        }
     }
 }

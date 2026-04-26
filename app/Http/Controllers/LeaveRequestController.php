@@ -8,6 +8,7 @@ use App\Services\Leave\LeaveBalanceService;
 use App\Services\Leave\LeaveEligibilityService;
 use App\Services\Leave\LeaveRequestException;
 use App\Services\Leave\LeaveRequestService;
+use App\Services\Notifications\EmailNotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class LeaveRequestController extends Controller
         private readonly LeaveEligibilityService $eligibilityService,
         private readonly LeaveBalanceService $balanceService,
         private readonly LeaveRequestService $leaveRequestService,
+        private readonly EmailNotificationService $emailNotificationService,
     ) {}
 
     public function index(Request $request): View|RedirectResponse
@@ -65,13 +67,15 @@ class LeaveRequestController extends Controller
         }
 
         try {
-            $this->leaveRequestService->submit(
+            $leaveRequest = $this->leaveRequestService->submit(
                 $employee,
                 Carbon::parse((string) $request->string('start_date')),
                 Carbon::parse((string) $request->string('end_date')),
                 $request->filled('reason') ? (string) $request->string('reason') : null,
                 now(),
             );
+
+            $this->emailNotificationService->notifyLeaveRequestSubmitted($leaveRequest);
         } catch (LeaveRequestException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }

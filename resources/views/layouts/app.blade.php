@@ -16,6 +16,13 @@
         $navAvatarUrl = $navUser->profile?->avatar_path
             ? route('media.avatar', ['path' => $navUser->profile->avatar_path])
             : null;
+        $notificationsTableExists = \Illuminate\Support\Facades\Schema::hasTable('notifications');
+        $navUnreadNotificationsCount = $notificationsTableExists
+            ? $navUser->unreadNotifications()->count()
+            : 0;
+        $navRecentNotifications = $notificationsTableExists
+            ? $navUser->notifications()->latest()->limit(7)->get()
+            : collect();
         $roleLabel = match ($navUser->role) {
             'admin' => 'مدير النظام',
             'manager' => 'مدير عام',
@@ -63,6 +70,121 @@
 
                     {{-- Left: User info + logout --}}
                     <div class="flex items-center gap-3">
+
+                        {{-- Notifications Bell --}}
+                        <div class="relative" id="notifications-menu-root">
+                            <button type="button"
+                                    id="notifications-menu-button"
+                                    class="relative flex h-12 w-12 items-center justify-center rounded-2xl border transition-all {{ $navUnreadNotificationsCount > 0 ? 'border-rose-200 bg-rose-50 text-rose-700 shadow-sm shadow-rose-100' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-secondary-600' }}"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    title="الإشعارات">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"/>
+                                </svg>
+                                @if($navUnreadNotificationsCount > 0)
+                                    <span class="absolute -bottom-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center border-2 border-white shadow-lg shadow-red-300/70 z-10" style="
+    position: absolute;
+    right: 24px;
+    bottom: -10px;
+">
+                                        {{ $navUnreadNotificationsCount > 99 ? '99+' : $navUnreadNotificationsCount }}
+                                    </span>
+                                @endif
+                            </button>
+
+                            <div id="notifications-menu-panel" class="hidden absolute left-0 mt-3 w-[420px] sm:w-[470px] max-w-[96vw] overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-2xl shadow-slate-300/40 z-50 flex flex-col max-h-[82vh]" style="
+    border-radius: 5%;
+">
+                                <div class="border-b border-slate-100 px-3.5 py-3 bg-white">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <h4 class="text-xl font-black text-slate-900 leading-none" style="
+    padding-right: 20px;
+">الإشعارات</h4>
+                                        @if($navUnreadNotificationsCount > 0)
+                                            <form action="{{ route('notifications.read-all') }}" method="POST">
+                                                @csrf
+                                                <button type="submit" class="inline-flex items-center rounded-lg bg-sky-100 px-3 py-1.5 text-xs font-black text-slate-900 transition hover:bg-sky-200">
+                                                    تحديد الكل كمقروء
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/70 px-2.5 py-2.5 space-y-2.5" style="max-height: calc(82vh - 108px); -webkit-overflow-scrolling: touch; touch-action: pan-y;">
+                                    @forelse($navRecentNotifications as $notification)
+                                        @php
+                                            $nData = $notification->data ?? [];
+                                            $nTitle = (string) ($nData['title'] ?? 'إشعار جديد');
+                                            $nMessage = (string) ($nData['message'] ?? '');
+                                            $nUrl = (string) ($nData['url'] ?? '#');
+                                            $nOpenUrl = $nUrl !== '#' ? route('notifications.open', ['notificationId' => $notification->id]) : '#';
+                                            $nUnread = $notification->read_at === null;
+                                            $nType = (string) ($nData['type'] ?? 'general');
+                                            $nRelativeTime = $notification->created_at
+                                                ? $notification->created_at->locale('ar')->diffForHumans()
+                                                : '';
+
+                                            $nTypeMeta = match ($nType) {
+                                                'leave_request_submitted' => ['icon' => '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>', 'card' => 'border-amber-300 bg-amber-50/90', 'circle' => 'bg-amber-500 text-white'],
+                                                'leave_request_decision' => ['icon' => '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>', 'card' => 'border-emerald-300 bg-emerald-50/90', 'circle' => 'bg-emerald-500 text-white'],
+                                                'task_assigned' => ['icon' => '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9m-5-4h5m0 0v5m0-5L10 14"/></svg>', 'card' => 'border-amber-300 bg-amber-50/90', 'circle' => 'bg-amber-500 text-white'],
+                                                'announcement_broadcast' => ['icon' => '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h6m8-8L3 11l7 2 2 7L21 4z"/></svg>', 'card' => 'border-sky-300 bg-sky-50/95', 'circle' => 'bg-sky-500 text-white'],
+                                                'welcome_employee' => ['icon' => '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M7 16.938A9 9 0 1117 16.938"/></svg>', 'card' => 'border-slate-300 bg-slate-100/95', 'circle' => 'bg-slate-400 text-white'],
+                                                'employee_of_month_published' => ['icon' => '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.037 3.193a1 1 0 00.95.69h3.357c.969 0 1.371 1.24.588 1.81l-2.716 1.973a1 1 0 00-.364 1.118l1.037 3.193c.3.921-.755 1.688-1.538 1.118l-2.716-1.973a1 1 0 00-1.176 0l-2.716 1.973c-.783.57-1.838-.197-1.538-1.118l1.037-3.193a1 1 0 00-.364-1.118L5.117 8.62c-.783-.57-.38-1.81.588-1.81h3.357a1 1 0 00.95-.69l1.037-3.193z"/></svg>', 'card' => 'border-indigo-300 bg-indigo-50/90', 'circle' => 'bg-indigo-500 text-white'],
+                                                default => ['icon' => '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>', 'card' => 'border-slate-300 bg-slate-100/90', 'circle' => 'bg-slate-500 text-white'],
+                                            };
+                                        @endphp
+
+                                        <div class="rounded-xl border p-3 {{ $nTypeMeta['card'] }} {{ $nUnread ? 'shadow-sm' : '' }}" style="
+    width: 295px;
+        margin-bottom: 5px;
+
+">
+                                            <div class="flex items-start gap-2.5">
+                                                <div class="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full {{ $nTypeMeta['circle'] }}">
+                                                    <span aria-hidden="true">{!! $nTypeMeta['icon'] !!}</span>
+                                                </div>
+
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="flex items-start gap-2">
+                                                        <p class="text-[14px] leading-6 font-black text-slate-900 break-words">{{ $nTitle }}</p>
+                                                        @if($nUnread)
+                                                            <span class="mt-2 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-sky-600"></span>
+                                                        @endif
+                                                    </div>
+
+                                                    @if($nMessage !== '')
+                                                        <p class="mt-1 text-[12px] leading-6 text-slate-800 break-words" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ $nMessage }}</p>
+                                                    @endif
+
+                                                    <div class="mt-2.5 flex items-center justify-between gap-2">
+                                                        @if($nOpenUrl !== '#')
+                                                            <a href="{{ $nOpenUrl }}" class="inline-flex items-center rounded-lg bg-sky-100 px-3 py-1.5 text-xs font-black text-slate-900 transition hover:bg-sky-200">فتح</a>
+                                                        @endif
+                                                        <div class="flex items-center gap-1.5 text-[11px] text-slate-700">
+                                                            <span class="inline-flex h-2 w-2 rounded-full bg-sky-600"></span>
+                                                            <span class="font-semibold whitespace-nowrap">{{ $nRelativeTime }}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="rounded-xl border border-slate-200 bg-white px-3 py-6 text-center text-xs text-slate-500">
+                                            لا توجد إشعارات حتى الآن
+                                        </div>
+                                    @endforelse
+                                </div>
+
+                                <div class="border-t border-slate-100 bg-white p-2.5">
+                                    <a href="{{ route('notifications.index') }}" class="flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-center text-xs font-black text-slate-700 transition hover:bg-slate-50">
+                                        عرض كل الإشعارات
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
 
                         {{-- Current Date --}}
                         <div class="hidden md:flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
@@ -249,6 +371,49 @@
                     if (_open) $s().style.width = '';
                 }
             });
+        });
+    })();
+    </script>
+
+    <script>
+    (function () {
+        var root = document.getElementById('notifications-menu-root');
+        var button = document.getElementById('notifications-menu-button');
+        var panel = document.getElementById('notifications-menu-panel');
+
+        if (!root || !button || !panel) {
+            return;
+        }
+
+        function closeMenu() {
+            panel.classList.add('hidden');
+            button.setAttribute('aria-expanded', 'false');
+        }
+
+        function openMenu() {
+            panel.classList.remove('hidden');
+            button.setAttribute('aria-expanded', 'true');
+        }
+
+        button.addEventListener('click', function (event) {
+            event.stopPropagation();
+            if (panel.classList.contains('hidden')) {
+                openMenu();
+            } else {
+                closeMenu();
+            }
+        });
+
+        document.addEventListener('click', function (event) {
+            if (!root.contains(event.target)) {
+                closeMenu();
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeMenu();
+            }
         });
     })();
     </script>

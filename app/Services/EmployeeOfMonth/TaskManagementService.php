@@ -4,6 +4,7 @@ namespace App\Services\EmployeeOfMonth;
 
 use App\Models\EmployeeMonthTask;
 use App\Models\User;
+use App\Services\Notifications\EmailNotificationService;
 use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -11,12 +12,16 @@ use Illuminate\Support\Facades\DB;
 
 class TaskManagementService
 {
+    public function __construct(
+        private readonly EmailNotificationService $emailNotificationService,
+    ) {}
+
     public function createTask(array $data, array $employeeIds, User $creator): EmployeeMonthTask
     {
         [$periodMonth, $periodYear] = $this->resolvePeriod($data);
         [$periodStart, $periodEnd] = PayrollPeriod::resolve($periodMonth, $periodYear);
 
-        return DB::transaction(function () use ($data, $employeeIds, $creator, $periodMonth, $periodYear, $periodStart, $periodEnd) {
+        $task = DB::transaction(function () use ($data, $employeeIds, $creator, $periodMonth, $periodYear, $periodStart, $periodEnd) {
             $task = EmployeeMonthTask::query()->create([
                 'title' => (string) $data['title'],
                 'description' => $data['description'] ?? null,
@@ -34,6 +39,10 @@ class TaskManagementService
 
             return $task->fresh(['assignments', 'employees', 'evaluation']);
         });
+
+        $this->emailNotificationService->notifyTaskAssigned($task, $employeeIds);
+
+        return $task;
     }
 
     public function updateTask(EmployeeMonthTask $task, array $data, ?array $employeeIds = null): EmployeeMonthTask
@@ -41,7 +50,9 @@ class TaskManagementService
         [$periodMonth, $periodYear] = $this->resolvePeriod($data, $task);
         [$periodStart, $periodEnd] = PayrollPeriod::resolve($periodMonth, $periodYear);
 
-        return DB::transaction(function () use ($task, $data, $employeeIds, $periodMonth, $periodYear, $periodStart, $periodEnd) {
+        $result = DB::transaction(function () use ($task, $data, $employeeIds, $periodMonth, $periodYear, $periodStart, $periodEnd) {
+            $newlyAssignedEmployeeIds = [];
+
             $task->update([
                 'title' => (string) ($data['title'] ?? $task->title),
                 'description' => array_key_exists('description', $data) ? $data['description'] : $task->description,
@@ -57,11 +68,29 @@ class TaskManagementService
             ]);
 
             if ($employeeIds !== null) {
-                $task->employees()->sync($this->sanitizeEmployeeIds($employeeIds));
+                $currentEmployeeIds = $task->employees()
+                    ->pluck('employees.id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                $targetEmployeeIds = $this->sanitizeEmployeeIds($employeeIds);
+                $task->employees()->sync($targetEmployeeIds);
+
+                $newlyAssignedEmployeeIds = array_values(array_diff($targetEmployeeIds, $currentEmployeeIds));
             }
 
-            return $task->fresh(['assignments', 'employees', 'evaluation']);
+            return [
+                'task' => $task->fresh(['assignments', 'employees', 'evaluation']),
+                'newly_assigned_employee_ids' => $newlyAssignedEmployeeIds,
+            ];
         });
+
+        $this->emailNotificationService->notifyTaskAssigned(
+            $result['task'],
+            $result['newly_assigned_employee_ids'],
+        );
+
+        return $result['task'];
     }
 
     public function deactivateTask(EmployeeMonthTask $task): EmployeeMonthTask

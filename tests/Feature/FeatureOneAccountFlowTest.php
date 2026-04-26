@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Notifications\WelcomeEmployeeNotification;
 use App\Services\Employee\EmployeeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class FeatureOneAccountFlowTest extends TestCase
@@ -25,6 +27,7 @@ class FeatureOneAccountFlowTest extends TestCase
             ->post(route('employees.store'), [
                 'ac_no' => 'AC-2001',
                 'name' => 'Omar Ali',
+                'account_email' => 'omar.ali@example.com',
                 'job_title' => 'developer',
                 'basic_salary' => 7000,
                 'is_remote_worker' => 0,
@@ -41,7 +44,7 @@ class FeatureOneAccountFlowTest extends TestCase
 
         $user = User::where('employee_id', $employee->id)->firstOrFail();
 
-        $this->assertStringEndsWith('@perfection.com', $user->email);
+        $this->assertSame('omar.ali@example.com', $user->email);
         $this->assertDatabaseHas('user_profiles', [
             'user_id' => $user->id,
         ]);
@@ -62,6 +65,7 @@ class FeatureOneAccountFlowTest extends TestCase
                 ->post(route('employees.store'), [
                     'ac_no' => $case['ac'],
                     'name' => $case['name'],
+                    'account_email' => strtolower(str_replace(' ', '.', $case['name'])) . '@example.com',
                     'job_title' => $case['job'],
                     'basic_salary' => 8000,
                     'is_remote_worker' => 0,
@@ -118,7 +122,52 @@ class FeatureOneAccountFlowTest extends TestCase
             ->assertOk();
     }
 
-    public function test_excel_import_employee_gets_auto_generated_account(): void
+    public function test_updating_employee_email_switches_login_to_the_new_email_only(): void
+    {
+        $admin = $this->makeAdmin();
+
+        $employee = Employee::factory()->create([
+            'ac_no' => 'AC-CHANGE-1',
+            'name' => 'Email Switch User',
+            'basic_salary' => 6500,
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->create([
+            'role' => 'employee',
+            'employee_id' => $employee->id,
+            'email' => 'old.login@example.com',
+            'password' => 'password',
+            'must_change_password' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('employees.update', $employee), [
+                'ac_no' => $employee->ac_no,
+                'name' => $employee->name,
+                'account_email' => 'new.login@example.com',
+                'job_title' => 'developer',
+                'basic_salary' => 6500,
+                'is_remote_worker' => 0,
+            ])
+            ->assertRedirect(route('employees.show', $employee));
+
+        $this->assertSame('new.login@example.com', $user->fresh()->email);
+
+        auth()->logout();
+
+        $this->post(route('login'), [
+            'email' => 'old.login@example.com',
+            'password' => 'password',
+        ])->assertSessionHasErrors('email');
+
+        $this->post(route('login'), [
+            'email' => 'new.login@example.com',
+            'password' => 'password',
+        ])->assertRedirect(route('dashboard'));
+    }
+
+    public function test_excel_import_employee_gets_account_without_email_until_admin_adds_one(): void
     {
         /** @var EmployeeService $service */
         $service = app(EmployeeService::class);
@@ -133,9 +182,56 @@ class FeatureOneAccountFlowTest extends TestCase
 
         $user = User::where('employee_id', $employee->id)->firstOrFail();
 
-        $this->assertStringEndsWith('@perfection.com', $user->email);
+        $this->assertNull($user->email);
         $this->assertDatabaseHas('user_profiles', [
             'user_id' => $user->id,
         ]);
+    }
+
+    public function test_excel_import_keeps_existing_system_name_when_excel_name_changes(): void
+    {
+        /** @var EmployeeService $service */
+        $service = app(EmployeeService::class);
+
+        $employee = Employee::factory()->create([
+            'ac_no' => 'AC-EXCEL-2',
+            'name' => 'System Name',
+        ]);
+
+        $resolved = $service->findOrCreateFromExcel('AC-EXCEL-2', 'Excel Different Name');
+
+        $this->assertSame($employee->id, $resolved->id);
+        $this->assertSame('System Name', $resolved->fresh()->name);
+        $this->assertDatabaseCount('employees', 1);
+    }
+
+    public function test_first_real_email_added_to_imported_employee_sends_welcome_notification(): void
+    {
+        Notification::fake();
+
+        $admin = $this->makeAdmin();
+
+        /** @var EmployeeService $service */
+        $service = app(EmployeeService::class);
+        $employee = $service->findOrCreateFromExcel('AC-EXCEL-3', 'Imported Welcome User');
+
+        $account = User::where('employee_id', $employee->id)->firstOrFail();
+        $this->assertNull($account->email);
+
+        $this->actingAs($admin)
+            ->put(route('employees.update', $employee), [
+                'ac_no' => $employee->ac_no,
+                'name' => $employee->name,
+                'account_email' => 'imported.user@example.com',
+                'job_title' => 'developer',
+                'basic_salary' => 5000,
+                'is_remote_worker' => 0,
+            ])
+            ->assertRedirect(route('employees.show', $employee));
+
+        Notification::assertSentTo(
+            $account->fresh(),
+            WelcomeEmployeeNotification::class
+        );
     }
 }

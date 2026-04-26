@@ -47,7 +47,7 @@
                 <div class="flex flex-wrap items-center gap-2 text-xs">
                     <span class="badge-gray">{{ $employee->position_line }}</span>
                     <span class="text-slate-500">الحساب:</span>
-                    <span class="font-mono text-slate-700">{{ $employee->user->email }}</span>
+                    <span class="font-mono text-slate-700">{{ $employee->user->email ?: 'غير مسجل' }}</span>
                     <span class="{{ $employee->user->must_change_password ? 'badge-warning' : 'badge-success' }}">
                         {{ $employee->user->must_change_password ? 'بانتظار أول تغيير' : 'نشط' }}
                     </span>
@@ -89,6 +89,21 @@
                        value="{{ old('name', $employee->name) }}"
                        class="form-input @error('name') border-red-400 focus:ring-red-300 @enderror">
                 @error('name')
+                    <p class="form-error">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                        {{ $message }}
+                    </p>
+                @enderror
+            </div>
+
+            <div class="form-group">
+                <label for="account_email" class="form-label">بريد الدخول للموظف</label>
+                <input type="email" id="account_email" name="account_email"
+                       value="{{ old('account_email', $employee->user?->email) }}"
+                       placeholder="example@gmail.com"
+                       class="form-input @error('account_email') border-red-400 focus:ring-red-300 @enderror">
+                <p class="mt-1.5 text-xs text-slate-400">عند تغييره يصبح البريد الجديد هو المعتمد لتسجيل الدخول.</p>
+                @error('account_email')
                     <p class="form-error">
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                         {{ $message }}

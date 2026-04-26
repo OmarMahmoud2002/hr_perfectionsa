@@ -5,25 +5,36 @@ namespace App\Services\Employee;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\UserProfile;
-use Illuminate\Support\Str;
+use App\Services\Notifications\EmailNotificationService;
+use InvalidArgumentException;
 
 class EmployeeAccountService
 {
-    public function provisionForEmployee(Employee $employee): User
+    public function __construct(
+        private readonly EmailNotificationService $emailNotificationService,
+    ) {}
+
+    public function provisionForEmployee(Employee $employee, ?string $email = null, bool $allowEmptyEmail = true): User
     {
         $account = $employee->user;
-        $email = $this->generateUniqueEmail(
-            employeeName: $employee->name,
-            employeeAcNo: $employee->ac_no,
-            ignoreUserId: $account?->id,
-        );
+        $oldEmail = $account?->email;
+        $normalizedEmail = $this->normalizeEmail($email);
+
+        if (! $account && ! $allowEmptyEmail && $normalizedEmail === null) {
+            throw new InvalidArgumentException('An email is required when provisioning a new employee account.');
+        }
 
         $payload = [
             'name' => $employee->name,
-            'email' => $email,
             'role' => $this->resolveRole($employee),
             'employee_id' => $employee->id,
         ];
+
+        if ($normalizedEmail !== null) {
+            $payload['email'] = $normalizedEmail;
+        } elseif (! $account && $allowEmptyEmail) {
+            $payload['email'] = null;
+        }
 
         if (! $account) {
             $payload['password'] = (string) config('attendance.employee_accounts.initial_password', '123456789');
@@ -36,7 +47,20 @@ class EmployeeAccountService
 
         UserProfile::firstOrCreate(['user_id' => $account->id]);
 
+        $this->emailNotificationService->sendWelcomeOnFirstEmail($account, $oldEmail);
+
         return $account->fresh();
+    }
+
+    private function normalizeEmail(?string $email): ?string
+    {
+        if ($email === null) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($email));
+
+        return $normalized === '' ? null : $normalized;
     }
 
     private function resolveRole(Employee $employee): string
@@ -67,37 +91,5 @@ class EmployeeAccountService
         }
 
         return 'employee';
-    }
-
-    private function generateUniqueEmail(string $employeeName, string $employeeAcNo, ?int $ignoreUserId = null): string
-    {
-        $domain = trim((string) config('attendance.employee_accounts.email_domain', 'perfection.com'));
-        $baseSlug = Str::slug($employeeName);
-
-        if ($baseSlug === '') {
-            $baseSlug = 'employee-' . Str::slug($employeeAcNo);
-        }
-
-        if ($baseSlug === '' || $baseSlug === 'employee-') {
-            $baseSlug = 'employee-' . $employeeAcNo;
-        }
-
-        $baseSlug = preg_replace('/[^a-z0-9\-]/', '', Str::lower($baseSlug)) ?: 'employee-' . $employeeAcNo;
-
-        $attempt = 0;
-        do {
-            $suffix = $attempt === 0 ? '' : (string) ($attempt + 1);
-            $email = $baseSlug . $suffix . '@' . $domain;
-
-            $query = User::where('email', $email);
-            if ($ignoreUserId !== null) {
-                $query->where('id', '!=', $ignoreUserId);
-            }
-
-            $exists = $query->exists();
-            $attempt++;
-        } while ($exists);
-
-        return $email;
     }
 }

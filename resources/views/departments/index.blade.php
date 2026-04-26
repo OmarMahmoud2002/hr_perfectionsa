@@ -42,8 +42,9 @@
                         </td>
                         <td>
                             <div class="flex items-center justify-center gap-2">
-                                <button type="button" class="btn-ghost btn-sm" @click="showMembers = true">عرض</button>
-                                <a href="{{ route('departments.edit', $department) }}" class="btn-ghost btn-sm">تعديل</a>
+                                <button type="button" class="btn-ghost btn-sm" @click="showMembers = true" 
+style="background: #2e7d32;color: #fff;">عرض</button>
+                                <a href="{{ route('departments.edit', $department) }}" class="btn-ghost btn-sm" style="background-color: #007BFF;color: white;">تعديل</a>
                                 <form action="{{ route('departments.destroy', $department) }}" method="POST"
                                       data-confirm="هل تريد حذف القسم {{ $department->name }}؟"
                                       data-confirm-title="تأكيد الحذف"

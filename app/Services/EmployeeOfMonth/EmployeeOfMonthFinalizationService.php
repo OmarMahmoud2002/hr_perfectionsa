@@ -4,12 +4,14 @@ namespace App\Services\EmployeeOfMonth;
 
 use App\Models\EmployeeOfMonthPublication;
 use App\Models\EmployeeOfMonthResult;
+use App\Services\Notifications\EmailNotificationService;
 use Illuminate\Support\Facades\DB;
 
 class EmployeeOfMonthFinalizationService
 {
     public function __construct(
         private readonly EmployeeOfMonthScoringService $scoringService,
+        private readonly EmailNotificationService $emailNotificationService,
     ) {}
 
     public function finalizeMonth(int $month, int $year, ?int $publishedByUserId = null): array
@@ -54,6 +56,14 @@ class EmployeeOfMonthFinalizationService
                 ]
             );
         });
+
+        $winnerEmployeeId = null;
+        $winnerRow = $rows->first();
+        if (is_array($winnerRow) && isset($winnerRow['employee_id'])) {
+            $winnerEmployeeId = (int) $winnerRow['employee_id'];
+        }
+
+        $this->emailNotificationService->notifyEmployeeOfMonthPublished($month, $year, $winnerEmployeeId);
 
         return [
             'month' => $month,

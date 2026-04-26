@@ -3,15 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ImportStatus;
+use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\EmployeeOfMonthResult;
 use App\Models\ImportBatch;
 use App\Services\Attendance\AbsenceDetectionService;
+use App\Services\Notifications\EmailNotificationService;
 use App\Services\Attendance\PublicHolidayService;
 use App\Services\Payroll\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -21,6 +24,7 @@ class MyAccountController extends Controller
     public function __construct(
         private readonly AbsenceDetectionService $absenceService,
         private readonly PublicHolidayService $holidayService,
+        private readonly EmailNotificationService $emailNotificationService,
     ) {}
 
     public function show(Request $request): View
@@ -145,32 +149,46 @@ class MyAccountController extends Controller
         ]);
     }
 
-    public function updateProfile(Request $request): RedirectResponse
+    public function updateProfile(ProfileUpdateRequest $request): RedirectResponse
     {
-        $user = $request->user()->loadMissing('profile');
-
-        $validated = $request->validate([
-            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            'bio' => ['nullable', 'string', 'max:1500'],
-            'social_link_1' => ['nullable', 'url', 'max:500'],
-            'social_link_2' => ['nullable', 'url', 'max:500'],
-        ]);
+        $user = $request->user()->loadMissing('profile', 'employee');
+        $validated = $request->validated();
+        $oldEmail = $user->email;
 
         $profile = $user->profile()->firstOrCreate(['user_id' => $user->id]);
+        $avatarPath = $profile->avatar_path;
 
         if ($request->hasFile('avatar')) {
             if ($profile->avatar_path) {
                 Storage::disk('public')->delete($profile->avatar_path);
             }
 
-            $validated['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
+            $avatarPath = $request->file('avatar')->store('avatars', 'public');
         }
 
-        unset($validated['avatar']);
+        DB::transaction(function () use ($avatarPath, $profile, $user, $validated): void {
+            $user->forceFill([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+            ])->save();
 
-        $profile->update($validated);
+            if ($user->employee) {
+                $user->employee->update([
+                    'name' => $validated['name'],
+                ]);
+            }
 
-        return back()->with('success', 'تم تحديث بيانات الملف الشخصي بنجاح.');
+            $profile->update([
+                'avatar_path' => $avatarPath,
+                'bio' => $validated['bio'] ?? null,
+                'social_link_1' => $validated['social_link_1'] ?? null,
+                'social_link_2' => $validated['social_link_2'] ?? null,
+            ]);
+        });
+
+        $this->emailNotificationService->sendWelcomeOnAssignedEmail($user->fresh(), $oldEmail);
+
+        return back()->with('success', 'Profile updated successfully.');
     }
 
     public function avatar(string $path): BinaryFileResponse
@@ -200,7 +218,6 @@ class MyAccountController extends Controller
 
         $cleanPath = ltrim($path, '/');
 
-        // Restrict this endpoint to task attachments only.
         if (! str_starts_with($cleanPath, 'task-attachments/')) {
             abort(404);
         }

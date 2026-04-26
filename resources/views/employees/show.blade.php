@@ -70,7 +70,11 @@
                 @if($employee->user)
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-xs text-slate-500">البريد</span>
-                        <span class="text-xs font-semibold text-slate-700 break-all text-left">{{ $employee->user->email }}</span>
+                        @if($employee->user->email)
+                            <span class="text-xs font-semibold text-slate-700 break-all text-left">{{ $employee->user->email }}</span>
+                        @else
+                            <span class="badge-warning">غير مسجل</span>
+                        @endif
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs text-slate-500">Role</span>

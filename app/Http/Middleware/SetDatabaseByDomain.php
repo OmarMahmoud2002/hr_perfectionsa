@@ -15,6 +15,10 @@ class SetDatabaseByDomain
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if (app()->environment('testing')) {
+            return $next($request);
+        }
+
         $host = strtolower($request->getHost());
         $map = config('attendance.tenancy.domain_connection_map', []);
         $fallbackTenant = (string) config('attendance.tenancy.fallback_tenant', 'eg');

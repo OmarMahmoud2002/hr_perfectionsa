@@ -440,6 +440,30 @@
                 <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
             @endif
         </a>
+
+        <a href="{{ route('notifications.compose') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('notifications.compose*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 8h10M7 12h6m8-8L3 11l7 2 2 7L21 4z"/>
+            </svg>
+            <span>إرسال إشعار</span>
+            @if(request()->routeIs('notifications.compose*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
+
+        <a href="{{ route('notifications.sent.index') }}"
+           class="{{ $linkClass }} {{ request()->routeIs('notifications.sent.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9l-4-4H9zm0 0v4h4"/>
+            </svg>
+            <span>سجل الإشعارات</span>
+            @if(request()->routeIs('notifications.sent.*'))
+                <span class="mr-auto w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+            @endif
+        </a>
         @endif
 
     </nav>

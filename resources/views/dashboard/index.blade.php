@@ -540,7 +540,9 @@
                     </td>
                     <td class="text-slate-500">{{ $batch->created_at->format('Y-m-d') }}</td>
                     <td class="text-center">
-                        <a href="{{ route('attendance.report', ['month' => $batch->month, 'year' => $batch->year]) }}" class="btn-ghost btn-sm">
+                        <a href="{{ route('attendance.report', ['month' => $batch->month, 'year' => $batch->year]) }}" class="btn-ghost btn-sm" style="
+    background-color: #6cc0fb;
+">
                             عرض
                         </a>
                     </td>

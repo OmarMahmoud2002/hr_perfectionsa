@@ -53,8 +53,8 @@
                         </td>
                         <td>
                             <div class="flex items-center justify-center gap-2">
-                                <button type="button" class="btn-ghost btn-sm" @click="showMembers = true">عرض</button>
-                                <a href="{{ route('job-titles.edit', $jobTitle) }}" class="btn-ghost btn-sm">تعديل</a>
+                                <button type="button" class="btn-ghost btn-sm "style="background: #2e7d32;color: #fff;" @click="showMembers = true">عرض</button>
+                                <a href="{{ route('job-titles.edit', $jobTitle) }}" class="btn-ghost btn-sm" style="background-color: #007BFF;color: white;">تعديل</a>
                                 <form action="{{ route('job-titles.destroy', $jobTitle) }}" method="POST"
                                       data-confirm="{{ $jobTitle->employees_count > 0 ? 'هذه الوظيفة مرتبطة بـ '.$jobTitle->employees_count.' موظف. عند المتابعة سيتم فك الارتباط ثم الحذف. هل تريد المتابعة؟' : 'هل تريد حذف هذه الوظيفة؟' }}"
                                       data-confirm-title="تأكيد حذف الوظيفة"

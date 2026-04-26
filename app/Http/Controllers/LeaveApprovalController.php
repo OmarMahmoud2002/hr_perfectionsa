@@ -11,6 +11,7 @@ use App\Services\Leave\LeaveApprovalService;
 use App\Services\Leave\LeaveBalanceService;
 use App\Services\Leave\LeaveEligibilityService;
 use App\Services\Leave\LeaveRequestException;
+use App\Services\Notifications\EmailNotificationService;
 use App\Services\Setting\SettingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class LeaveApprovalController extends Controller
         private readonly LeaveEligibilityService $eligibilityService,
         private readonly LeaveBalanceService $balanceService,
         private readonly SettingService $settingService,
+        private readonly EmailNotificationService $emailNotificationService,
     ) {}
 
     private function ensureHrLikeAccess(Request $request): void
@@ -293,16 +295,20 @@ class LeaveApprovalController extends Controller
 
     public function decide(DecideLeaveRequestRequest $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        $decision = (string) $request->string('decision');
+
         try {
-            $this->approvalService->decide(
+            $updatedLeaveRequest = $this->approvalService->decide(
                 $leaveRequest,
                 $request->user(),
-                (string) $request->string('decision'),
+                $decision,
                 null,
                 $request->filled('note') ? (string) $request->string('note') : null,
                 now(),
                 null,
             );
+
+            $this->emailNotificationService->notifyLeaveDecision($updatedLeaveRequest, $request->user(), $decision);
         } catch (LeaveRequestException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }

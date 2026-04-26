@@ -75,6 +75,25 @@
                 @enderror
             </div>
 
+            {{-- بريد الدخول --}}
+            <div class="form-group">
+                <label for="account_email" class="form-label">
+                    بريد الدخول للموظف
+                    <span class="text-red-500">*</span>
+                </label>
+                <input type="email" id="account_email" name="account_email"
+                       value="{{ old('account_email') }}"
+                       placeholder="example@gmail.com"
+                       class="form-input @error('account_email') border-red-400 focus:ring-red-300 @enderror">
+                <p class="mt-1.5 text-xs text-slate-400">هذا البريد سيكون المعتمد لتسجيل دخول الموظف واستلام الإشعارات.</p>
+                @error('account_email')
+                    <p class="form-error">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                        {{ $message }}
+                    </p>
+                @enderror
+            </div>
+
             {{-- الوظيفة والقسم --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="form-group">
@@ -300,8 +319,8 @@
                 <div>
                     <p class="font-semibold mb-1">إنشاء الحساب يتم تلقائياً</p>
                     <p class="text-xs">
-                        سيتم إنشاء بريد الموظف تلقائياً بصيغة <span class="font-mono">name@perfection.com</span>
-                        مع كلمة مرور أولية <span class="font-mono">123456789</span> ويُطلب من الموظف تغييرها عند أول دخول.
+                        يتم استخدام البريد الذي أدخلته كحساب دخول للموظف.
+                        كلمة المرور الأولية <span class="font-mono">123456789</span> ويُطلب من الموظف تغييرها عند أول دخول.
                     </p>
                 </div>
             </div>

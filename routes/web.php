@@ -25,6 +25,8 @@ use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\RemoteAttendanceController;
 use App\Http\Controllers\EmployeeRemoteAttendancePageController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\InternalAnnouncementController;
 use App\Models\DailyPerformanceEntry;
 use App\Models\Department;
 use App\Models\Employee;
@@ -75,6 +77,10 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
         ->where('path', '.*')
         ->name('media.task-attachment.file');
 
+    Route::get('/media/announcement-image/{path}', [InternalAnnouncementController::class, 'image'])
+        ->where('path', '.*')
+        ->name('media.announcement.file');
+
     // Dashboard
     Route::middleware(['role:admin,manager,hr,department_manager,employee,office_girl'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -83,6 +89,26 @@ Route::middleware(['auth', 'force_password_change'])->group(function () {
     // My Account
     Route::get('/my-account', [MyAccountController::class, 'show'])->name('account.my');
     Route::put('/my-account', [MyAccountController::class, 'updateProfile'])->name('account.my.update');
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::middleware(['role:admin,manager,hr'])->group(function () {
+        Route::get('/notifications/sent', [InternalAnnouncementController::class, 'index'])
+            ->name('notifications.sent.index');
+        Route::get('/notifications/compose', [InternalAnnouncementController::class, 'create'])
+            ->name('notifications.compose');
+        Route::post('/notifications/compose', [InternalAnnouncementController::class, 'store'])
+            ->name('notifications.compose.store');
+    });
+    Route::get('/notifications/announcements/{announcement}', [InternalAnnouncementController::class, 'show'])
+        ->name('notifications.announcements.show');
+    Route::get('/notifications/{notificationId}/open', [NotificationController::class, 'open'])
+        ->name('notifications.open');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.read-all');
+    Route::post('/notifications/{notificationId}/read', [NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
 
     // Employee of Month - Voting endpoint (employee + admin/manager/hr)
     Route::middleware(['feature:employee_of_month', 'role:employee,admin,manager,hr,department_manager'])->group(function () {

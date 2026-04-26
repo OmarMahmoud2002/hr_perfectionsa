@@ -37,16 +37,22 @@ class EmployeeController extends Controller
             return $this->allCards($request);
         }
 
-        $filters = $request->only(['search']);
+        $perPage = $this->resolvePerPage($request, default: 20);
+        $filters = $request->only(['search', 'email_status']);
+        $filters['per_page'] = $perPage;
         $employees = $this->employeeService->getEmployees(
             $filters,
-            perPage: 15,
+            perPage: $perPage,
+            actor: $actor,
+        );
+        $directorySummary = $this->employeeService->getEmployeeDirectorySummary(
             actor: $actor,
         );
 
         return view('employees.index', [
             'employees' => $employees,
             'filters' => $filters,
+            'directorySummary' => $directorySummary,
         ]);
     }
 
@@ -60,6 +66,7 @@ class EmployeeController extends Controller
         );
 
         $search = trim((string) $request->query('search', ''));
+        $perPage = $this->resolvePerPage($request, default: 20, allowed: [12, 20, 32, 48]);
 
         $query = Employee::query()
             ->with(['user.profile', 'department:id,name', 'jobTitleRef:id,name_ar', 'leaveProfile:employee_id,employment_start_date'])
@@ -72,12 +79,20 @@ class EmployeeController extends Controller
             });
         }
 
-        $employees = $query->paginate(18)->withQueryString();
+        $employees = $query->paginate($perPage)->withQueryString();
 
         return view('employees.all-cards', [
             'employees' => $employees,
             'search' => $search,
+            'perPage' => $perPage,
         ]);
+    }
+
+    private function resolvePerPage(Request $request, int $default = 20, array $allowed = [10, 20, 50, 100]): int
+    {
+        $perPage = (int) $request->integer('per_page', $default);
+
+        return in_array($perPage, $allowed, true) ? $perPage : $default;
     }
 
     /**
@@ -123,11 +138,15 @@ class EmployeeController extends Controller
             );
         }
         $account = $employee->user;
+        $loginEmail = (string) ($account?->email ?? '');
+        $loginInfo = $loginEmail !== ''
+            ? "بيانات الدخول: {$loginEmail} | كلمة السر الأولية: 123456789"
+            : 'تم إنشاء الحساب بدون بريد حالياً. يجب إضافة بريد صحيح ليتمكن الموظف من تسجيل الدخول.';
 
         return redirect()
             ->route('employees.show', $employee)
             ->with('success', "تم إضافة الموظف «{$employee->name}» بنجاح.")
-            ->with('info', "بيانات الدخول: {$account->email} | كلمة السر الأولية: 123456789");
+            ->with('info', $loginInfo);
     }
 
     /**
@@ -229,11 +248,12 @@ class EmployeeController extends Controller
             );
         }
         $account = $employee->user;
+        $accountEmail = (string) ($account?->email ?? 'غير مسجل');
 
         return redirect()
             ->route('employees.show', $employee)
             ->with('success', "تم تحديث بيانات الموظف «{$employee->name}» بنجاح.")
-            ->with('info', "البريد المرتبط بالحساب: {$account->email}");
+            ->with('info', "البريد المرتبط بالحساب: {$accountEmail}");
     }
 
     /**
@@ -249,4 +269,3 @@ class EmployeeController extends Controller
             ->with('success', "تم حذف الموظف «{$name}» نهائياً بنجاح.");
     }
 }
-

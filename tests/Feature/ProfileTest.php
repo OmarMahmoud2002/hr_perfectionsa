@@ -46,13 +46,18 @@ class ProfileTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)->put(route('account.my.update'), [
+            'name' => 'Updated Employee Name',
             'bio' => 'Backend developer',
             'social_link_1' => 'https://linkedin.com/in/test-employee',
             'social_link_2' => 'https://github.com/test-employee',
-            'email' => 'should-not-change@perfection.com',
+            'email' => 'updated.employee@perfection.com',
         ]);
 
         $response->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->assertSame('Updated Employee Name', $user->fresh()->name);
+        $this->assertSame('updated.employee@perfection.com', $user->fresh()->email);
+        $this->assertSame('Updated Employee Name', $employee->fresh()->name);
 
         $this->assertDatabaseHas('user_profiles', [
             'user_id' => $user->id,
@@ -60,8 +65,6 @@ class ProfileTest extends TestCase
             'social_link_1' => 'https://linkedin.com/in/test-employee',
             'social_link_2' => 'https://github.com/test-employee',
         ]);
-
-        $this->assertSame('test.employee@perfection.com', $user->fresh()->email);
     }
 
     public function test_my_account_shows_employee_of_month_achievements_count_and_months(): void

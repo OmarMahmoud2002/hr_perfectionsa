@@ -38,13 +38,14 @@
                     @endif
                 </div>
                 <form method="GET" class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full xl:w-auto xl:min-w-[560px]">
-                    <select name="status" class="form-input !bg-white/95 !border-white/25 !h-9 !min-h-0 !py-1 !text-sm !w-full" onchange="this.form.submit()">
+                    <select name="status" class="form-input !bg-white/95 !border-white/25 !h-9 !min-h-0 !py-1 !text-sm !w-full" onchange="this.form.submit()" style="height: 2.75rem !important;padding-right: 30px;">
                         <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>كل الحالات</option>
                         <option value="pending" {{ $statusFilter === 'pending' ? 'selected' : '' }}>قيد المراجعة</option>
                         <option value="approved" {{ $statusFilter === 'approved' ? 'selected' : '' }}>معتمد</option>
                         <option value="rejected" {{ $statusFilter === 'rejected' ? 'selected' : '' }}>مرفوض</option>
                     </select>
-                    <select name="month" class="form-input !bg-white/95 !border-white/25 !h-9 !min-h-0 !py-1 !text-sm !w-full" onchange="this.form.submit()">
+                    <select name="month" class="form-input !bg-white/95 !border-white/25 !h-9 !min-h-0 !py-1 !text-sm !w-full" onchange="this.form.submit()" style="    height: 2.75rem !important;
+    padding-right: 30px;">
                         @foreach(range(1, 12) as $m)
                             <option value="{{ $m }}" {{ (int) $monthFilter === (int) $m ? 'selected' : '' }}>
                                 {{ \Carbon\Carbon::create((int) $yearFilter, $m, 1)->locale('ar')->isoFormat('MMMM') }}
