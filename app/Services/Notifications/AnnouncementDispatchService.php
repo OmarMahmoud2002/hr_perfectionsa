@@ -8,16 +8,20 @@ use App\Models\Employee;
 use App\Models\JobTitle;
 use App\Models\User;
 use App\Notifications\AnnouncementBroadcastNotification;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AnnouncementDispatchService
 {
+    public function __construct(
+        private readonly NotificationInfrastructureService $notificationInfrastructureService,
+    ) {}
+
     public function dispatch(User $sender, array $payload, ?UploadedFile $image = null): array
     {
         $this->ensureAnnouncementsTableExists();
@@ -51,12 +55,19 @@ class AnnouncementDispatchService
         $announcement->loadMissing('sender');
 
         $notification = new AnnouncementBroadcastNotification($announcement);
-        $recipients->each(fn (User $user) => $user->notify($notification));
+        $notificationFailures = 0;
+
+        $recipients->each(function (User $user) use ($notification, &$notificationFailures, $announcement): void {
+            if (! $this->safeNotify($user, $notification, $announcement)) {
+                $notificationFailures++;
+            }
+        });
 
         return [
             'announcement' => $announcement,
             'recipients' => $recipients,
             'email_recipients' => $recipients->filter(fn (User $user) => is_string($user->email) && trim($user->email) !== '')->values(),
+            'notification_failures' => $notificationFailures,
         ];
     }
 
@@ -140,22 +151,28 @@ class AnnouncementDispatchService
 
     public function ensureAnnouncementsTableExists(): void
     {
-        if (Schema::hasTable('announcements')) {
-            return;
+        $this->notificationInfrastructureService->ensureAnnouncementsTableExists();
+    }
+
+    private function safeNotify(User $user, AnnouncementBroadcastNotification $notification, Announcement $announcement): bool
+    {
+        if (! $this->notificationInfrastructureService->ensureNotificationTablesExist()) {
+            return false;
         }
 
-        Schema::create('announcements', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('sender_user_id')->constrained('users')->cascadeOnDelete();
-            $table->string('title', 120);
-            $table->text('message');
-            $table->string('link_url', 2048)->nullable();
-            $table->string('image_path')->nullable();
-            $table->string('audience_type', 32);
-            $table->json('audience_meta')->nullable();
-            $table->unsignedInteger('recipient_count')->default(0);
-            $table->timestamps();
-        });
+        try {
+            $user->notify($notification);
+
+            return true;
+        } catch (Throwable $exception) {
+            Log::warning('Announcement notification delivery skipped after the announcement was saved.', [
+                'announcement_id' => (int) $announcement->id,
+                'user_id' => (int) $user->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function optimizeStoredImage(?string $imagePath): void

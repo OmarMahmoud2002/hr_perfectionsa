@@ -16,7 +16,7 @@
         $navAvatarUrl = $navUser->profile?->avatar_path
             ? route('media.avatar', ['path' => $navUser->profile->avatar_path])
             : null;
-        $notificationsTableExists = \Illuminate\Support\Facades\Schema::hasTable('notifications');
+        $notificationsTableExists = app(\App\Services\Notifications\NotificationInfrastructureService::class)->notificationsTableExists();
         $navUnreadNotificationsCount = $notificationsTableExists
             ? $navUser->unreadNotifications()->count()
             : 0;

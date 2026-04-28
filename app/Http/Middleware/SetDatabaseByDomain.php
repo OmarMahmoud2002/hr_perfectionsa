@@ -2,11 +2,14 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Notifications\NotificationInfrastructureService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class SetDatabaseByDomain
 {
@@ -66,6 +69,16 @@ class SetDatabaseByDomain
         DB::purge('mysql_sa');
         DB::purge($connection);
         DB::reconnect($connection);
+
+        try {
+            app(NotificationInfrastructureService::class)->ensureCoreTablesExist();
+        } catch (Throwable $exception) {
+            Log::warning('Tenant support tables could not be prepared.', [
+                'tenant' => $tenant,
+                'connection' => $connection,
+                'message' => $exception->getMessage(),
+            ]);
+        }
 
         return $next($request);
     }

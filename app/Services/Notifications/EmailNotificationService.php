@@ -17,10 +17,16 @@ use App\Notifications\TaskCompletedNotification;
 use App\Notifications\TaskAssignedNotification;
 use App\Notifications\TaskEvaluationSubmittedNotification;
 use App\Notifications\WelcomeEmployeeNotification;
-use Illuminate\Support\Collection;
+use Illuminate\Notifications\Notification as LaravelNotification;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class EmailNotificationService
 {
+    public function __construct(
+        private readonly NotificationInfrastructureService $notificationInfrastructureService,
+    ) {}
+
     public function notifyLeaveRequestSubmitted(LeaveRequest $leaveRequest): void
     {
         $leaveRequest->loadMissing('employee.user', 'managerEmployee.user');
@@ -53,7 +59,10 @@ class EmailNotificationService
             ->filter(fn ($user) => $user instanceof User)
             ->unique('id')
             ->each(function (User $user) use ($leaveRequest): void {
-                $user->notify(new LeaveRequestSubmittedNotification($leaveRequest));
+                $this->safeNotify($user, new LeaveRequestSubmittedNotification($leaveRequest), [
+                    'event' => 'leave_request_submitted',
+                    'leave_request_id' => (int) $leaveRequest->id,
+                ]);
             });
     }
 
@@ -66,11 +75,14 @@ class EmailNotificationService
             return;
         }
 
-        $employeeUser->notify(new LeaveRequestDecisionNotification(
+        $this->safeNotify($employeeUser, new LeaveRequestDecisionNotification(
             $leaveRequest,
             $actor->name,
             $decision,
-        ));
+        ), [
+            'event' => 'leave_request_decision',
+            'leave_request_id' => (int) $leaveRequest->id,
+        ]);
     }
 
     /**
@@ -95,7 +107,10 @@ class EmailNotificationService
             ->whereIn('employee_id', $sanitized)
             ->get();
 
-        $users->each(fn (User $user) => $user->notify(new TaskAssignedNotification($task)));
+        $users->each(fn (User $user) => $this->safeNotify($user, new TaskAssignedNotification($task), [
+            'event' => 'task_assigned',
+            'task_id' => (int) $task->id,
+        ]));
     }
 
     public function notifyTaskCompleted(EmployeeMonthTaskAssignment $assignment, User $actor): void
@@ -111,7 +126,10 @@ class EmailNotificationService
         User::query()
             ->whereIn('role', ['user', 'admin', 'hr'])
             ->get()
-            ->each(fn (User $user) => $user->notify($notification));
+            ->each(fn (User $user) => $this->safeNotify($user, $notification, [
+                'event' => 'task_completed',
+                'task_id' => (int) $assignment->task_id,
+            ]));
     }
 
     public function notifyTaskEvaluated(EmployeeMonthTask $task, User $evaluator, float $score, ?string $note = null): void
@@ -139,7 +157,10 @@ class EmailNotificationService
             ->whereIn('employee_id', $employeeIds)
             ->whereIn('role', User::workforceRoles())
             ->get()
-            ->each(fn (User $user) => $user->notify($notification));
+            ->each(fn (User $user) => $this->safeNotify($user, $notification, [
+                'event' => 'task_evaluated',
+                'task_id' => (int) $task->id,
+            ]));
     }
 
     public function notifyDailyPerformanceReviewed(DailyPerformanceEntry $entry, User $reviewer, int $rating, ?string $comment = null): void
@@ -151,12 +172,15 @@ class EmailNotificationService
             return;
         }
 
-        $employeeUser->notify(new DailyPerformanceReviewedNotification(
+        $this->safeNotify($employeeUser, new DailyPerformanceReviewedNotification(
             $entry,
             (string) $reviewer->name,
             $rating,
             $comment,
-        ));
+        ), [
+            'event' => 'daily_performance_reviewed',
+            'entry_id' => (int) $entry->id,
+        ]);
     }
 
     public function notifyAttendanceMonthImported(int $month, int $year): void
@@ -166,7 +190,11 @@ class EmailNotificationService
         User::query()
             ->whereIn('role', User::workforceRoles())
             ->get()
-            ->each(fn (User $user) => $user->notify($notification));
+            ->each(fn (User $user) => $this->safeNotify($user, $notification, [
+                'event' => 'attendance_month_imported',
+                'month' => $month,
+                'year' => $year,
+            ]));
     }
 
     public function sendWelcomeOnFirstEmail(User $user, ?string $oldEmail): void
@@ -179,7 +207,9 @@ class EmailNotificationService
             return;
         }
 
-        $user->notify(new WelcomeEmployeeNotification());
+        $this->safeNotify($user, new WelcomeEmployeeNotification(), [
+            'event' => 'welcome_employee_first_email',
+        ]);
     }
 
     public function sendWelcomeOnAssignedEmail(User $user, ?string $oldEmail): void
@@ -195,7 +225,9 @@ class EmailNotificationService
             return;
         }
 
-        $user->notify(new WelcomeEmployeeNotification());
+        $this->safeNotify($user, new WelcomeEmployeeNotification(), [
+            'event' => 'welcome_employee_assigned_email',
+        ]);
     }
 
     public function notifyEmployeeOfMonthPublished(int $month, int $year, ?int $winnerEmployeeId = null): void
@@ -212,7 +244,11 @@ class EmailNotificationService
             ->get();
 
         $users->each(function (User $user) use ($month, $year, $winnerName): void {
-            $user->notify(new EmployeeOfMonthPublishedNotification($month, $year, $winnerName));
+            $this->safeNotify($user, new EmployeeOfMonthPublishedNotification($month, $year, $winnerName), [
+                'event' => 'employee_of_month_published',
+                'month' => $month,
+                'year' => $year,
+            ]);
         });
     }
 
@@ -224,5 +260,26 @@ class EmailNotificationService
     private function hasEmail(?string $email): bool
     {
         return is_string($email) && trim($email) !== '';
+    }
+
+    private function safeNotify(User $user, LaravelNotification $notification, array $context = []): bool
+    {
+        if (! $this->notificationInfrastructureService->ensureNotificationTablesExist()) {
+            return false;
+        }
+
+        try {
+            $user->notify($notification);
+
+            return true;
+        } catch (Throwable $exception) {
+            Log::warning('Notification delivery skipped after the main action succeeded.', array_merge($context, [
+                'user_id' => (int) $user->id,
+                'notification' => $notification::class,
+                'message' => $exception->getMessage(),
+            ]));
+
+            return false;
+        }
     }
 }
