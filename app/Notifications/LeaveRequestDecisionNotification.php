@@ -5,10 +5,11 @@ namespace App\Notifications;
 use App\Models\LeaveRequest;
 use App\Notifications\Concerns\ResolvesNotificationChannels;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class LeaveRequestDecisionNotification extends Notification
+class LeaveRequestDecisionNotification extends Notification implements ShouldQueueAfterCommit
 {
     use Queueable;
     use ResolvesNotificationChannels;

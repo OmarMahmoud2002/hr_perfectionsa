@@ -7,10 +7,11 @@ use App\Models\EmployeeMonthTask;
 use App\Models\User;
 use App\Notifications\Concerns\ResolvesNotificationChannels;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TaskCompletedNotification extends Notification
+class TaskCompletedNotification extends Notification implements ShouldQueueAfterCommit
 {
     use Queueable;
     use ResolvesNotificationChannels;

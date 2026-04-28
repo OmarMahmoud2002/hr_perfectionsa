@@ -5,11 +5,12 @@ namespace App\Notifications;
 use App\Models\Announcement;
 use App\Notifications\Concerns\ResolvesNotificationChannels;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
-class AnnouncementBroadcastNotification extends Notification
+class AnnouncementBroadcastNotification extends Notification implements ShouldQueueAfterCommit
 {
     use Queueable;
     use ResolvesNotificationChannels;

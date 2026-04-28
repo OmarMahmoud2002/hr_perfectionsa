@@ -5,10 +5,11 @@ namespace App\Notifications;
 use App\Notifications\Concerns\ResolvesNotificationChannels;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class AttendanceMonthImportedNotification extends Notification
+class AttendanceMonthImportedNotification extends Notification implements ShouldQueueAfterCommit
 {
     use Queueable;
     use ResolvesNotificationChannels;

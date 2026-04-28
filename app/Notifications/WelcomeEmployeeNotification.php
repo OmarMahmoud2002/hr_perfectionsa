@@ -4,10 +4,11 @@ namespace App\Notifications;
 
 use App\Notifications\Concerns\ResolvesNotificationChannels;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class WelcomeEmployeeNotification extends Notification
+class WelcomeEmployeeNotification extends Notification implements ShouldQueueAfterCommit
 {
     use Queueable;
     use ResolvesNotificationChannels;
