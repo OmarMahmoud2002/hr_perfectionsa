@@ -12,6 +12,12 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        if (config('queue.default') === 'database') {
+            $schedule->command('queue:work --queue=default --stop-when-empty --tries=3 --timeout=60')
+                ->everyMinute()
+                ->withoutOverlapping(5);
+        }
+
         $schedule->command('employee-of-month:auto-finalize --tenant=eg')
             ->monthlyOn(21, '23:45')
             ->withoutOverlapping();
