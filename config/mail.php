@@ -42,6 +42,7 @@ return [
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => env('MAIL_TIMEOUT', 10),
+            'verify_peer' => env('MAIL_VERIFY_PEER', true),
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],
 
